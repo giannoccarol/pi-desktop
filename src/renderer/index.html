@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'" />
+  <title>Pi Desktop</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="side-head">
+        <div class="brand-row">
+          <div class="brand">
+            <span class="logo">π</span>
+            <span class="brand-name">pi · desktop</span>
+          </div>
+          <button id="btn-new-chat" class="icon-btn borderless" data-i18n-title="btn.newChat.title" data-i18n-aria-label="btn.newChat.aria">
+            <i data-lucide="square-pen"></i>
+          </button>
+        </div>
+
+        <div class="global-search" role="search">
+          <i data-lucide="search" class="search-icon" aria-hidden="true"></i>
+          <input id="session-search" type="search" data-i18n-placeholder="search.placeholder" data-i18n-aria-label="search.aria" spellcheck="false" />
+          <span class="search-shortcut">⌘K</span>
+          <button id="search-clear" class="search-clear hidden" type="button" data-i18n-aria-label="search.clear.aria"><i data-lucide="x"></i></button>
+        </div>
+
+        <div class="projects-head">
+          <div class="side-section-title"><span data-i18n="projects.title">Progetti</span></div>
+          <button id="btn-add-project" class="icon-btn borderless tiny" data-i18n-title="btn.addProject.title" data-i18n-aria-label="btn.addProject.aria">
+            <i data-lucide="plus"></i>
+          </button>
+        </div>
+      </div>
+      <nav id="projects-list" data-i18n-aria-label="sidebar.projects.aria" aria-label="Progetti e conversazioni"></nav>
+      <div id="sidebar-resizer" aria-hidden="true" data-i18n-title="sidebar.resizer.title" title="Trascina per ridimensionare"></div>
+
+      <div class="side-foot">
+        <div class="profile">
+          <span class="avatar">L</span>
+          <span>Lorenzo</span>
+        </div>
+        <span id="sessions-count" class="muted small"></span>
+        <button id="btn-settings" class="icon-btn borderless tiny" data-i18n-title="sideFoot.settings.title" data-i18n-aria-label="sideFoot.settings.title">
+          <i data-lucide="settings"></i>
+        </button>
+      </div>
+    </aside>
+
+    <main id="main">
+      <header id="topbar">
+        <button id="btn-toggle-sidebar" class="icon-btn" data-i18n-title="btn.toggleSidebar.title" data-i18n-aria-label="btn.toggleSidebar.aria">
+          <i data-lucide="panel-left"></i>
+        </button>
+        <div id="chat-tabs" class="chat-tabs" role="tablist" aria-label="Chat aperte"></div>
+        <span class="flex-spacer"></span>
+        <button id="btn-commands" class="icon-btn" data-i18n-title="btn.commands.title" data-i18n-aria-label="btn.commands.aria">
+          <i data-lucide="command"></i>
+        </button>
+        <button id="btn-tree" class="icon-btn" data-i18n-title="btn.tree.title" data-i18n-aria-label="btn.tree.aria">
+          <i data-lucide="git-fork"></i>
+        </button>
+        <button id="btn-session-tools" class="icon-btn" data-i18n-title="btn.sessionTools.title" data-i18n-aria-label="btn.sessionTools.aria">
+          <i data-lucide="sliders-horizontal"></i>
+        </button>
+        <button id="top-new-chat" class="icon-btn" data-i18n-title="btn.topNewChat.title" data-i18n-aria-label="btn.topNewChat.title">
+          <i data-lucide="square-pen"></i>
+        </button>
+        <button id="btn-packages" class="icon-btn" data-i18n-title="btn.packages.title" data-i18n-aria-label="btn.packages.aria">
+          <i data-lucide="blocks"></i>
+        </button>
+        <button id="btn-theme" class="icon-btn" data-i18n-title="btn.theme.title" data-i18n-aria-label="btn.theme.aria">
+          <i data-lucide="sun"></i>
+        </button>
+      </header>
+
+      <div id="extension-statuses" class="extension-statuses hidden" aria-live="polite"></div>
+
+      <section id="chat" aria-live="polite">
+        <div id="messages"></div>
+        <div id="empty-state" class="hidden">
+          <div class="hero">
+            <div class="hero-logo">π</div>
+            <h1 data-i18n="hero.greeting">Ciao Lorenzo,</h1>
+            <p data-i18n="hero.subtitle">come posso aiutarti oggi?</p>
+            <div id="empty-hint" class="hint hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <div id="extension-widgets-above" class="extension-widgets hidden"></div>
+      <div id="queued-note" class="hidden"></div>
+      <div id="composer-wrap">
+        <div id="composer">
+          <textarea id="input" rows="2" data-i18n-placeholder="composer.placeholder" spellcheck="false"></textarea>
+          <div id="slash-suggestions" class="slash-suggestions hidden" role="listbox" data-i18n-aria-label="composer.slash.aria"></div>
+          <div id="attachment-tray" class="attachment-tray hidden" data-i18n-aria-label="composer.attachments.aria"></div>
+          <div class="composer-actions">
+            <div class="composer-tools">
+              <button id="btn-attach" class="composer-tool" data-i18n-title="btn.attach.title" data-i18n-aria-label="btn.attach.aria"><i data-lucide="paperclip"></i></button>
+              <button id="btn-attach-image" class="composer-tool" data-i18n-title="btn.attachImage.title" data-i18n-aria-label="btn.attachImage.aria"><i data-lucide="image"></i></button>
+            </div>
+            <div id="busy-send-choice" class="busy-send-choice hidden" aria-label="Modalità messaggio in coda">
+              <button type="button" class="active" data-queue-behavior="followUp" title="Invia solo quando Pi ha terminato">Dopo</button>
+              <button type="button" data-queue-behavior="steer" title="Forza l’istruzione dopo lo step corrente">Forza</button>
+            </div>
+            <div class="send-group">
+              <button id="btn-send" class="send-btn" data-i18n-title="btn.send.title" data-i18n-aria-label="btn.send.aria">
+                <i data-lucide="send-horizontal"></i>
+              </button>
+              <button id="btn-stop" class="send-btn stop hidden" data-i18n-title="btn.stop.title" data-i18n-aria-label="btn.stop.aria">
+                <i data-lucide="square"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="extension-widgets-below" class="extension-widgets hidden"></div>
+
+      <div id="model-dock">
+        <div class="dropdown dock-section" id="provider-dropdown">
+          <button id="provider-btn" class="dock-button" data-i18n-title="provider.change.title">
+            <span class="dock-icon provider-mark">AI</span>
+            <span class="dock-copy"><small data-i18n="provider.label">Provider</small><strong id="provider-label">—</strong></span>
+            <i class="dock-caret" data-lucide="chevron-down"></i>
+          </button>
+          <div id="provider-menu" class="menu dock-menu hidden">
+            <div id="provider-list" class="menu-scroll"></div>
+          </div>
+        </div>
+
+        <div class="dropdown dock-section model-section" id="model-dropdown">
+          <button id="model-btn" class="dock-button" data-i18n-title="model.change.title">
+            <span class="dock-copy"><small data-i18n="model.label">Modello</small><strong id="model-label">modello…</strong></span>
+            <i class="dock-caret" data-lucide="chevron-down"></i>
+          </button>
+          <div id="model-menu" class="menu dock-menu hidden">
+            <div class="menu-search">
+              <i data-lucide="search"></i>
+              <input id="model-search" type="search" data-i18n-placeholder="model.placeholder" spellcheck="false" />
+            </div>
+            <div id="model-list" class="menu-scroll"></div>
+          </div>
+        </div>
+
+        <div class="dropdown dock-section" id="thinking-dropdown">
+          <button id="thinking-btn" class="dock-button" data-i18n-title="thinking.title">
+            <i class="dock-main-icon" data-lucide="gauge"></i>
+            <span class="dock-copy"><small data-i18n="thinking.label">Ragionamento</small><strong id="thinking-label">—</strong></span>
+            <i class="dock-caret" data-lucide="chevron-down"></i>
+          </button>
+          <div id="thinking-menu" class="menu compact-menu hidden">
+            <div id="thinking-list" class="menu-scroll"></div>
+          </div>
+        </div>
+
+        <button id="pi-chip" class="pi-status-button" data-i18n-title="piChip.title">
+          <span class="status-light"></span>
+          <span id="pi-chip-text">pi: …</span>
+          <i data-lucide="chevron-right"></i>
+        </button>
+      </div>
+
+      <footer id="statusbar">
+        <span id="status-cwd" class="muted small mono ellipsis" data-i18n-title="status.cwd.title"></span>
+        <span class="flex-spacer"></span>
+        <span id="status-activity" class="small"></span>
+        <span id="status-tokens" class="muted small mono"></span>
+      </footer>
+    </main>
+  </div>
+
+  <dialog id="modal-pi">
+    <div class="modal-body">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="refresh-cw"></i></span>
+        <div><h2 data-i18n="modal.pi.title">Agente Pi</h2><p class="muted small" data-i18n="modal.pi.subtitle">Installazione esterna e aggiornabile indipendentemente da Pi Desktop.</p></div>
+      </div>
+      <div id="pi-status-box" class="status-box"><span class="muted" data-i18n="modal.pi.checking">Verifica in corso…</span></div>
+      <pre id="maintenance-log" class="log hidden"></pre>
+      <div class="row gap">
+        <button id="btn-pi-install" class="btn primary hidden"><i data-lucide="download"></i> <span data-i18n="btn.installNow">Installa ora</span></button>
+        <button id="btn-pi-update" class="btn primary hidden"><i data-lucide="refresh-cw"></i> <span data-i18n="btn.updatePi">Aggiorna pi</span></button>
+        <button id="btn-pi-recheck" class="btn ghost"><i data-lucide="rotate-cw"></i> <span data-i18n="btn.recheck">Ricontrolla</span></button>
+        <span class="flex-spacer"></span>
+        <button id="btn-pi-close" class="btn ghost" data-i18n="btn.close">Chiudi</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="modal-settings">
+    <div class="modal-body">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="settings"></i></span>
+        <div><h2 data-i18n="modal.settings.title">Impostazioni</h2><p class="muted small" data-i18n="modal.settings.subtitle">Configura runtime e archiviazione di pi.</p></div>
+      </div>
+      <div class="settings-tabs" role="tablist">
+        <button class="settings-tab active" data-settings-tab="general" role="tab" data-i18n="settings.tab.general">Generali</button>
+        <button class="settings-tab" data-settings-tab="runtime" role="tab" data-i18n="settings.tab.runtime">Runtime Pi</button>
+        <button class="settings-tab" data-settings-tab="providers" role="tab" data-i18n="settings.tab.providers">Provider</button>
+      </div>
+
+      <div id="settings-general" class="settings-panel">
+        <label class="field">
+          <span data-i18n="settings.general.cwd.label">Directory di lavoro predefinita dell’agente</span>
+          <div class="row gap">
+            <code id="setting-cwd" class="grow mono ellipsis"></code>
+            <button id="btn-pick-cwd" class="btn ghost small" data-i18n="btn.choose">Scegli…</button>
+          </div>
+        </label>
+        <label class="field">
+          <span data-i18n="settings.general.piPath.label">Percorso binario pi (opzionale, altrimenti cercato nel PATH)</span>
+          <input id="setting-pipath" type="text" data-i18n-placeholder="settings.general.piPath.placeholder" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span data-i18n="settings.general.sessionsDir.label">Cartella sessioni (opzionale, default <code>~/.pi/agent/sessions</code>)</span>
+          <input id="setting-sessionsdir" type="text" data-i18n-placeholder="settings.general.sessionsDir.placeholder" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span data-i18n="settings.language.label">Lingua / Language</span>
+          <select id="setting-language">
+            <option value="it" data-i18n="settings.language.it">Italiano</option>
+            <option value="en" data-i18n="settings.language.en">English</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="settings-runtime" class="settings-panel runtime-settings hidden">
+        <div class="tool-setting-grid">
+          <label class="field"><span data-i18n="settings.runtime.projectTrust.label">Trust del progetto corrente</span><select id="setting-project-trust"><option value="inherit" data-i18n="settings.runtime.projectTrust.inherit">Eredita / predefinito</option><option value="true" data-i18n="settings.runtime.projectTrust.true">Considera attendibile</option><option value="false" data-i18n="settings.runtime.projectTrust.false">Non attendibile</option></select></label>
+          <label class="field"><span data-i18n="settings.runtime.defaultTrust.label">Trust predefinito per nuovi progetti</span><select id="setting-default-trust"><option value="ask" data-i18n="settings.runtime.defaultTrust.ask">Chiedi / ignora in RPC</option><option value="always" data-i18n="settings.runtime.defaultTrust.always">Considera attendibili</option><option value="never" data-i18n="settings.runtime.defaultTrust.never">Non considerare attendibili</option></select></label>
+          <label class="field"><span data-i18n="settings.runtime.transport.label">Trasporto provider</span><select id="setting-transport"><option value="auto" data-i18n="settings.runtime.transport.auto">Automatico</option><option value="sse">SSE</option><option value="websocket">WebSocket</option><option value="websocket-cached">WebSocket cached</option></select></label>
+          <label class="field"><span data-i18n="settings.runtime.enabledModels.label">Modelli inclusi nel cycling, separati da virgola</span><input id="setting-enabled-models" type="text" data-i18n-placeholder="settings.runtime.enabledModels.placeholder" /></label>
+        </div>
+        <fieldset class="native-tools"><legend data-i18n="settings.runtime.nativeTools.legend">Tool abilitati di default</legend><label><input type="checkbox" value="read" /> read</label><label><input type="checkbox" value="bash" /> bash</label><label><input type="checkbox" value="powershell" /> powershell</label><label><input type="checkbox" value="edit" /> edit</label><label><input type="checkbox" value="write" /> write</label><label><input type="checkbox" value="grep" /> grep</label><label><input type="checkbox" value="find" /> find</label><label><input type="checkbox" value="ls" /> ls</label></fieldset>
+        <div class="tool-setting-grid">
+          <label class="field"><span data-i18n="settings.runtime.shellPath.label">Shell personalizzata</span><input id="setting-shell-path" type="text" placeholder="/bin/bash" /></label>
+          <label class="field"><span data-i18n="settings.runtime.shellPrefix.label">Prefisso comandi shell</span><input id="setting-shell-prefix" type="text" data-i18n-placeholder="settings.runtime.shellPrefix.placeholder" /></label>
+          <label class="field"><span data-i18n="settings.runtime.compactReserve.label">Token riservati alla risposta</span><input id="setting-compact-reserve" type="number" min="1024" /></label>
+          <label class="field"><span data-i18n="settings.runtime.compactKeep.label">Token recenti da conservare</span><input id="setting-compact-keep" type="number" min="0" /></label>
+          <label class="field"><span data-i18n="settings.runtime.retryMax.label">Numero massimo retry</span><input id="setting-retry-max" type="number" min="0" max="20" /></label>
+          <label class="field"><span data-i18n="settings.runtime.retryDelay.label">Ritardo retry iniziale (ms)</span><input id="setting-retry-delay" type="number" min="100" /></label>
+        </div>
+        <div class="toggle-row"><label><input id="setting-compact-enabled" type="checkbox" /> <span data-i18n="settings.runtime.compactEnabled">Compattazione automatica</span></label><label><input id="setting-retry-enabled" type="checkbox" /> <span data-i18n="settings.runtime.retryEnabled">Retry automatico</span></label></div>
+        <div class="toggle-row"><label><input id="setting-image-resize" type="checkbox" /> <span data-i18n="settings.runtime.imageResize">Ridimensiona immagini automaticamente</span></label><label><input id="setting-block-images" type="checkbox" /> <span data-i18n="settings.runtime.blockImages">Blocca immagini verso il modello</span></label></div>
+        <div id="project-trust-note" class="muted small"></div>
+        <div class="row end"><button id="btn-pi-settings-save" class="btn primary" data-i18n="btn.savePiSettings">Salva impostazioni Pi e riavvia runtime</button></div>
+      </div>
+
+      <div id="settings-providers" class="settings-panel hidden">
+        <div class="provider-settings-head">
+          <div>
+            <strong data-i18n="settings.providers.title">Provider AI</strong>
+            <p class="muted small" data-i18n="settings.providers.subtitle">Le credenziali sono condivise con l’installazione esterna di pi.</p>
+          </div>
+          <div class="provider-search">
+            <i data-lucide="search"></i>
+            <input id="provider-settings-search" type="search" data-i18n-placeholder="settings.providers.search.placeholder" spellcheck="false" />
+          </div>
+        </div>
+        <div id="provider-settings-list" class="provider-settings-list"></div>
+        <p class="provider-note muted small" data-i18n="settings.providers.note">
+          OAuth e API key vengono configurati tramite il runtime dell’installazione esterna e salvati nel suo
+          <code>~/.pi/agent/auth.json</code>. Provider aggiunti da estensioni restano disponibili automaticamente.
+        </p>
+      </div>
+      <div class="row gap end">
+        <button id="btn-settings-save" class="btn primary" data-i18n="btn.save">Salva</button>
+        <button id="btn-settings-close" class="btn ghost" data-i18n="btn.close">Chiudi</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="modal-packages" class="wide-dialog">
+    <div class="modal-body package-modal-body">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="blocks"></i></span>
+        <div class="grow"><h2 data-i18n="modal.packages.title">Store plugin</h2><p class="muted small" data-i18n="modal.packages.subtitle">Estensioni, skill e strumenti installati direttamente nella tua copia di pi.</p></div>
+        <button id="btn-packages-close" class="icon-btn borderless" data-i18n-title="btn.close" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="package-toolbar">
+        <div class="package-search grow">
+          <i data-lucide="search"></i>
+          <input id="package-search" type="search" data-i18n-placeholder="packages.search.placeholder" spellcheck="false" />
+        </div>
+        <label class="package-select" title="Filtra per tipo">
+          <span class="sr-only">Tipo</span>
+          <select id="package-type">
+            <option value="" data-i18n="packages.type.all">Tutti i tipi</option>
+            <option value="extension" data-i18n="packages.type.extension">Estensioni</option>
+            <option value="skill" data-i18n="packages.type.skill">Skill</option>
+            <option value="prompt" data-i18n="packages.type.prompt">Prompt</option>
+            <option value="theme" data-i18n="packages.type.theme">Temi</option>
+          </select>
+        </label>
+        <label class="package-select" title="Ordina catalogo">
+          <span class="sr-only">Ordina</span>
+          <select id="package-sort">
+            <option value="downloads" data-i18n="packages.sort.downloads">Più scaricati</option>
+            <option value="recent" data-i18n="packages.sort.recent">Più recenti</option>
+            <option value="name" data-i18n="packages.sort.name">Nome A–Z</option>
+          </select>
+        </label>
+        <button id="btn-packages-refresh" class="btn ghost"><i data-lucide="rotate-cw"></i> <span data-i18n="btn.refresh">Aggiorna</span></button>
+      </div>
+      <div class="package-security-note">
+        <i data-lucide="shield-alert"></i>
+        <span data-i18n="packages.security">I plugin possono eseguire codice con i tuoi permessi. Installa solo pacchetti di cui riconosci autore e sorgente.</span>
+      </div>
+      <div class="package-source-row">
+        <input id="package-source" class="grow" type="text" data-i18n-placeholder="packages.source.placeholder" spellcheck="false" />
+        <select id="package-scope" data-i18n-title="packages.scope.user">
+          <option value="user" data-i18n="packages.scope.user">Utente</option>
+          <option value="project" data-i18n="packages.scope.project">Progetto</option>
+        </select>
+        <button id="btn-package-source-install" class="btn primary" type="button"><i data-lucide="plus"></i> <span data-i18n="btn.installSource">Installa sorgente</span></button>
+        <button id="btn-packages-update" class="btn ghost" type="button"><i data-lucide="refresh-cw"></i> <span data-i18n="btn.updatePackages">Aggiorna pacchetti</span></button>
+        <button id="btn-models-update" class="btn ghost" type="button" data-i18n="btn.updateModels">Aggiorna modelli</button>
+      </div>
+      <details class="package-native-section">
+        <summary><span data-i18n="packages.installed">Pacchetti installati</span> <span id="package-installed-count" class="muted small"></span></summary>
+        <div id="package-installed-list" class="package-native-list"></div>
+      </details>
+      <details class="package-native-section">
+        <summary><span data-i18n="packages.resources">Risorse caricate (pi config)</span> <span id="package-resource-count" class="muted small"></span></summary>
+        <div id="package-resource-list" class="package-resource-list"></div>
+      </details>
+      <div id="package-list" class="package-list"><div class="menu-empty" data-i18n="packages.catalog.loading">Caricamento catalogo…</div></div>
+      <div class="package-pagination">
+        <button id="package-prev" class="btn ghost" type="button" data-i18n="btn.prev">← Precedente</button>
+        <span id="package-page-info" class="muted small">Pagina 1</span>
+        <button id="package-next" class="btn ghost" type="button" data-i18n="btn.next">Successiva →</button>
+      </div>
+      <pre id="package-log" class="log hidden"></pre>
+      <div class="row gap end">
+        <a id="package-catalog-link" class="btn ghost" href="https://pi.dev/packages" data-i18n="btn.officialCatalog">Catalogo ufficiale</a>
+        <button id="btn-packages-done" class="btn primary" data-i18n="btn.done">Fine</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="modal-ui">
+    <div class="modal-body">
+      <h3 id="ui-title" data-i18n="modal.ui.title">pi chiede un input</h3>
+      <p id="ui-message" class="muted"></p>
+      <div id="ui-options" class="col gap"></div>
+      <label id="ui-input-wrap" class="field hidden"><input id="ui-input" type="text" spellcheck="false" /></label>
+      <textarea id="ui-editor" class="hidden" rows="10" spellcheck="false"></textarea>
+      <div class="row gap end">
+        <button id="ui-cancel" class="btn ghost" data-i18n="btn.cancel">Annulla</button>
+        <button id="ui-ok" class="btn primary hidden" data-i18n="btn.ok">OK</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="modal-commands" class="wide-dialog">
+    <div class="modal-body palette-body">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="command"></i></span>
+        <div class="grow"><h2 data-i18n="modal.commands.title">Comandi Pi</h2><p class="muted small" data-i18n="modal.commands.subtitle">Estensioni, skill e prompt template caricati dal runtime corrente.</p></div>
+        <button id="btn-commands-close" class="icon-btn borderless" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="palette-search">
+        <i data-lucide="search"></i>
+        <input id="command-search" type="search" data-i18n-placeholder="commands.search.placeholder" spellcheck="false" />
+      </div>
+      <div id="command-list" class="command-list"><div class="menu-empty" data-i18n="commands.loading">Caricamento…</div></div>
+    </div>
+  </dialog>
+
+  <dialog id="modal-tree" class="wide-dialog">
+    <div class="modal-body tree-modal-body">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="git-fork"></i></span>
+        <div class="grow"><h2 data-i18n="modal.tree.title">Albero sessione</h2><p class="muted small" data-i18n="modal.tree.subtitle">Cronologia completa, inclusi rami abbandonati. Puoi creare un fork da un messaggio utente.</p></div>
+        <button id="btn-tree-close" class="icon-btn borderless" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="tree-toolbar">
+        <span id="tree-summary" class="muted small grow"></span>
+        <button id="btn-tree-refresh" class="btn ghost small"><i data-lucide="rotate-cw"></i> <span data-i18n="btn.update">Aggiorna</span></button>
+        <button id="btn-child-session" class="btn ghost small"><i data-lucide="git-branch-plus"></i> <span data-i18n="btn.newChild">Nuova figlia</span></button>
+        <button id="btn-clone-session" class="btn ghost small"><i data-lucide="copy-plus"></i> <span data-i18n="btn.cloneBranch">Clona ramo attivo</span></button>
+      </div>
+      <div id="tree-list" class="tree-list"><div class="menu-empty" data-i18n="tree.loading">Caricamento…</div></div>
+    </div>
+  </dialog>
+
+  <dialog id="modal-session-tools">
+    <div class="modal-body session-tools-body">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="sliders-horizontal"></i></span>
+        <div class="grow"><h2 data-i18n="modal.sessionTools.title">Strumenti sessione</h2><p class="muted small" data-i18n="modal.sessionTools.subtitle">Azioni native sul runtime Pi corrente.</p></div>
+        <button id="btn-session-tools-close" class="icon-btn borderless" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
+      </div>
+      <label class="field"><span data-i18n="session.name.label">Nome sessione</span><div class="row gap"><input id="session-name-input" class="grow" type="text" maxlength="200" data-i18n-placeholder="session.name.placeholder" /><button id="btn-session-rename" class="btn primary" data-i18n="btn.saveName">Salva nome</button></div></label>
+      <div class="tool-setting-grid">
+        <label class="field"><span data-i18n="session.steering.label">Consegna messaggi steer</span><select id="steering-mode"><option value="one-at-a-time" data-i18n="session.delivery.one">Uno alla volta</option><option value="all" data-i18n="session.delivery.all">Tutti insieme</option></select></label>
+        <label class="field"><span data-i18n="session.followUp.label">Consegna follow-up</span><select id="follow-up-mode"><option value="one-at-a-time" data-i18n="session.delivery.one">Uno alla volta</option><option value="all" data-i18n="session.delivery.all">Tutti insieme</option></select></label>
+      </div>
+      <div class="toggle-row"><label><input id="auto-compaction" type="checkbox" /> <span data-i18n="settings.runtime.compactEnabled">Compattazione automatica</span></label><label><input id="auto-retry" type="checkbox" /> <span data-i18n="settings.runtime.retryEnabled">Retry automatico</span></label></div>
+      <label class="field"><span data-i18n="session.compact.instructions.label">Istruzioni opzionali per la compattazione</span><textarea id="compact-instructions" rows="3" data-i18n-placeholder="session.compact.instructions.placeholder"></textarea></label>
+      <div class="session-action-grid">
+        <button id="btn-compact" class="btn ghost"><i data-lucide="archive"></i> <span data-i18n="btn.compactNow">Compatta ora</span></button>
+        <button id="btn-copy-last" class="btn ghost"><i data-lucide="copy"></i> <span data-i18n="btn.copyLast">Copia ultima risposta</span></button>
+        <button id="btn-export-html" class="btn ghost"><i data-lucide="file-down"></i> <span data-i18n="btn.exportHtml">Esporta HTML</span></button>
+        <button id="btn-abort-retry" class="btn ghost"><i data-lucide="ban"></i> <span data-i18n="btn.abortRetry">Ferma retry</span></button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="modal-auth">
+    <div class="modal-body auth-modal-body">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="key-round"></i></span>
+        <div class="grow"><h2 id="auth-title" data-i18n="modal.auth.title">Accesso provider</h2><p id="auth-subtitle" class="muted small" data-i18n="modal.auth.subtitle">Configurazione gestita dal runtime Pi installato.</p></div>
+      </div>
+      <div id="auth-status" class="status-box"><span class="muted" data-i18n="auth.preparing">Preparazione…</span></div>
+      <div id="auth-options" class="col gap hidden"></div>
+      <label id="auth-input-wrap" class="field hidden"><span id="auth-input-label"></span><input id="auth-input" type="text" autocomplete="off" /></label>
+      <div class="row gap end"><button id="btn-auth-cancel" class="btn ghost" data-i18n="btn.cancel">Annulla</button><button id="btn-auth-ok" class="btn primary hidden" data-i18n="btn.continue">Continua</button></div>
+    </div>
+  </dialog>
+
+  <div id="chat-tooltip" class="chat-tooltip hidden" role="tooltip" aria-hidden="true">
+    <div class="chat-tooltip-arrow" aria-hidden="true"></div>
+    <div class="chat-tooltip-title"></div>
+    <div class="chat-tooltip-meta">
+      <span class="chat-tooltip-pref"><i data-lucide="cpu"></i><span class="ct-pref-text"></span></span>
+      <span class="chat-tooltip-dot" aria-hidden="true">·</span>
+      <span class="chat-tooltip-time"></span>
+    </div>
+    <div class="chat-tooltip-path"></div>
+  </div>
+  <div id="toasts"></div>
+
+  <script src="../../node_modules/lucide/dist/umd/lucide.min.js"></script>
+  <script src="markdown.js"></script>
+  <script src="chat-utils.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
