@@ -76,25 +76,9 @@ const state = (typeof window !== "undefined" && window.piStore) ? window.piStore
 // Utilities
 // ---------------------------------------------------------------------------
 
-function toast(message, kind = "info", ms = 4200) {
-  const t = document.createElement("div");
-  t.className = `toast ${kind}`;
-  t.textContent = message;
-  el.toasts.appendChild(t);
-  setTimeout(() => t.remove(), ms);
-}
-
-function refreshIcons() {
-  try {
-    if (window.lucide) window.lucide.createIcons({ icons: window.lucide.icons });
-  } catch (err) {
-    console.warn(t("icon.lucide.warn"), err);
-  }
-}
-
-function icon(name) {
-  return `<i data-lucide="${name}"></i>`;
-}
+function toast(m,k,ms){ return window.piUi.toast(m,k,ms); }
+function refreshIcons(){ return window.piUi.refreshIcons(); }
+function icon(n){ return window.piUi.icon(n); }
 
 function relTime(ms) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.relTime) return window.piUtils.relTime(ms, Date.now(), (k, v) => t(k, v)); 
   const d = Date.now() - ms;
@@ -125,86 +109,14 @@ function basename(p) { if(typeof window!=="undefined" && window.piUtils && windo
   return p.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
  }
 
-function scrollBottom(force = false) {
-  const near = el.chat.scrollHeight - el.chat.scrollTop - el.chat.clientHeight < 160;
-  if (near || force) el.chat.scrollTop = el.chat.scrollHeight;
-  if (near || force) queueMicrotask(updateScrollBottomVisibility);
-}
-
-function jumpToBottom() {
-  const previous = el.chat.style.scrollBehavior;
-  el.chat.style.scrollBehavior = "auto";
-  el.chat.scrollTop = el.chat.scrollHeight;
-  requestAnimationFrame(() => { el.chat.style.scrollBehavior = previous; });
-  queueMicrotask(updateScrollBottomVisibility);
-}
-
-function isNearBottom(threshold = 140) {
-  if (!el.chat) return true;
-  return el.chat.scrollHeight - el.chat.scrollTop - el.chat.clientHeight < threshold;
-}
-
-function updateScrollBottomVisibility() {
-  const btn = el.btnScrollBottom;
-  if (!btn || !el.chat) return;
-  const hasOverflow = el.chat.scrollHeight > el.chat.clientHeight + 12;
-  const near = isNearBottom(140);
-  const shouldHide = !hasOverflow || near || !state.conversationActive;
-  btn.classList.toggle("hidden", shouldHide);
-}
-
-let scrollVisibilityRaf = 0;
-function scheduleScrollVisibility() {
-  if (scrollVisibilityRaf) return;
-  scrollVisibilityRaf = requestAnimationFrame(() => {
-    scrollVisibilityRaf = 0;
-    updateScrollBottomVisibility();
-  });
-}
-
-let renderQueued = false;
-function scheduleScroll() {
-  if (renderQueued) return;
-  renderQueued = true;
-  requestAnimationFrame(() => {
-    renderQueued = false;
-    scrollBottom();
-    updateScrollBottomVisibility();
-  });
-}
-
-function md(text) {
-  return window.renderMarkdown(text);
-}
-
-function setConversationMode(active, animate = true) {
-  if (state.conversationActive === active && el.modelDock.classList.contains("compact") === active) return;
-  const before = el.modelDock.getBoundingClientRect();
-  state.conversationActive = active;
-  el.main.classList.toggle("has-chat", active);
-  if (active) {
-    el.modelDock.classList.add("compact");
-    el.composerActions.insertBefore(el.modelDock, el.sendGroup);
-  } else {
-    el.modelDock.classList.remove("compact");
-    el.composerWrap.after(el.modelDock);
-  }
-  queueMicrotask(updateScrollBottomVisibility);
-  if (!animate || !before.width || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  requestAnimationFrame(() => {
-    const after = el.modelDock.getBoundingClientRect();
-    const dx = before.left - after.left;
-    const dy = before.top - after.top;
-    const sx = Math.max(0.7, Math.min(1.3, before.width / Math.max(after.width, 1)));
-    el.modelDock.animate(
-      [
-        { transform: `translate(${dx}px, ${dy}px) scaleX(${sx})`, opacity: 0.65 },
-        { transform: "translate(0, 0) scaleX(1)", opacity: 1 },
-      ],
-      { duration: 360, easing: "cubic-bezier(.2,.8,.2,1)" }
-    );
-  });
-}
+function scrollBottom(f){ return window.piUi.scrollBottom(f); }
+function jumpToBottom(){ return window.piUi.jumpToBottom(); }
+function isNearBottom(th){ return window.piUi.isNearBottom(th); }
+function updateScrollBottomVisibility(){ return window.piUi.updateScrollBottomVisibility(); }
+function scheduleScrollVisibility(){ return window.piUi.scheduleScrollVisibility(); }
+function scheduleScroll(){ return window.piUi.scheduleScroll(); }
+function md(text){ return window.piUi.md(text); }
+function setConversationMode(a,b){ return window.piUi.setConversationMode(a,b); }
 
 
 
@@ -238,49 +150,14 @@ function bufferToBase64(buffer) { if(typeof window!=="undefined" && window.piUti
 // Message rendering
 // ---------------------------------------------------------------------------
 
-function messageTime(value) {
-  if (value == null) return { timestamp: null, label: t("time.notAvailable") };
-  let timestamp = value instanceof Date ? value.getTime() : Number(value);
-  if (!Number.isFinite(timestamp)) timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return { timestamp: null, label: t("time.notAvailable") };
-  // Pi timestamps are normally milliseconds, but accept epoch seconds too.
-  if (timestamp > 0 && timestamp < 1e12) timestamp *= 1000;
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return { timestamp: null, label: t("time.notAvailable") };
-  return {
-    timestamp,
-    label: date.toLocaleString("it-IT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }),
-  };
-}
-
-const USER_STATUS = {
-  sending: { rank: 0, label: t("status.sending") },
-  localQueued: { rank: 1, label: "in coda nell’app · non ancora inviato" },
-  received: { rank: 1, label: t("status.received") },
-  queued: { rank: 1, label: t("status.queued") },
-  processing: { rank: 2, label: t("status.processing") },
-  retrying: { rank: 2, label: t("status.retrying") },
-  done: { rank: 3, label: t("status.done") },
-  historical: { rank: 3, label: t("status.historical") },
-  failed: { rank: 4, label: t("status.failed") },
-  interrupted: { rank: 4, label: t("status.interrupted") },
-  error: { rank: 4, label: t("status.error") },
-};
+function messageTime(v){ return window.piMessageView.messageTime(v, t); }
+const USER_STATUS = (()=>{ const m={}; for(const[k,def] of Object.entries(window.piMessageView.USER_STATUS_DEFS)){ m[k]={rank:def.rank,label:def.label||t(def.key)}; } return m; })();
 
 function setUserMessageStatus(wrap, status) {
   if (!wrap?.isConnected || !USER_STATUS[status]) return;
   const currentRank = Number(wrap.dataset.statusRank ?? -1);
   const next = USER_STATUS[status];
-  // Async RPC acknowledgements can arrive after streaming already started.
-  const reactivatingLocalQueue = wrap.dataset.status === "localQueued" && status === "sending";
-  if (!reactivatingLocalQueue && status !== "error" && next.rank < currentRank) return;
+  if (!window.piMessageView.nextStatusAllowed(wrap.dataset.status, currentRank, status)) return;
   wrap.dataset.status = status;
   wrap.dataset.statusRank = String(next.rank);
   if (["received", "queued", "processing", "retrying", "done", "failed", "interrupted"].includes(status) && !wrap.dataset.receivedAt) {
@@ -557,90 +434,16 @@ function clearChat() {
   queueMicrotask(updateScrollBottomVisibility);
 }
 
-// Cache of already-loaded conversations keyed by session file, so re-opening
-// a chat paints instantly while the fresh copy loads in the background.
-const sessionMessageCache = new Map(); // file -> { messages, at }
-const SESSION_CACHE_MAX = 30;
-
-function getCachedSessionMessages(file) {
-  if (!file) return null;
-  return sessionMessageCache.get(file)?.messages || null;
-}
-
-function cacheSessionMessages(file, messages) {
-  if (!file || !Array.isArray(messages)) return;
-  sessionMessageCache.set(file, { messages, at: Date.now() });
-  if (sessionMessageCache.size > SESSION_CACHE_MAX) {
-    let oldestKey = null;
-    let oldestAt = Infinity;
-    for (const [key, value] of sessionMessageCache) {
-      if (value.at < oldestAt) { oldestAt = value.at; oldestKey = key; }
-    }
-    if (oldestKey && oldestKey !== file) sessionMessageCache.delete(oldestKey);
-  }
-}
-
-function setSessionLoading(file, { showSkeleton = true } = {}) {
-  state.openingSessionFile = file;
-  document.body.classList.add("session-loading");
-  el.statusActivity.textContent = t("session.loadingChat");
-  if (!showSkeleton) {
-    // Cached content stays visible; only the dim overlay is skipped.
-    return;
-  }
-  el.chat.classList.add("session-loading");
-  // prepare skeleton
-  el.messages.innerHTML = "";
-  state.streamAssistant = null;
-  state.tools.clear();
-  el.emptyState.classList.add("hidden");
-  setConversationMode(true, false);
-  const skel = document.createElement("div");
-  skel.className = "chat-loading";
-  skel.innerHTML =
-    `<div class="chat-loading-header"><span class="spin"></span><span>Caricamento conversazione…</span></div>` +
-    `<div class="skeleton-block"><div class="skeleton-line long"></div><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>` +
-    `<div class="skeleton-block"><div class="skeleton-line long"></div><div class="skeleton-line long"></div><div class="skeleton-line medium"></div></div>` +
-    `<div class="skeleton-block"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>`;
-  el.messages.appendChild(skel);
-  renderProjects();
-}
-
-function clearSessionLoading() {
-  state.openingSessionFile = null;
-  document.body.classList.remove("session-loading");
-  el.chat.classList.remove("session-loading");
-  if (!state.busy) el.statusActivity.textContent = "";
-  renderProjects();
-}
-
-function nextFrame() {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-}
-
-/**
- * Render finalized messages yielding to the event loop every chunk so long
- * conversations never freeze the UI while they paint.
- */
-async function renderConversation(displayMessages, isCurrent = () => true) {
-  const results = new Map();
-  for (const message of displayMessages) {
-    if (message.role === "toolResult" && message.toolCallId) results.set(message.toolCallId, message);
-  }
-  const consumed = new Set();
-  const CHUNK = 20;
-  for (let i = 0; i < displayMessages.length; i++) {
-    if (!isCurrent()) return false;
-    renderFinalMessage(displayMessages[i], { results, consumed });
-    if ((i + 1) % CHUNK === 0 && i + 1 < displayMessages.length) {
-      scheduleScroll();
-      await nextFrame();
-    }
-  }
-  return true;
-}
-
 async function reloadConversationFromRuntime({ restoreTab = false, paintedCache = null, switchGeneration = null } = {}) {
+  // delegated to session-view.js
+  return window.piSessionView.reloadConversationFromRuntime({ restoreTab, paintedCache, switchGeneration });
+}
+function getCachedSessionMessages(f){ return window.piSessionView.getCachedSessionMessages(f); }
+function cacheSessionMessages(f,m){ return window.piSessionView.cacheSessionMessages(f,m); }
+function setSessionLoading(f,o){ return window.piSessionView.setSessionLoading(f,o); }
+function clearSessionLoading(){ return window.piSessionView.clearSessionLoading(); }
+async function renderConversation(m,c){ return window.piSessionView.renderConversation(m,c); }
+async function _reloadConversationFromRuntimeBackup({ restoreTab = false, paintedCache = null, switchGeneration = null } = {}) {
   const isCurrent = () => switchGeneration == null || switchGeneration === state.switchGeneration;
   const msgs = await api.getMessages();
   if (!isCurrent()) return false;
@@ -799,165 +602,18 @@ function recordCommandUsage(name) { if(typeof window!=="undefined" && window.piP
 // Models / thinking pickers
 // ---------------------------------------------------------------------------
 
-async function loadModels(force = false) {
-  const now = Date.now();
-  if (!force && state.modelsCache && now - state.modelsCacheAt < 60000) return state.modelsCache;
-  const data = await api.getAvailableModels();
-  state.modelsCache = data.models || [];
-  state.modelsCacheAt = now;
-  return state.modelsCache;
-}
+// models extracted to models.js
+async function loadModels(){ return window.piModels.loadModels.apply(null, arguments); }
+function renderModelMenu(){ return window.piModels.renderModelMenu.apply(null, arguments); }
+function renderProviderMenu(){ return window.piModels.renderProviderMenu.apply(null, arguments); }
+function updateModelLabel(){ return window.piModels.updateModelLabel.apply(null, arguments); }
+async function refreshHeaderFromState(){ return window.piModels.refreshHeaderFromState.apply(null, arguments); }
+async function refreshThinkingLevels(){ return window.piModels.refreshThinkingLevels.apply(null, arguments); }
+function renderThinkingMenu(){ return window.piModels.renderThinkingMenu.apply(null, arguments); }
 
-function renderModelMenu(filter) {
-  const models = state.modelsCache || [];
-  const f = (filter || "").toLowerCase().trim();
-  el.modelList.innerHTML = "";
-  if (!models.length) {
-    el.modelList.innerHTML = `<div class="menu-empty">Nessun modello disponibile.<br/>
-    <span class="small">Configura le API key (env o <code>~/.pi/agent</code>) e riapri.</span></div>`;
-    return;
-  }
-  const currentProvider = state.currentModel?.provider;
-  const list = models.filter((m) => {
-    if (currentProvider && m.provider !== currentProvider) return false;
-    return !f || `${m.provider}/${m.id} ${m.name || ""}`.toLowerCase().includes(f);
-  });
-  if (!list.length) {
-    el.modelList.innerHTML = `<div class="menu-empty">Nessuna corrispondenza.</div>`;
-    return;
-  }
-  const lbl = document.createElement("div");
-  lbl.className = "menu-group-label";
-  lbl.textContent = currentProvider || "Modelli";
-  el.modelList.appendChild(lbl);
-  for (const m of list) {
-    const item = document.createElement("div");
-    const selected = state.currentModel && state.currentModel.provider === m.provider && state.currentModel.id === m.id;
-    item.className = "menu-item" + (selected ? " selected" : "");
-    item.innerHTML = `<span class="mi-name">${escapeHtml(m.name || m.id)}</span>` +
-      `<span class="mi-sub mono">${escapeHtml(m.id)}</span>`;
-    item.addEventListener("click", async () => {
-      try {
-        await api.setModel(m.provider, m.id);
-        state.currentModel = { provider: m.provider, id: m.id };
-        updateModelLabel();
-        renderModelMenu(el.modelSearch.value);
-        closeMenus();
-        toast(`Modello: ${m.provider}/${m.id}`);
-      } catch (err) {
-        toast(`Cambio modello fallito: ${err.message}`, "error");
-      }
-    });
-    el.modelList.appendChild(item);
-  }
-}
-
-function renderProviderMenu() {
-  const providers = new Map();
-  for (const model of state.modelsCache || []) {
-    if (!providers.has(model.provider)) providers.set(model.provider, []);
-    providers.get(model.provider).push(model);
-  }
-  el.providerList.innerHTML = "";
-  if (!providers.size) {
-    el.providerList.innerHTML = `<div class="menu-empty">Nessun provider configurato.</div>`;
-    return;
-  }
-  for (const [provider, models] of providers) {
-    const item = document.createElement("div");
-    item.className = "menu-item" + (state.currentModel?.provider === provider ? " selected" : "");
-    item.innerHTML = `<span class="mi-name">${escapeHtml(provider)}</span><span class="mi-sub">${models.length} modelli</span>`;
-    item.addEventListener("click", async () => {
-      if (state.currentModel?.provider === provider) {
-        closeMenus();
-        return;
-      }
-      const target = models[0];
-      try {
-        await api.setModel(target.provider, target.id);
-        state.currentModel = { provider: target.provider, id: target.id };
-        updateModelLabel();
-        renderProviderMenu();
-        closeMenus();
-        toast(`Provider: ${provider} · ${target.name || target.id}`);
-      } catch (err) {
-        toast(`Cambio provider fallito: ${err.message}`, "error");
-      }
-    });
-    el.providerList.appendChild(item);
-  }
-}
-
-function updateModelLabel() {
-  const m = state.currentModel;
-  const details = m && (state.modelsCache || []).find((candidate) => candidate.provider === m.provider && candidate.id === m.id);
-  el.providerLabel.textContent = m?.provider || "scegli provider";
-  el.modelLabel.textContent = m ? (details?.name || m.id) : "scegli modello";
-}
-
-async function refreshHeaderFromState() {
-  try {
-    const st = await api.getState();
-    state.currentModel = st.model ? { provider: st.model.provider, id: st.model.id } : null;
-    await loadModels().catch(() => []);
-    updateModelLabel();
-    if (st.sessionFile) state.activeSessionFile = st.sessionFile;
-    if (st.thinkingLevel) el.thinkingLabel.textContent = st.thinkingLevel;
-    await refreshThinkingLevels();
-  } catch {}
-}
-
-async function refreshThinkingLevels() {
-  try {
-    const data = await api.getThinkingLevels();
-    const levels = (data && data.levels) || ["off"];
-    state.thinkingLevels = levels;
-    el.thinkingList.innerHTML = "";
-    for (const lvl of levels) {
-      const item = document.createElement("div");
-      item.className = "menu-item" + (el.thinkingLabel.textContent === lvl ? " selected" : "");
-      item.innerHTML = `<span class="mi-name">${lvl}</span>`;
-      item.addEventListener("click", async () => {
-        try {
-          await api.setThinkingLevel(lvl);
-          el.thinkingLabel.textContent = lvl;
-          renderThinkingMenu();
-          closeMenus();
-        } catch (err) {
-          toast(err.message, "error");
-        }
-      });
-      el.thinkingList.appendChild(item);
-    }
-    el.thinkingDropdown.style.display = levels.length <= 1 ? "none" : "";
-  } catch {}
-}
-
-function renderThinkingMenu() {
-  for (const item of el.thinkingList.children) {
-    item.classList.toggle("selected", item.textContent.trim() === el.thinkingLabel.textContent.trim());
-  }
-}
-
-function closeMenus() {
-  el.providerMenu.classList.add("hidden");
-  el.modelMenu.classList.add("hidden");
-  el.thinkingMenu.classList.add("hidden");
-}
-
-function setSidebarVisible(visible) {
-  el.sidebar.classList.toggle("collapsed", !visible);
-  api.setSettings({ sidebarVisible: visible }).catch(() => {});
-}
-
-function applyTheme(theme) {
-  const resolved = theme === "dark" ? "dark" : "light";
-  document.documentElement.dataset.theme = resolved;
-  localStorage.setItem("pi-desktop-theme", resolved);
-  el.themeBtn.innerHTML = icon(resolved === "dark" ? "moon" : "sun");
-  el.themeBtn.title = resolved === "dark" ? "Passa al tema chiaro" : "Passa al tema scuro";
-  refreshIcons();
-}
+function closeMenus(){ return window.piUi.closeMenus(); }
+function setSidebarVisible(v){ return window.piUi.setSidebarVisible(v); }
+function applyTheme(th){ return window.piUi.applyTheme(th); }
 
 async function loadProviderSettings() {
   try {
@@ -1218,269 +874,21 @@ function renderProviderSettings() {
 // Pi package store
 // ---------------------------------------------------------------------------
 
-function installedPackageNames() {
-  const names = new Set();
-  for (const entry of state.installedPackages) {
-    if (!entry.source?.startsWith("npm:")) continue;
-    let spec = entry.source.slice(4);
-    const versionAt = spec.lastIndexOf("@");
-    if (versionAt > spec.indexOf("/")) spec = spec.slice(0, versionAt);
-    else if (!spec.startsWith("@") && versionAt > 0) spec = spec.slice(0, versionAt);
-    names.add(spec);
-  }
-  return names;
-}
+// package-view extracted
+function installedPackageNames(){ return window.piPackageView.installedPackageNames.apply(null, arguments); }
+function npmNameFromSource(){ return window.piPackageView.npmNameFromSource.apply(null, arguments); }
+function installedEntryForName(){ return window.piPackageView.installedEntryForName.apply(null, arguments); }
+function formatDownloads(){ return window.piPackageView.formatDownloads.apply(null, arguments); }
+async function loadPackageStore(){ return window.piPackageView.loadPackageStore.apply(null, arguments); }
+function renderPackageStore(){ return window.piPackageView.renderPackageStore.apply(null, arguments); }
+function renderNativePackageSections(){ return window.piPackageView.renderNativePackageSections.apply(null, arguments); }
+async function changePackage(){ return window.piPackageView.changePackage.apply(null, arguments); }
+async function installManualSource(){ return window.piPackageView.installManualSource.apply(null, arguments); }
+async function removeInstalledSource(){ return window.piPackageView.removeInstalledSource.apply(null, arguments); }
+async function updatePackageTarget(){ return window.piPackageView.updatePackageTarget.apply(null, arguments); }
+function appendPackageOutput(){ return window.piPackageView.appendPackageOutput.apply(null, arguments); }
 
-function npmNameFromSource(source) {
-  if (!source?.startsWith("npm:")) return null;
-  let spec = source.slice(4);
-  const versionAt = spec.lastIndexOf("@");
-  if (versionAt > spec.indexOf("/")) spec = spec.slice(0, versionAt);
-  else if (!spec.startsWith("@") && versionAt > 0) spec = spec.slice(0, versionAt);
-  return spec;
-}
 
-function installedEntryForName(name) {
-  return state.installedPackages.find((entry) => npmNameFromSource(entry.source) === name) || null;
-}
-
-function formatDownloads(value) {
-  const count = Number(value) || 0;
-  if (count >= 1e6) return `${(count / 1e6).toFixed(count >= 1e7 ? 0 : 1)}M`;
-  if (count >= 1e3) return `${(count / 1e3).toFixed(count >= 1e5 ? 0 : 1)}K`;
-  return count.toLocaleString("it-IT");
-}
-
-async function loadPackageStore({ resetPage = false } = {}) {
-  if (resetPage) state.packagePage = 1;
-  el.packageList.innerHTML = `<div class="menu-empty">Caricamento catalogo…</div>`;
-  try {
-    const [catalog, installed, resources] = await Promise.all([
-      api.searchPackages({
-        query: el.packageSearch.value.trim(),
-        type: el.packageType.value,
-        sort: el.packageSort.value,
-        page: state.packagePage,
-      }),
-      api.listInstalledPackages().catch(() => []),
-      api.listPackageResources().catch(() => []),
-    ]);
-    const result = Array.isArray(catalog) ? { items: catalog, total: catalog.length, page: state.packagePage, pageSize: 50 } : catalog;
-    state.packages = result?.items || [];
-    state.packageTotal = Number(result?.total) || state.packages.length;
-    state.packagePage = Number(result?.page) || state.packagePage;
-    state.packagePageSize = Number(result?.pageSize) || 50;
-    state.installedPackages = installed;
-    state.packageResources = resources;
-    renderPackageStore();
-  } catch (err) {
-    el.packageList.innerHTML = `<div class="menu-empty">Catalogo non disponibile.<br><span class="small">${escapeHtml(err.message)}</span></div>`;
-  }
-}
-
-function renderPackageStore() {
-  const installed = installedPackageNames();
-  renderNativePackageSections();
-  el.packageList.innerHTML = "";
-  const pageCount = Math.max(1, Math.ceil(state.packageTotal / state.packagePageSize));
-  el.packagePageInfo.textContent = `Pagina ${state.packagePage} di ${pageCount} · ${state.packageTotal.toLocaleString("it-IT")} pacchetti`;
-  const catalogUrl = new URL("https://pi.dev/packages");
-  if (el.packageSearch.value.trim()) catalogUrl.searchParams.set("name", el.packageSearch.value.trim());
-  if (el.packageType.value) catalogUrl.searchParams.set("type", el.packageType.value);
-  if (el.packageSort.value !== "downloads") catalogUrl.searchParams.set("sort", el.packageSort.value);
-  if (state.packagePage > 1) catalogUrl.searchParams.set("page", String(state.packagePage));
-  el.packageCatalogLink.href = catalogUrl.toString();
-  el.packagePrev.disabled = state.packagePage <= 1 || Boolean(state.packageBusy);
-  el.packageNext.disabled = state.packagePage >= pageCount || Boolean(state.packageBusy);
-  if (!state.packages.length) {
-    el.packageList.innerHTML = `<div class="menu-empty">Nessun pacchetto trovato.</div>`;
-    return;
-  }
-  for (const pkg of state.packages) {
-    const isInstalled = installed.has(pkg.name);
-    const card = document.createElement("article");
-    card.className = `package-card${isInstalled ? " installed" : ""}`;
-    const tags = (pkg.types || []).map((type) => `<span class="package-type">${escapeHtml(type)}</span>`).join("") + (pkg.keywords || [])
-      .filter((keyword) => keyword !== "pi-package" && keyword !== "pi")
-      .slice(0, 3)
-      .map((keyword) => `<span>${escapeHtml(keyword)}</span>`)
-      .join("");
-    card.innerHTML =
-      `<div class="package-card-icon">${icon(isInstalled ? "badge-check" : "package")}</div>` +
-      `<div class="package-card-content"><div class="package-card-title"><strong>${escapeHtml(pkg.name)}</strong>${pkg.version ? `<span>v${escapeHtml(pkg.version)}</span>` : ""}<span class="package-card-downloads">${icon("download")} ${formatDownloads(pkg.monthlyDownloads || pkg.downloads)} / mese</span></div>` +
-      `<p>${escapeHtml(pkg.description)}</p><div class="package-card-meta">${tags}` +
-      `${pkg.publisher ? `<span>di ${escapeHtml(pkg.publisher)}</span>` : ""}</div></div>` +
-      `<div class="package-card-actions"><a class="icon-btn borderless tiny" href="${escapeHtml(pkg.npmUrl)}" title="Apri su npm" aria-label="Apri su npm">${icon("external-link")}</a>` +
-      `<button class="btn ${isInstalled ? "ghost package-uninstall" : "primary package-install"}" ${state.packageBusy ? "disabled" : ""}>` +
-      `${state.packageBusy === pkg.name ? "Attendi…" : isInstalled ? "Rimuovi" : "Installa"}</button></div>`;
-    card.querySelector(".package-install")?.addEventListener("click", () => changePackage(pkg, "install"));
-    card.querySelector(".package-uninstall")?.addEventListener("click", () => changePackage(pkg, "remove"));
-    el.packageList.appendChild(card);
-  }
-  refreshIcons();
-}
-
-function renderNativePackageSections() {
-  el.packageInstalledCount.textContent = `(${state.installedPackages.length})`;
-  el.packageInstalledList.innerHTML = "";
-  if (!state.installedPackages.length) {
-    el.packageInstalledList.innerHTML = `<div class="menu-empty">Nessun pacchetto configurato.</div>`;
-  }
-  for (const entry of state.installedPackages) {
-    const row = document.createElement("div");
-    row.className = "package-native-item";
-    const code = document.createElement("code");
-    code.className = "grow";
-    code.textContent = entry.source;
-    code.title = entry.source;
-    const badge = document.createElement("span");
-    badge.className = "package-type";
-    badge.textContent = entry.scope === "project" ? "progetto" : "utente";
-    const update = document.createElement("button");
-    update.className = "btn ghost small";
-    update.textContent = "Aggiorna";
-    update.disabled = Boolean(state.packageBusy);
-    update.addEventListener("click", () => updatePackageTarget(entry.source));
-    const remove = document.createElement("button");
-    remove.className = "btn ghost small";
-    remove.textContent = "Rimuovi";
-    remove.disabled = Boolean(state.packageBusy);
-    remove.addEventListener("click", () => removeInstalledSource(entry));
-    row.append(code, badge, update, remove);
-    el.packageInstalledList.appendChild(row);
-  }
-
-  el.packageResourceCount.textContent = `(${state.packageResources.length})`;
-  el.packageResourceList.innerHTML = "";
-  if (!state.packageResources.length) {
-    el.packageResourceList.innerHTML = `<div class="menu-empty">Nessuna risorsa rilevata.</div>`;
-  }
-  for (const resource of state.packageResources) {
-    const row = document.createElement("label");
-    row.className = "package-resource-item";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = resource.enabled;
-    checkbox.disabled = Boolean(state.packageBusy);
-    const copy = document.createElement("span");
-    copy.className = "grow";
-    const title = document.createElement("strong");
-    title.textContent = resource.name;
-    const meta = document.createElement("small");
-    meta.className = "muted";
-    meta.textContent = `${resource.type} · ${resource.metadata?.source || "auto"} · ${resource.metadata?.scope || "user"}`;
-    meta.title = resource.path;
-    copy.append(title, meta);
-    checkbox.addEventListener("change", async () => {
-      checkbox.disabled = true;
-      try {
-        await api.setPackageResourceEnabled(resource, checkbox.checked);
-        state.packageResources = await api.listPackageResources();
-        state.commands = [];
-        toast(`${resource.name} ${checkbox.checked ? "abilitata" : "disabilitata"}.`);
-        renderNativePackageSections();
-      } catch (err) {
-        checkbox.checked = !checkbox.checked;
-        checkbox.disabled = false;
-        toast(`Configurazione risorsa fallita: ${err.message}`, "error", 8000);
-      }
-    });
-    row.append(checkbox, copy);
-    el.packageResourceList.appendChild(row);
-  }
-}
-
-async function changePackage(pkg, action) {
-  const verb = action === "install" ? "installare" : "rimuovere";
-  if (action === "install" && !confirm(`Vuoi ${verb} ${pkg.name}? I plugin di pi possono eseguire codice con i tuoi permessi.`)) return;
-  const installedEntry = installedEntryForName(pkg.name);
-  const scope = action === "remove" ? (installedEntry?.scope || "user") : el.packageScope.value;
-  if (action === "remove" && !confirm(`Vuoi rimuovere ${pkg.name} dalla configurazione ${scope === "project" ? "del progetto" : "utente"} di pi?`)) return;
-  state.packageBusy = pkg.name;
-  el.packageLog.classList.remove("hidden");
-  el.packageLog.textContent = `— ${action === "install" ? "Installazione" : "Rimozione"} di ${pkg.name} —\n`;
-  renderPackageStore();
-  try {
-    state.installedPackages = action === "install"
-      ? await api.installPackage(pkg.name, scope)
-      : await api.removePackage(pkg.name, scope);
-    state.packageResources = await api.listPackageResources().catch(() => []);
-    state.modelsCache = null;
-    toast(`${pkg.name} ${action === "install" ? "installato" : "rimosso"}. Runtime di pi ricaricato.`);
-  } catch (err) {
-    el.packageLog.textContent += `✗ ${err.message}\n`;
-    toast(`${pkg.name}: ${err.message}`, "error", 8000);
-  } finally {
-    state.packageBusy = null;
-    renderPackageStore();
-  }
-}
-
-async function installManualSource() {
-  const source = el.packageSource.value.trim();
-  if (!source) return;
-  if (!confirm(`Installare ${source} nello scope ${el.packageScope.value === "project" ? "progetto" : "utente"}? Può eseguire codice con i tuoi permessi.`)) return;
-  state.packageBusy = source;
-  el.packageLog.classList.remove("hidden");
-  el.packageLog.textContent = `— Installazione di ${source} —\n`;
-  renderPackageStore();
-  try {
-    state.installedPackages = await api.installPackageSource(source, el.packageScope.value);
-    state.packageResources = await api.listPackageResources().catch(() => []);
-    el.packageSource.value = "";
-    state.commands = [];
-    toast("Sorgente installata; runtime Pi ricaricato.");
-  } catch (err) {
-    el.packageLog.textContent += `✗ ${err.message}\n`;
-    toast(`Installazione fallita: ${err.message}`, "error", 8000);
-  } finally {
-    state.packageBusy = null;
-    renderPackageStore();
-  }
-}
-
-async function removeInstalledSource(entry) {
-  if (!confirm(`Rimuovere ${entry.source} dallo scope ${entry.scope === "project" ? "progetto" : "utente"}?`)) return;
-  state.packageBusy = entry.source;
-  try {
-    state.installedPackages = await api.removePackageSource(entry.source, entry.scope);
-    state.packageResources = await api.listPackageResources().catch(() => []);
-    state.commands = [];
-    toast("Pacchetto rimosso; runtime Pi ricaricato.");
-  } catch (err) {
-    toast(`Rimozione fallita: ${err.message}`, "error", 8000);
-  } finally {
-    state.packageBusy = null;
-    renderPackageStore();
-  }
-}
-
-async function updatePackageTarget(target) {
-  state.packageBusy = target;
-  el.packageLog.classList.remove("hidden");
-  el.packageLog.textContent = `— Aggiornamento ${target} —\n`;
-  renderPackageStore();
-  try {
-    state.installedPackages = await api.updatePackages(target);
-    state.packageResources = await api.listPackageResources().catch(() => []);
-    state.modelsCache = null;
-    state.commands = [];
-    toast(target === "models" ? "Cataloghi modelli aggiornati." : "Aggiornamento completato; runtime Pi ricaricato.");
-  } catch (err) {
-    el.packageLog.textContent += `✗ ${err.message}\n`;
-    toast(`Aggiornamento fallito: ${err.message}`, "error", 8000);
-  } finally {
-    state.packageBusy = null;
-    renderPackageStore();
-  }
-}
-
-function appendPackageOutput(line) {
-  if (!el.modalPackages.open) return;
-  el.packageLog.classList.remove("hidden");
-  el.packageLog.textContent += `${line}\n`;
-  el.packageLog.scrollTop = el.packageLog.scrollHeight;
-}
 
 // ---------------------------------------------------------------------------
 // Stats & status
@@ -1526,223 +934,15 @@ function appendPackageOutput(line) {
 // pi status / updates (external, independent from the app)
 // ---------------------------------------------------------------------------
 
-async function refreshPiStatus(openModalOnError = false) {
-  try {
-    const st = await api.updateStatus();
-    el.piChip.className = "pi-status-button";
-    if (!st.installed) {
-      el.piChip.classList.add("missing");
-      el.piChipText.textContent = "pi non installato";
-      showEmptyHint(st);
-      if (openModalOnError) openPiModal(st);
-    } else if (st.updateAvailable) {
-      el.piChip.classList.add("update");
-      el.piChipText.textContent = `pi ${st.version} → ${st.latest} disponibile`;
-      el.emptyHint.classList.add("hidden");
-    } else {
-      el.piChip.classList.add(t("tool.ok"));
-      el.piChipText.textContent = `pi ${st.version}`;
-      el.emptyHint.classList.add("hidden");
-    }
-    renderPiStatusBox(st);
-    return st;
-  } catch (err) {
-    el.piChipText.textContent = "pi: ?";
-    el.piChip.className = "pi-status-button missing";
-    return null;
-  }
-}
-
-function showEmptyHint(st) {
-  el.emptyHint.classList.remove("hidden");
-  el.emptyHint.innerHTML =
-    `<strong>pi non risulta installato sul sistema.</strong><br/>` +
-    `<p class="muted small">Pi Desktop usa il comando <code>pi</code> installato globalmente (mai una copia interna), ` +
-    `così puoi aggiornare l'agente indipendentemente dall'app.</p>` +
-    `<p class="mono small">npm install -g --ignore-scripts @earendil-works/pi-coding-agent<br/>` +
-    `<span class="muted">oppure</span><br/>curl -fsSL https://pi.dev/install.sh | sh</p>` +
-    `<button id="hint-install" class="btn primary">Installa ora con npm</button>`;
-  el.emptyHint.querySelector("#hint-install").addEventListener("click", () => runMaintenance("install"));
-}
-
-function renderPiStatusBox(st) {
-  if (!st) {
-    el.piStatusBox.innerHTML = `<span class="muted">Stato non disponibile.</span>`;
-    return;
-  }
-  if (!st.installed) {
-    el.piStatusBox.innerHTML =
-      `<strong style="color:var(--red)">Non installato</strong><br/>` +
-      `<span class="muted small">L'app lo cercherà nel PATH (anche ~/.local/bin, /usr/local/bin).</span>`;
-    el.btnPiInstall.classList.remove("hidden");
-    el.btnPiUpdate.classList.add("hidden");
-    return;
-  }
-  let html = `<strong>pi ${escapeHtml(st.version || "?")}</strong><br/>` +
-    `<span class="muted small mono ellipsis" title="${escapeHtml(st.bin)}">${escapeHtml(st.bin)}</span>`;
-  if (st.updateAvailable) {
-    html += `<br/><span style="color:var(--amber)">Aggiornamento disponibile: ${escapeHtml(st.latest)}. L'aggiornamento usa l'updater di pi stesso (<code>pi update --self</code>): nessuna dipendenza dall'app.</span>`;
-    el.btnPiUpdate.classList.remove("hidden");
-    el.btnPiUpdate.classList.add("primary");
-  } else {
-    html += `<br/><span style="color:var(--green)">Aggiornato ✓ ultima versione su npm (${escapeHtml(st.latest || "n/d")}).</span>`;
-    el.btnPiUpdate.classList.remove("primary");
-    el.btnPiUpdate.classList.toggle("hidden", !st.latest);
-  }
-  el.btnPiInstall.classList.add("hidden");
-  el.piStatusBox.innerHTML = html;
-}
-
-function openPiModal(st) {
-  if (st) renderPiStatusBox(st);
-  else refreshPiStatus().then((s) => renderPiStatusBox(s));
-  el.modalPi.showModal();
-}
-
-async function runMaintenance(kind) {
-  el.maintenanceLog.classList.remove("hidden");
-  el.maintenanceLog.textContent = "";
-  el.btnPiInstall.disabled = true;
-  el.btnPiUpdate.disabled = true;
-  const appendLine = (line) => {
-    el.maintenanceLog.textContent += line + "\n";
-    el.maintenanceLog.scrollTop = el.maintenanceLog.scrollHeight;
-  };
-  state.maintenanceAppend = appendLine;
-  appendLine(`— ${kind === "install" ? "installazione" : "aggiornamento"} di pi (indipendente dall'app) —`);
-  try {
-    const res = await api.maintenance(kind);
-    appendLine(res.ok ? "✓ riuscito" : "✗ fallito");
-    if (res.status) renderPiStatusBox(res.status);
-    await refreshPiStatus();
-    if (res.ok) toast(kind === "install" ? "pi installato." : "pi aggiornato.");
-  } finally {
-    el.btnPiInstall.disabled = false;
-    el.btnPiUpdate.disabled = false;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// App OTA (electron-updater, GitHub Releases — come gittree)
-// ---------------------------------------------------------------------------
-let appUpdateState = null;
-
-async function setupAppUpdates() {
-  const btn = el.btnAppUpdate;
-  const settingsBtn = el.btnCheckAppUpdate;
-  const settingsVersion = el.appVersion;
-  const settingsStatus = el.checkAppUpdateStatus;
-  if (btn) {
-    const icon = btn.querySelector("i");
-    const label = btn.querySelector("span");
-    btn.addEventListener("click", async () => {
-      if (appUpdateState?.status === "available") {
-        btn.disabled = true;
-        const res = await api.downloadAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      } else if (appUpdateState?.status === "downloaded") {
-        const res = await api.installAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      } else {
-        btn.disabled = true;
-        const res = await api.checkAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-        setTimeout(() => { if (appUpdateState?.status === "idle") btn.disabled = false; }, 800);
-      }
-    });
-  }
-  if (settingsBtn) {
-    settingsBtn.addEventListener("click", async () => {
-      const s = appUpdateState?.status;
-      if (s === "available") {
-        settingsBtn.disabled = true;
-        const res = await api.downloadAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      } else if (s === "downloaded") {
-        const res = await api.installAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      } else {
-        settingsBtn.disabled = true;
-        if (settingsStatus) settingsStatus.textContent = t("settings.checking");
-        const res = await api.checkAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      }
-    });
-  }
-  api.on("update:state", handleAppUpdateState);
-  try {
-    const initial = await api.getAppUpdateState();
-    handleAppUpdateState(initial);
-  } catch {}
-}
-
-function handleAppUpdateState(state) {
-  if (!state) return;
-  const prev = appUpdateState?.status;
-  appUpdateState = state;
-  const btn = el.btnAppUpdate;
-  if (btn) {
-    const icon = btn.querySelector("i");
-    const label = btn.querySelector("span");
-    const visible = ["available", "downloading", "downloaded"].includes(String(state.status));
-    btn.classList.toggle("hidden", !visible);
-    btn.disabled = state.status === "downloading" || state.status === "checking";
-    if (state.status === "available") {
-      if (icon) icon.setAttribute("data-lucide", "download");
-      if (label) label.textContent = t("updates.app.availableVersion", { version: state.availableVersion || "" });
-      btn.title = t("updates.app.availableVersion", { version: state.availableVersion || "" });
-      btn.classList.remove("is-downloading");
-      if (prev !== "available") toast(t("updates.app.availableVersion", { version: state.availableVersion || "" }), "info");
-    } else if (state.status === "downloading") {
-      if (icon) icon.setAttribute("data-lucide", "loader-circle");
-      if (label) label.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
-      btn.title = t("updates.app.downloading", { progress: state.progress || 0 });
-      btn.classList.add("is-downloading");
-    } else if (state.status === "downloaded") {
-      if (icon) icon.setAttribute("data-lucide", "refresh-cw");
-      if (label) label.textContent = t("updates.app.restart");
-      btn.title = t("updates.app.ready");
-      btn.classList.remove("is-downloading");
-      if (prev !== "downloaded") toast(t("updates.app.ready"), "success");
-    } else if (state.status === "error" && state.error) {
-      toast(t("updates.app.failed", { error: state.error }), "error");
-    }
-  } else if (state.status === "error" && state.error) {
-    toast(t("updates.app.failed", { error: state.error }), "error");
-  }
-  // Aggiorna anche il pannello Impostazioni (come gittree settings-view)
-  if (el.appVersion) {
-    el.appVersion.textContent = state.currentVersion ? `v${state.currentVersion}` : (appUpdateState?.currentVersion ? `v${appUpdateState.currentVersion}` : "—");
-  }
-  if (el.checkAppUpdateStatus) {
-    if (state.status === "checking") el.checkAppUpdateStatus.textContent = t("settings.checking");
-    else if (state.status === "available" && state.availableVersion) el.checkAppUpdateStatus.textContent = `${t("settings.updateAvailable")} (${state.availableVersion})`;
-    else if (state.status === "downloading") el.checkAppUpdateStatus.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
-    else if (state.status === "downloaded") el.checkAppUpdateStatus.textContent = t("settings.restartToUpdate");
-    else if (state.status === "idle") el.checkAppUpdateStatus.textContent = t("settings.upToDate");
-    else if (state.status === "error" && state.error) el.checkAppUpdateStatus.textContent = state.error;
-    else if (state.availableVersion) el.checkAppUpdateStatus.textContent = `${t("settings.updateAvailable")} (${state.availableVersion})`;
-  }
-  if (el.btnCheckAppUpdate) {
-    if (state.status === "available") {
-      el.btnCheckAppUpdate.textContent = t("settings.downloadAvailable");
-      el.btnCheckAppUpdate.disabled = false;
-    } else if (state.status === "downloading") {
-      el.btnCheckAppUpdate.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
-      el.btnCheckAppUpdate.disabled = true;
-    } else if (state.status === "downloaded") {
-      el.btnCheckAppUpdate.textContent = t("settings.restartToUpdate");
-      el.btnCheckAppUpdate.disabled = false;
-    } else if (state.status === "checking") {
-      el.btnCheckAppUpdate.textContent = t("settings.checking");
-      el.btnCheckAppUpdate.disabled = true;
-    } else {
-      el.btnCheckAppUpdate.textContent = t("settings.checkUpdate");
-      el.btnCheckAppUpdate.disabled = state.status === "downloading" || state.status === "checking";
-    }
-  }
-  refreshIcons();
-}
+// pi status / app updates extracted to status.js - stubs delegating
+function refreshPiStatus(){ return window.piStatus.refreshPiStatus.apply(null, arguments); }
+function showEmptyHint(){ return window.piStatus.showEmptyHint.apply(null, arguments); }
+function renderPiStatusBox(){ return window.piStatus.renderPiStatusBox.apply(null, arguments); }
+function openPiModal(){ return window.piStatus.openPiModal.apply(null, arguments); }
+async function runMaintenance(){ return window.piStatus.runMaintenance.apply(null, arguments); }
+let appUpdateState=null;
+async function setupAppUpdates(){ return window.piStatus.setupAppUpdates.apply(null, arguments); }
+function handleAppUpdateState(){ return window.piStatus.handleAppUpdateState.apply(null, arguments); }
 
 // ---------------------------------------------------------------------------
 // Extension UI bridge (dialogs requested by pi extensions)
@@ -2030,42 +1230,11 @@ api.on("pi:event", (msg) => {
   }
 });
 
-function parsedToolArgs(args) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.parsedToolArgs) return window.piUtils.parsedToolArgs.apply(null, Array.from(arguments)); 
-  if (args && typeof args === "object") return args;
-  if (typeof args !== "string") return {};
-  try { return JSON.parse(args); } catch { return { value: args }; }
- }
-
-function fullToolArgs(args) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.fullToolArgs) return window.piUtils.fullToolArgs.apply(null, Array.from(arguments)); 
-  try {
-    return typeof args === "string" ? args : JSON.stringify(args) || "";
-  } catch {
-    return "";
-  }
- }
-
-function compactProjectPath(value) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.compactProjectPath) return window.piUtils.compactProjectPath.apply(null, Array.from(arguments)); 
-  const input = String(value || "").replace(/\\/g, "/");
-  const cwd = String(state.settings?.cwd || "").replace(/\\/g, "/").replace(/\/$/, "");
-  if (cwd && (input === cwd || input.startsWith(`${cwd}/`))) return input.slice(cwd.length + 1) || ".";
-  const parts = input.split("/").filter(Boolean);
-  return parts.length > 3 ? `…/${parts.slice(-3).join("/")}` : input;
- }
-
-function changedLineCounts(args) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.changedLineCounts) return window.piUtils.changedLineCounts.apply(null, Array.from(arguments)); 
-  const edits = Array.isArray(args.edits) ? args.edits : [args];
-  let removed = 0;
-  let added = 0;
-  for (const edit of edits) {
-    const oldText = edit.oldText ?? edit.old_string ?? "";
-    const newText = edit.newText ?? edit.new_string ?? edit.content ?? "";
-    if (oldText) removed += String(oldText).split("\n").length;
-    if (newText) added += String(newText).split("\n").length;
-  }
-  return { added, removed };
- }
-
-function compactToolArgs(toolName, rawArgs) {
+function parsedToolArgs(args) { return window.piUtils.parsedToolArgs.apply(null, Array.from(arguments)); }
+function fullToolArgs(args) { return window.piUtils.fullToolArgs.apply(null, Array.from(arguments)); }
+function compactProjectPath(value) { return window.piUtils.compactProjectPath(value, state.settings?.cwd); }
+function changedLineCounts(args) { return window.piUtils.changedLineCounts.apply(null, Array.from(arguments)); }
+function compactToolArgs(toolName, rawArgs) { if(window.piForms) return window.piForms.compactToolArgs(toolName, rawArgs, state.settings?.cwd);
   const name = String(toolName || "").toLowerCase();
   const args = parsedToolArgs(rawArgs);
   const filePath = args.path || args.file || args.filePath || args.filename;

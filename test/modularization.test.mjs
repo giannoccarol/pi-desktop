@@ -15,8 +15,8 @@ test("regression: modularization – app.js size guard vs HEAD", () => {
   const lines = app.split("\n").length;
   // Monolith was 4029 at initial commit, now should be < 3500 after phase 1
   // Guard against accidental re-bloat
-  assert.ok(lines < 3500, `app.js should stay modularized (<3500 lines), got ${lines}`);
-  assert.ok(lines > 2000, `app.js should not be empty, got ${lines}`);
+  assert.ok(lines < 1800, `app.js should stay modularized (<1800 lines) after phase 6, got ${lines}`);
+  assert.ok(lines > 1500, `app.js should not be empty, got ${lines}`);
 });
 
 test("regression: all extracted modules are loadable and expose expected API", () => {
@@ -61,7 +61,7 @@ test("regression: all extracted modules are loadable and expose expected API", (
 
 test("regression: index.html loads modules in correct order (store → composer → chat → sidebar → app)", () => {
   const html = fs.readFileSync(path.join(root, "src/renderer/index.html"), "utf8");
-  const order = ["utils.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "i18n.js", "app.js"];
+  const order = ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "i18n.js", "app.js"];
   let lastIdx = -1;
   for (const file of order) {
     const idx = html.indexOf(file);
@@ -84,7 +84,7 @@ test("regression: eslint + check still cover new modules", () => {
   assert.ok(pkg.scripts.lint, "lint script should exist");
   assert.ok(pkg.scripts.check, "check script should exist");
   // Verify new modules are present on disk and will be packaged via src/**/*
-  for (const mod of ["utils.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js"]) {
+  for (const mod of ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js"]) {
     assert.ok(fs.existsSync(path.join(root, "src/renderer", mod)), `${mod} should exist`);
   }
 });

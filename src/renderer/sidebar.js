@@ -69,6 +69,15 @@ function renderTabs() {
       if (event.target.closest(".chat-tab-close")) return;
       switchToTab(tab.id);
     });
+    button.addEventListener("auxclick", (event) => {
+      if (event.button === 1) {
+        event.preventDefault();
+        closeChatTab(tab.id);
+      }
+    });
+    button.addEventListener("mousedown", (event) => {
+      if (event.button === 1) event.preventDefault();
+    });
     button.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
