@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const styles = fs.readFileSync(path.join(root, "src/renderer/styles.css"), "utf8");
 
 test("typography: Inter is the UI font and monospace is reserved for technical content", () => {

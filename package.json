@@ -16,7 +16,7 @@
     "verify": "node scripts/verify/verify.js",
     "verify:quick": "node scripts/verify/verify.js --quick",
     "prepare": "node scripts/hooks/install-hooks.js && node scripts/build/prepare-build-assets.js",
-    "test": "node --test test/",
+    "test": "node --test \"test/**/*.test.mjs\"",
     "test:legacy": "node test/rpc.test.mjs",
     "lint": "eslint src --ext .js,.mjs",
     "lint:fix": "eslint src --ext .js,.mjs --fix",
