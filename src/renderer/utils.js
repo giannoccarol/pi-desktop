@@ -126,7 +126,7 @@
   }
 
   // relTime is pure if we inject `now` and `t` — keep original behaviour but testable
-  function relTime(ms, nowMs = Date.now(), t = (k, v) => k) {
+  function relTime(ms, nowMs = Date.now(), t = (typeof window !== "undefined" && window.t) || (typeof globalThis !== "undefined" && globalThis.t) || ((k) => k)) {
     let ts = Number(ms);
     if (!Number.isFinite(ts)) return t("time.notAvailable");
     if (ts > 0 && ts < 1e12) ts *= 1000; // epoch seconds

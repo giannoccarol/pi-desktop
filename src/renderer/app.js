@@ -96,7 +96,7 @@ function icon(name) {
   return `<i data-lucide="${name}"></i>`;
 }
 
-function relTime(ms) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.relTime) return window.piUtils.relTime.apply(null, Array.from(arguments)); 
+function relTime(ms) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.relTime) return window.piUtils.relTime(ms, Date.now(), (k, v) => t(k, v)); 
   const d = Date.now() - ms;
   const m = Math.floor(d / 60000);
   if (m < 1) return t("time.now");
