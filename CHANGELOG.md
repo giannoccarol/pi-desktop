@@ -1,3 +1,10 @@
+## [0.6.2](https://github.com/giannoccarol/pi-desktop/compare/v0.6.1...v0.6.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* **build:** usa artifactName GitHub-safe Pi-Desktop per fix auto-updater 404 ([aead89d](https://github.com/giannoccarol/pi-desktop/commit/aead89d18b1065ef46e5a419340bf92447d5b6dc))
+
 ## [0.6.1](https://github.com/giannoccarol/pi-desktop/compare/v0.6.0...v0.6.1) (2026-08-25)
 
 # [0.6.0](https://github.com/giannoccarol/pi-desktop/compare/v0.5.0...v0.6.0) (2026-08-25)
