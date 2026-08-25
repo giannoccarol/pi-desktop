@@ -117,8 +117,26 @@ function requestAuthPrompt(providerId, prompt, signal) {
   });
 }
 
+function resolveWindowIcon() {
+  const candidates = [];
+  // Dev: projectRoot/build/icon.png / icon.png
+  candidates.push(path.join(__dirname, "..", "..", "build", "icon.png"));
+  candidates.push(path.join(__dirname, "..", "..", "icon.png"));
+  // Packaged: resourcesPath/build/icon.png (extraResources)
+  try { candidates.push(path.join(process.resourcesPath, "build", "icon.png")); } catch {}
+  try { candidates.push(path.join(process.resourcesPath, "icon.png")); } catch {}
+  // Fallback via app.getAppPath()
+  try { candidates.push(path.join(app.getAppPath(), "build", "icon.png")); } catch {}
+  try { candidates.push(path.join(app.getAppPath(), "icon.png")); } catch {}
+  for (const p of candidates) {
+    try { if (p && fs.existsSync(p)) return p; } catch {}
+  }
+  return undefined;
+}
+
 function createWindow() {
-  const windowIcon = path.join(__dirname, "..", "..", "build", "icon.png");
+  const windowIcon = resolveWindowIcon();
+  if (!windowIcon) console.warn("[window] icon not found, checked build/icon.png and icon.png");
   win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -126,7 +144,7 @@ function createWindow() {
     minHeight: 480,
     backgroundColor: "#0f1115",
     autoHideMenuBar: true,
-    icon: fs.existsSync(windowIcon) ? windowIcon : undefined,
+    icon: windowIcon,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "preload.js"),
       contextIsolation: true,

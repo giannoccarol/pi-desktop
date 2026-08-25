@@ -11,11 +11,11 @@
   },
   "homepage": "https://pi.dev",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/prepare-build-assets.js && electron .",
     "check": "node scripts/check.js",
     "verify": "node scripts/verify.js",
     "verify:quick": "node scripts/verify.js --quick",
-    "prepare": "node scripts/install-hooks.js",
+    "prepare": "node scripts/install-hooks.js && node scripts/prepare-build-assets.js",
     "test": "node --test test/*.test.mjs",
     "test:legacy": "node test/rpc.test.mjs",
     "lint": "eslint src --ext .js,.mjs",
