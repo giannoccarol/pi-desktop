@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const nav = require("../src/renderer/navigation.js");
+const nav = require("../src/renderer/lib/navigation.js");
 
 // stub i18n
 globalThis.window = globalThis;

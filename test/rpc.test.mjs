@@ -16,7 +16,7 @@ const { semverCompare } = require("../src/main/updates/updater.js");
 const providerStore = require("../src/main/services/provider-store.js");
 const packageStore = require("../src/main/services/package-store.js");
 const piSettingsStore = require("../src/main/services/pi-settings-store.js");
-const { collapseRetryAttempts, hasVisibleAssistantContent } = require("../src/renderer/chat-utils.js");
+const { collapseRetryAttempts, hasVisibleAssistantContent } = require("../src/renderer/lib/chat-utils.js");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MOCK = path.join(__dirname, "mock-pi.js");
@@ -402,7 +402,7 @@ test("sessions: parse fixture files and list newest-first", () => {
 
 test("markdown: code blocks, tables, links are rendered safely", () => {
   global.window = {};
-  require("../src/renderer/markdown.js");
+  require("../src/renderer/lib/markdown.js");
   const md = global.window.renderMarkdown;
 
   const html = md("# Tit\n\n```js\nlet a = \"<script>\";\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ngoto [x](javascript:alert(1)) e [ok](https://pi.dev)");

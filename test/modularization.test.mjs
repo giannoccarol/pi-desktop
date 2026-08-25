@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
 test("regression: modularization – app.js size guard vs HEAD", () => {
-  const app = fs.readFileSync(path.join(root, "src/renderer/app.js"), "utf8");
+  const app = fs.readFileSync(path.join(root, "src/renderer/core/app.js"), "utf8");
   const lines = app.split("\n").length;
   // Monolith was 4029 at initial commit, goal is <1000 after decomposition
   assert.ok(lines < 1000, `app.js should be decomposed below 1000 lines, got ${lines}`);
@@ -20,40 +20,40 @@ test("regression: modularization – app.js size guard vs HEAD", () => {
 });
 
 test("regression: all extracted modules are loadable and expose expected API", () => {
-  const utils = require("../src/renderer/utils.js");
+  const utils = require("../src/renderer/lib/utils.js");
   assert.equal(typeof utils.escapeHtml, "function");
   assert.equal(typeof utils.formatBytes, "function");
   assert.equal(typeof utils.messageListStats, "function");
 
-  const nav = require("../src/renderer/navigation.js");
+  const nav = require("../src/renderer/lib/navigation.js");
   assert.equal(typeof nav.configuredProjects, "function");
   assert.equal(typeof nav.sessionsForProject, "function");
   assert.equal(typeof nav.tabDisplayTitle, "function");
 
-  const persistence = require("../src/renderer/persistence.js");
+  const persistence = require("../src/renderer/lib/persistence.js");
   assert.equal(typeof persistence.persistExpandedProjects, "function");
   assert.equal(typeof persistence.commandUsageScore, "function");
 
   // Store is DOM-dependent – just check file exists and syntax ok
-  assert.ok(fs.existsSync(path.join(root, "src/renderer/store.js")));
-  assert.ok(fs.existsSync(path.join(root, "src/renderer/composer.js")));
-  assert.ok(fs.existsSync(path.join(root, "src/renderer/chat.js")));
-  assert.ok(fs.existsSync(path.join(root, "src/renderer/sidebar.js")));
+  assert.ok(fs.existsSync(path.join(root, "src/renderer/core/store.js")));
+  assert.ok(fs.existsSync(path.join(root, "src/renderer/features/chat/composer.js")));
+  assert.ok(fs.existsSync(path.join(root, "src/renderer/features/chat/chat.js")));
+  assert.ok(fs.existsSync(path.join(root, "src/renderer/ui/sidebar.js")));
 
   // Composer/chat/sidebar are classic scripts (no module.exports for composer/chat/sidebar in node without DOM),
   // but they should at least be syntax-valid (already checked by `npm run check`).
   // Verify they define expected globals via static analysis
-  const composer = fs.readFileSync(path.join(root, "src/renderer/composer.js"), "utf8");
+  const composer = fs.readFileSync(path.join(root, "src/renderer/features/chat/composer.js"), "utf8");
   assert.match(composer, /function renderAttachmentTray/);
   assert.match(composer, /async function sendMessage/);
   assert.match(composer, /function autosize/);
 
-  const chat = fs.readFileSync(path.join(root, "src/renderer/chat.js"), "utf8");
+  const chat = fs.readFileSync(path.join(root, "src/renderer/features/chat/chat.js"), "utf8");
   assert.match(chat, /function renderFinalMessage/);
   assert.match(chat, /function beginStreamAssistant/);
   assert.match(chat, /function endStreamAssistant/);
 
-  const sidebar = fs.readFileSync(path.join(root, "src/renderer/sidebar.js"), "utf8");
+  const sidebar = fs.readFileSync(path.join(root, "src/renderer/ui/sidebar.js"), "utf8");
   assert.match(sidebar, /function renderProjects/);
   assert.match(sidebar, /function renderTabs/);
   assert.match(sidebar, /function switchToTab/);
@@ -61,7 +61,7 @@ test("regression: all extracted modules are loadable and expose expected API", (
 
 test("regression: index.html loads modules in correct order (store → composer → chat → sidebar → app)", () => {
   const html = fs.readFileSync(path.join(root, "src/renderer/index.html"), "utf8");
-  const order = ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "palette.js", "mentions.js", "diff-view.js", "dragdrop.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "i18n.js", "bootstrap.js", "app.js"];
+  const order = ["lib/utils.js", "ui/ui.js", "ui/message-view.js", "lib/package-helpers.js", "lib/navigation.js", "lib/persistence.js", "core/store.js", "features/chat/composer.js", "features/chat/chat.js", "ui/sidebar.js", "features/session/palette.js", "features/chat/mentions.js", "features/chat/diff-view.js", "features/chat/dragdrop.js", "features/chat/session-view.js", "ui/status.js", "features/models.js", "features/package-view.js", "lib/forms.js", "features/runtime-events.js", "features/auth.js", "features/extension-bridge.js", "ui/media.js", "lib/i18n.js", "core/bootstrap.js", "core/app.js"];
   let lastIdx = -1;
   for (const file of order) {
     const idx = html.indexOf(`src="${file}"`);
@@ -71,38 +71,38 @@ test("regression: index.html loads modules in correct order (store → composer 
 });
 
 test("regression: new extracted modules expose expected API via static analysis", () => {
-  const auth = fs.readFileSync(path.join(root, "src/renderer/auth.js"), "utf8");
+  const auth = fs.readFileSync(path.join(root, "src/renderer/features/auth.js"), "utf8");
   assert.match(auth, /function loadProviderSettings/);
   assert.match(auth, /function renderProviderSettings/);
   assert.match(auth, /async function loadNativePiSettings/);
   assert.match(auth, /function switchSettingsTab/);
   assert.match(auth, /window\.piAuth/);
 
-  const ext = fs.readFileSync(path.join(root, "src/renderer/extension-bridge.js"), "utf8");
+  const ext = fs.readFileSync(path.join(root, "src/renderer/features/extension-bridge.js"), "utf8");
   assert.match(ext, /function handleUiRequest/);
   assert.match(ext, /function updateExtensionStatus/);
   assert.match(ext, /function showDialog/);
   assert.match(ext, /window\.piExtensionBridge/);
 
-  const media = fs.readFileSync(path.join(root, "src/renderer/media.js"), "utf8");
+  const media = fs.readFileSync(path.join(root, "src/renderer/ui/media.js"), "utf8");
   assert.match(media, /function addUserMessage/);
   assert.match(media, /function makeToolCard/);
   assert.match(media, /function safeImageSource/);
   assert.match(media, /function renderMediaBlock/);
   assert.match(media, /window\.piMedia/);
 
-  const bootstrap = fs.readFileSync(path.join(root, "src/renderer/bootstrap.js"), "utf8");
+  const bootstrap = fs.readFileSync(path.join(root, "src/renderer/core/bootstrap.js"), "utf8");
   assert.match(bootstrap, /function wireUi/);
   assert.match(bootstrap, /async function boot/);
   assert.match(bootstrap, /window\.piBootstrap/);
 
-  const runtime = fs.readFileSync(path.join(root, "src/renderer/runtime-events.js"), "utf8");
+  const runtime = fs.readFileSync(path.join(root, "src/renderer/features/runtime-events.js"), "utf8");
   assert.match(runtime, /function createRuntimeEvents/);
   assert.match(runtime, /function bindGlobalPiEvents/);
   assert.match(runtime, /piRuntimeEvents/);
 
   // app.js should delegate to new modules via one-liners, not contain full implementations
-  const app = fs.readFileSync(path.join(root, "src/renderer/app.js"), "utf8");
+  const app = fs.readFileSync(path.join(root, "src/renderer/core/app.js"), "utf8");
   assert.match(app, /window\.piAuth\.loadProviderSettings/);
   assert.match(app, /window\.piExtensionBridge\.handleUiRequest/);
   assert.match(app, /window\.piBootstrap\.wireUi/);
@@ -127,7 +127,7 @@ test("regression: eslint + check still cover new modules", () => {
   assert.ok(pkg.scripts.lint, "lint script should exist");
   assert.ok(pkg.scripts.check, "check script should exist");
   // Verify new modules are present on disk and will be packaged via src/**/*
-  for (const mod of ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "palette.js", "mentions.js", "diff-view.js", "dragdrop.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "bootstrap.js"]) {
+  for (const mod of ["lib/utils.js", "ui/ui.js", "ui/message-view.js", "lib/package-helpers.js", "lib/navigation.js", "lib/persistence.js", "core/store.js", "features/chat/composer.js", "features/chat/chat.js", "ui/sidebar.js", "features/session/palette.js", "features/chat/mentions.js", "features/chat/diff-view.js", "features/chat/dragdrop.js", "features/chat/session-view.js", "ui/status.js", "features/models.js", "features/package-view.js", "lib/forms.js", "features/runtime-events.js", "features/auth.js", "features/extension-bridge.js", "ui/media.js", "core/bootstrap.js"]) {
     assert.ok(fs.existsSync(path.join(root, "src/renderer", mod)), `${mod} should exist`);
   }
 });

@@ -7,10 +7,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname,"..");
 
 test("session-view extracted: app.js delegates to piSessionView",()=>{
-  const app=fs.readFileSync(path.join(root,"src/renderer/session-view.js"),"utf8");
+  const app=fs.readFileSync(path.join(root,"src/renderer/features/chat/session-view.js"),"utf8");
   assert.match(app,/function getCachedSessionMessages/);
   assert.match(app,/function openHistorySession/);
-  const main=fs.readFileSync(path.join(root,"src/renderer/app.js"),"utf8");
+  const main=fs.readFileSync(path.join(root,"src/renderer/core/app.js"),"utf8");
   assert.match(main,/piSessionView/);
   const html=fs.readFileSync(path.join(root,"src/renderer/index.html"),"utf8");
   assert.ok(html.indexOf("session-view.js")>html.indexOf("session.js"));
@@ -33,7 +33,7 @@ test("session cache: explicit tab aliases stay isolated and dirty entries are no
     getMessages:async(tabId)=>({messages:[{role:"user",content:`fresh:${tabId}`}] }),
     getState:async(tabId)=>({tabId,sessionFile:`/sessions/${tabId.slice(-1)}.jsonl`}),
   };
-  await import(`../src/renderer/session-view.js?cache-test=${Date.now()}`);
+  await import(`../src/renderer/features/chat/session-view.js?cache-test=${Date.now()}`);
   const cache=globalThis.piSessionView;
   const original=[{role:"user",content:"cached-a"}];
   cache.cacheSessionMessages("/sessions/a.jsonl",original,"tab-a");

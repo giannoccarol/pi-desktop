@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 
 // Load markdown.js in a VM to get window.renderMarkdown without browser
 function loadMarkdown() {
-  const code = fs.readFileSync(new URL("../src/renderer/markdown.js", import.meta.url), "utf8");
+  const code = fs.readFileSync(new URL("../src/renderer/lib/markdown.js", import.meta.url), "utf8");
   const sandbox = { window: {} };
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox);

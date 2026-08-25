@@ -32,17 +32,23 @@ let failed = false;
   } else log("check", "ok - syntax valid");
 }
 
-// 2) Renderer integrity: ogni src/renderer/*.js deve essere referenziato in index.html
+// 2) Renderer integrity: ogni src/renderer/**/*.js deve essere referenziato in index.html
 {
   const htmlPath = path.join(root, "src/renderer/index.html");
   const html = fs.readFileSync(htmlPath, "utf8");
-  const rendererFiles = fs.readdirSync(path.join(root, "src/renderer")).filter(f => f.endsWith(".js"));
+  const rendererRoot = path.join(root, "src/renderer");
+  const rendererFiles = [];
+  (function walk(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) walk(path.join(dir, e.name));
+      else if (e.name.endsWith(".js")) rendererFiles.push(path.relative(rendererRoot, path.join(dir, e.name)).split(path.sep).join("/"));
+    }
+  })(rendererRoot);
   const missing = [];
-  for (const f of rendererFiles) {
-    // app.js è sempre incluso, gli altri devono avere <script src="f">
-    if (!html.includes(`src="${f}"`) && !html.includes(`src='./${f}'`) && !html.includes(`"${f}"`)) {
-      // tollera markdown.js etc - ma tutti i nostri moduli devono essere inclusi
-      missing.push(f);
+  for (const rel of rendererFiles) {
+    // app.js è sempre incluso, gli altri devono avere <script src="rel">
+    if (!html.includes(`src="${rel}"`) && !html.includes(`src='./${rel}'`)) {
+      missing.push(rel);
     }
   }
   if (missing.length) {
@@ -51,12 +57,12 @@ let failed = false;
     failed = true;
   } else log("renderer-integrity", `ok - tutti i ${rendererFiles.length} moduli referenziati in index.html`);
 
-  // ordine minimo store -> composer -> chat -> sidebar -> palette -> session -> app
-  const order = ["store.js", "composer.js", "chat.js", "sidebar.js", "palette.js", "session.js", "i18n.js", "app.js"];
+  // ordine minimo core/store -> features/chat/composer -> features/chat/chat -> ui/sidebar -> features/session/palette -> features/session/session -> lib/i18n -> core/app
+  const order = ["core/store.js", "features/chat/composer.js", "features/chat/chat.js", "ui/sidebar.js", "features/session/palette.js", "features/session/session.js", "lib/i18n.js", "core/app.js"];
   let lastIdx = -1;
   let orderOk = true;
-  for (const f of order) {
-    const idx = html.indexOf(f);
+  for (const rel of order) {
+    const idx = html.indexOf(`src="${rel}"`);
     if (idx === -1) { console.error(`WARN: ${f} non trovato in index.html`); orderOk = false; }
     else if (idx < lastIdx) { console.error(`FAIL: ordine script errato: ${f} prima del precedente`); orderOk = false; failed = true; }
     lastIdx = Math.max(lastIdx, idx);

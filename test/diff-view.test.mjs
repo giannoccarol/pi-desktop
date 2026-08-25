@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const diff = require("../src/renderer/diff-view.js");
+const diff = require("../src/renderer/features/chat/diff-view.js");
 
 test("diff-view: parseUnifiedDiff basic", () => {
   const raw = `--- a/file.js\n+++ b/file.js\n@@ -1,2 +1,2 @@\n-foo\n+bar\n context`;

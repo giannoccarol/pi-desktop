@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 test("ui: module exposes expected API", async () => {
-  const ui = await import("../src/renderer/ui.js");
+  const ui = await import("../src/renderer/ui/ui.js");
   const m = ui.default || globalThis.piUi;
   assert.equal(typeof m.toast, "function");
   assert.equal(typeof m.refreshIcons, "function");
@@ -34,7 +34,7 @@ test("ui: live scroll follows prior user intent and restores each chat position"
 });
 
 test("message-view: messageTime handles null, ms, seconds, Date", async () => {
-  const mv = await import("../src/renderer/message-view.js");
+  const mv = await import("../src/renderer/ui/message-view.js");
   const api = mv.default || globalThis.piMessageView;
   assert.equal(api.messageTime(null, () => "na").label, "na");
   const ms = Date.now();
@@ -44,7 +44,7 @@ test("message-view: messageTime handles null, ms, seconds, Date", async () => {
 });
 
 test("message-view: nextStatusAllowed respects ranks", async () => {
-  const mv = await import("../src/renderer/message-view.js");
+  const mv = await import("../src/renderer/ui/message-view.js");
   const api = mv.default || globalThis.piMessageView;
   assert.equal(api.nextStatusAllowed("processing", 2, "done"), true);
   assert.equal(api.nextStatusAllowed("done", 3, "processing"), false);
@@ -53,7 +53,7 @@ test("message-view: nextStatusAllowed respects ranks", async () => {
 });
 
 test("package-helpers: npmNameFromSource and formatDownloads", async () => {
-  const ph = await import("../src/renderer/package-helpers.js");
+  const ph = await import("../src/renderer/lib/package-helpers.js");
   const api = ph.default || globalThis.piPackageHelpers;
   assert.equal(api.npmNameFromSource("npm:foo@1.0.0"), "foo");
   assert.equal(api.npmNameFromSource("npm:@scope/foo@2.0.0"), "@scope/foo");
