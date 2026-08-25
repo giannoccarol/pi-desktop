@@ -1,3 +1,11 @@
+## [0.7.6](https://github.com/giannoccarol/pi-desktop/compare/v0.7.5...v0.7.6) (2026-08-25)
+
+
+### Bug Fixes
+
+* **main:** update paths for renderer and preload assets ([bc99c79](https://github.com/giannoccarol/pi-desktop/commit/bc99c798f76c6cd40eb5295b3a4cfcf4235eaee2))
+* **verify:** corregge spawn dello smoke electron senza xvfb ([c7cf1b9](https://github.com/giannoccarol/pi-desktop/commit/c7cf1b95f4338a9e32c53a73628f285b9db51ac7))
+
 ## [0.7.5](https://github.com/giannoccarol/pi-desktop/compare/v0.7.4...v0.7.5) (2026-08-25)
 
 
