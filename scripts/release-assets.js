@@ -30,12 +30,13 @@ const PLATFORM_RULES = {
     ]
   },
   linux: {
-    package: name => /^Pi Desktop-.+-linux-.+\.(?:AppImage|deb)$/i.test(name),
+    package: name => /^Pi Desktop-.+-linux-.+\.(?:AppImage|deb|pacman)$/i.test(name),
     metadata: name => /^(?:latest|beta|alpha)-linux\.yml$/i.test(name),
     optional: name => /^Pi Desktop-.+-linux-.+\.AppImage\.blockmap$/i.test(name),
     required: [
       { label: 'AppImage update payload', matches: name => /^Pi Desktop-.+-linux-.+\.AppImage$/i.test(name) },
-      { label: 'DEB installer', matches: name => /^Pi Desktop-.+-linux-.+\.deb$/i.test(name) }
+      { label: 'DEB installer', matches: name => /^Pi Desktop-.+-linux-.+\.deb$/i.test(name) },
+      { label: 'Pacman installer', matches: name => /^Pi Desktop-.+-linux-.+\.pacman$/i.test(name) }
     ]
   }
 };
