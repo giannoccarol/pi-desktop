@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/giannoccarol/pi-desktop/compare/v1.2.1...v1.3.0) (2026-08-25)
+
+
+### Features
+
+* add app OTA UI in header (come gittree #btn-update) ([1db484b](https://github.com/giannoccarol/pi-desktop/commit/1db484b5de3857778dccb42a9bcd9c5d16457e2c)), closes [#btn-update](https://github.com/giannoccarol/pi-desktop/issues/btn-update) [#btn-app-update](https://github.com/giannoccarol/pi-desktop/issues/btn-app-update)
+
 ## [1.2.1](https://github.com/giannoccarol/pi-desktop/compare/v1.2.0...v1.2.1) (2026-08-25)
 
 
