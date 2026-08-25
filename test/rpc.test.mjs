@@ -221,7 +221,7 @@ test("providers: preserves OAuth entries, masks keys, and writes auth.json with 
   assert.equal(auth.anthropic.type, "oauth");
   assert.equal(auth.custom.key, "keep-me");
   assert.equal(auth.openai.key, "sk-test-12345678");
-  assert.equal(fs.statSync(authFile).mode & 0o777, 0o600);
+  if (process.platform !== "win32") assert.equal(fs.statSync(authFile).mode & 0o777, 0o600);
   assert.match(configured.find((provider) => provider.id === "openai").masked, /5678$/);
 
   providerStore.removeCredential("openai", authFile);
@@ -317,7 +317,7 @@ test("native Pi settings: writes global settings and explicit project trust safe
     piSettingsStore.setTrust(project, true);
     data = piSettingsStore.get(project);
     assert.equal(data.trust.projectTrusted, true);
-    assert.equal(fs.statSync(data.files.global).mode & 0o777, 0o600);
+    if (process.platform !== "win32") assert.equal(fs.statSync(data.files.global).mode & 0o777, 0o600);
   } finally {
     if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previous;

@@ -30,7 +30,9 @@ function writeObject(file, value) {
   const temp = `${file}.tmp-${process.pid}`;
   fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
   fs.renameSync(temp, file);
-  fs.chmodSync(file, 0o600);
+  if (process.platform !== "win32") {
+    try { fs.chmodSync(file, 0o600); } catch {}
+  }
 }
 
 function mergeSettings(globalSettings, projectSettings) {

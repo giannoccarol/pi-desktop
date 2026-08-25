@@ -102,7 +102,9 @@ function writeAuth(authFile, auth) {
   const tempFile = `${authFile}.tmp-${process.pid}`;
   fs.writeFileSync(tempFile, JSON.stringify(auth, null, 2) + "\n", { mode: 0o600 });
   fs.renameSync(tempFile, authFile);
-  fs.chmodSync(authFile, 0o600);
+  if (process.platform !== "win32") {
+    try { fs.chmodSync(authFile, 0o600); } catch {}
+  }
 }
 
 function setApiKey(providerId, key, authFile = defaultAuthFile()) {

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Pre-commit hook: verifica che il progetto non sia rotto prima di commitare.
+# Viene installato via `npm run prepare` o `node scripts/install-hooks.js`.
+# Gli agents DEVONO eseguire `npm run verify` prima di ogni commit (vedi AGENTS.md).
+
+set -e
+
+echo ">> pre-commit: npm run verify (quick)"
+# quick = skip electron smoke (veloce), ma fa check + lint + renderer integrity + tests
+node scripts/verify.js --quick
+
+# Se vuoi anche lo smoke completo su pre-commit, decommenta:
+# node scripts/verify.js
+
+echo ">> pre-commit: ok"
