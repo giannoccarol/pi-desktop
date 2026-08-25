@@ -11,7 +11,7 @@
   },
   "homepage": "https://pi.dev",
   "scripts": {
-    "start": "node scripts/build/prepare-build-assets.js && electron .",
+    "start": "node scripts/build/prepare-build-assets.js && node scripts/run-electron.js",
     "check": "node scripts/verify/check.js",
     "verify": "node scripts/verify/verify.js",
     "verify:quick": "node scripts/verify/verify.js --quick",

@@ -181,7 +181,7 @@ function tTray(key, vars = {}) {
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     { label: tTray("tray.show"), click: () => showWindow() },
-    { label: tTray("tray.newChat"), click: () => { showWindow(); if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } },
+    { label: tTray("tray.newChat"), click: () => { showWindow(); try { if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } catch {} } },
     { type: "separator" },
     { label: tTray("tray.quit"), role: "quit" },
   ]);
@@ -285,11 +285,13 @@ function unregisterGlobalShortcut() {
 
 function createWindow() {
   // Avoid creating duplicate if a valid window already exists
-  if (win && !win.isDestroyed()) {
+  let existingAlive = false;
+  try { existingAlive = Boolean(win && typeof win.isDestroyed === "function" && !win.isDestroyed()); } catch { existingAlive = false; }
+  if (existingAlive) {
     try { showWindow(); } catch {}
     return win;
   }
-  if (win && win.isDestroyed()) win = null;
+  try { if (win) win = null; } catch {}
   const windowIcon = resolveWindowIcon();
   if (!windowIcon) console.warn("[window] icon not found, checked build/icon.png and icon.png");
   win = new BrowserWindow({

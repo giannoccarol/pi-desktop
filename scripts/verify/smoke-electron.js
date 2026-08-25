@@ -32,9 +32,13 @@ function run() {
     const hasDisplay = Boolean(process.env.DISPLAY || isWayland);
     const xvfb = process.platform === "linux" && !hasDisplay ? "xvfb-run" : null;
 
-    const args = xvfb ? ["-a", "npx", "electron", ".", "--enable-logging"] : ["electron", ".", "--enable-logging"];
-    const cmd = xvfb ? "xvfb-run" : "npx";
-    const proc = spawn(cmd, args, { cwd: root, env: process.env });
+    const args = xvfb
+      ? ["-a", "node", "scripts/run-electron.js", ".", "--enable-logging"]
+      : ["node", "scripts/run-electron.js", ".", "--enable-logging"];
+    const cmd = xvfb ? "xvfb-run" : "node";
+    const env = { ...process.env, SMOKE_TIMEOUT: String(timeoutMs) };
+    delete env.ELECTRON_RUN_AS_NODE;
+    const proc = spawn(cmd, args, { cwd: root, env });
 
     const timer = setTimeout(() => {
       // Timeout: se abbiamo visto "agente avviato" e nessun errore critico, è ok
@@ -81,9 +85,11 @@ function run() {
         // Trigger second-instance per testare showWindow su window esistente (riproduce bug 155:11)
         setTimeout(() => {
           try {
-            const sArgs = xvfb ? ["-a", "npx", "electron", ".", "--enable-logging"] : ["electron", ".", "--enable-logging"];
-            const sCmd = xvfb ? "xvfb-run" : "npx";
-            secondProc = spawn(sCmd, sArgs, { cwd: root, env: process.env });
+            const sArgs = xvfb
+              ? ["-a", "node", "scripts/run-electron.js", ".", "--enable-logging"]
+              : ["node", "scripts/run-electron.js", ".", "--enable-logging"];
+            const sCmd = xvfb ? "xvfb-run" : "node";
+            secondProc = spawn(sCmd, sArgs, { cwd: root, env });
             let secondOut = "";
             secondProc.stdout.on("data", (d) => { secondOut += d.toString(); output += d.toString(); });
             secondProc.stderr.on("data", (d) => { secondOut += d.toString(); output += d.toString(); });
