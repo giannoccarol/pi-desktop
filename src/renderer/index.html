@@ -237,6 +237,15 @@
             <option value="en" data-i18n="settings.language.en">English</option>
           </select>
         </label>
+        <div class="field app-update-row">
+          <span data-i18n="settings.appUpdate.label">Pi Desktop — aggiornamenti app (GitHub OTA)</span>
+          <div class="row gap" style="align-items:center">
+            <code id="app-version" class="mono small">—</code>
+            <button id="btn-check-app-update" class="btn ghost small" data-i18n="settings.checkUpdate">Verifica aggiornamenti</button>
+            <span id="check-app-update-status" class="muted small" aria-live="polite"></span>
+          </div>
+          <small class="muted" data-i18n="settings.appUpdate.help">Build unsigned; OTA via latest.yml. Repo ora pubblico.</small>
+        </div>
       </div>
 
       <div id="settings-runtime" class="settings-panel runtime-settings hidden">

@@ -1629,24 +1629,46 @@ let appUpdateState = null;
 
 async function setupAppUpdates() {
   const btn = el.btnAppUpdate;
-  if (!btn) return;
-  const icon = btn.querySelector("i");
-  const label = btn.querySelector("span");
-  btn.addEventListener("click", async () => {
-    if (appUpdateState?.status === "available") {
-      btn.disabled = true;
-      const res = await api.downloadAppUpdate();
-      if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-    } else if (appUpdateState?.status === "downloaded") {
-      const res = await api.installAppUpdate();
-      if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-    } else {
-      btn.disabled = true;
-      const res = await api.checkAppUpdate();
-      if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      setTimeout(() => { if (appUpdateState?.status === "idle") btn.disabled = false; }, 800);
-    }
-  });
+  const settingsBtn = el.btnCheckAppUpdate;
+  const settingsVersion = el.appVersion;
+  const settingsStatus = el.checkAppUpdateStatus;
+  if (btn) {
+    const icon = btn.querySelector("i");
+    const label = btn.querySelector("span");
+    btn.addEventListener("click", async () => {
+      if (appUpdateState?.status === "available") {
+        btn.disabled = true;
+        const res = await api.downloadAppUpdate();
+        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+      } else if (appUpdateState?.status === "downloaded") {
+        const res = await api.installAppUpdate();
+        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+      } else {
+        btn.disabled = true;
+        const res = await api.checkAppUpdate();
+        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+        setTimeout(() => { if (appUpdateState?.status === "idle") btn.disabled = false; }, 800);
+      }
+    });
+  }
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", async () => {
+      const s = appUpdateState?.status;
+      if (s === "available") {
+        settingsBtn.disabled = true;
+        const res = await api.downloadAppUpdate();
+        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+      } else if (s === "downloaded") {
+        const res = await api.installAppUpdate();
+        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+      } else {
+        settingsBtn.disabled = true;
+        if (settingsStatus) settingsStatus.textContent = t("settings.checking");
+        const res = await api.checkAppUpdate();
+        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+      }
+    });
+  }
   api.on("update:state", handleAppUpdateState);
   try {
     const initial = await api.getAppUpdateState();
@@ -1659,31 +1681,65 @@ function handleAppUpdateState(state) {
   const prev = appUpdateState?.status;
   appUpdateState = state;
   const btn = el.btnAppUpdate;
-  if (!btn) return;
-  const icon = btn.querySelector("i");
-  const label = btn.querySelector("span");
-  const visible = ["available", "downloading", "downloaded"].includes(String(state.status));
-  btn.classList.toggle("hidden", !visible);
-  btn.disabled = state.status === "downloading" || state.status === "checking";
-  if (state.status === "available") {
-    if (icon) icon.setAttribute("data-lucide", "download");
-    if (label) label.textContent = t("updates.app.availableVersion", { version: state.availableVersion || "" });
-    btn.title = t("updates.app.availableVersion", { version: state.availableVersion || "" });
-    btn.classList.remove("is-downloading");
-    if (prev !== "available") toast(t("updates.app.availableVersion", { version: state.availableVersion || "" }), "info");
-  } else if (state.status === "downloading") {
-    if (icon) icon.setAttribute("data-lucide", "loader-circle");
-    if (label) label.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
-    btn.title = t("updates.app.downloading", { progress: state.progress || 0 });
-    btn.classList.add("is-downloading");
-  } else if (state.status === "downloaded") {
-    if (icon) icon.setAttribute("data-lucide", "refresh-cw");
-    if (label) label.textContent = t("updates.app.restart");
-    btn.title = t("updates.app.ready");
-    btn.classList.remove("is-downloading");
-    if (prev !== "downloaded") toast(t("updates.app.ready"), "success");
+  if (btn) {
+    const icon = btn.querySelector("i");
+    const label = btn.querySelector("span");
+    const visible = ["available", "downloading", "downloaded"].includes(String(state.status));
+    btn.classList.toggle("hidden", !visible);
+    btn.disabled = state.status === "downloading" || state.status === "checking";
+    if (state.status === "available") {
+      if (icon) icon.setAttribute("data-lucide", "download");
+      if (label) label.textContent = t("updates.app.availableVersion", { version: state.availableVersion || "" });
+      btn.title = t("updates.app.availableVersion", { version: state.availableVersion || "" });
+      btn.classList.remove("is-downloading");
+      if (prev !== "available") toast(t("updates.app.availableVersion", { version: state.availableVersion || "" }), "info");
+    } else if (state.status === "downloading") {
+      if (icon) icon.setAttribute("data-lucide", "loader-circle");
+      if (label) label.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
+      btn.title = t("updates.app.downloading", { progress: state.progress || 0 });
+      btn.classList.add("is-downloading");
+    } else if (state.status === "downloaded") {
+      if (icon) icon.setAttribute("data-lucide", "refresh-cw");
+      if (label) label.textContent = t("updates.app.restart");
+      btn.title = t("updates.app.ready");
+      btn.classList.remove("is-downloading");
+      if (prev !== "downloaded") toast(t("updates.app.ready"), "success");
+    } else if (state.status === "error" && state.error) {
+      toast(t("updates.app.failed", { error: state.error }), "error");
+    }
   } else if (state.status === "error" && state.error) {
     toast(t("updates.app.failed", { error: state.error }), "error");
+  }
+  // Aggiorna anche il pannello Impostazioni (come gittree settings-view)
+  if (el.appVersion) {
+    el.appVersion.textContent = state.currentVersion ? `v${state.currentVersion}` : (appUpdateState?.currentVersion ? `v${appUpdateState.currentVersion}` : "—");
+  }
+  if (el.checkAppUpdateStatus) {
+    if (state.status === "checking") el.checkAppUpdateStatus.textContent = t("settings.checking");
+    else if (state.status === "available" && state.availableVersion) el.checkAppUpdateStatus.textContent = `${t("settings.updateAvailable")} (${state.availableVersion})`;
+    else if (state.status === "downloading") el.checkAppUpdateStatus.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
+    else if (state.status === "downloaded") el.checkAppUpdateStatus.textContent = t("settings.restartToUpdate");
+    else if (state.status === "idle") el.checkAppUpdateStatus.textContent = t("settings.upToDate");
+    else if (state.status === "error" && state.error) el.checkAppUpdateStatus.textContent = state.error;
+    else if (state.availableVersion) el.checkAppUpdateStatus.textContent = `${t("settings.updateAvailable")} (${state.availableVersion})`;
+  }
+  if (el.btnCheckAppUpdate) {
+    if (state.status === "available") {
+      el.btnCheckAppUpdate.textContent = t("settings.downloadAvailable");
+      el.btnCheckAppUpdate.disabled = false;
+    } else if (state.status === "downloading") {
+      el.btnCheckAppUpdate.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
+      el.btnCheckAppUpdate.disabled = true;
+    } else if (state.status === "downloaded") {
+      el.btnCheckAppUpdate.textContent = t("settings.restartToUpdate");
+      el.btnCheckAppUpdate.disabled = false;
+    } else if (state.status === "checking") {
+      el.btnCheckAppUpdate.textContent = t("settings.checking");
+      el.btnCheckAppUpdate.disabled = true;
+    } else {
+      el.btnCheckAppUpdate.textContent = t("settings.checkUpdate");
+      el.btnCheckAppUpdate.disabled = state.status === "downloading" || state.status === "checking";
+    }
   }
   refreshIcons();
 }
