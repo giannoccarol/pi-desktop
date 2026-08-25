@@ -3,7 +3,7 @@
 const { spawn } = require("child_process");
 const { existsSync } = require("fs");
 const { resolve } = require("path");
-const { whichPi } = require("./updater");
+const { whichPi } = require("../updates/updater");
 
 const NPM_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/i;
 const NPM_SPEC = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)(?:@[^\s]+)?$/i;

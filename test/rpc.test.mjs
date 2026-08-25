@@ -9,13 +9,13 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
-const { PiRpcClient } = require("../src/main/pi-rpc.js");
-const { RuntimeTabs } = require("../src/main/runtime-tabs.js");
-const sessionsStore = require("../src/main/sessions.js");
-const { semverCompare } = require("../src/main/updater.js");
-const providerStore = require("../src/main/provider-store.js");
-const packageStore = require("../src/main/package-store.js");
-const piSettingsStore = require("../src/main/pi-settings-store.js");
+const { PiRpcClient } = require("../src/main/core/pi-rpc.js");
+const { RuntimeTabs } = require("../src/main/core/runtime-tabs.js");
+const sessionsStore = require("../src/main/services/sessions.js");
+const { semverCompare } = require("../src/main/updates/updater.js");
+const providerStore = require("../src/main/services/provider-store.js");
+const packageStore = require("../src/main/services/package-store.js");
+const piSettingsStore = require("../src/main/services/pi-settings-store.js");
 const { collapseRetryAttempts, hasVisibleAssistantContent } = require("../src/renderer/chat-utils.js");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

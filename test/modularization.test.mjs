@@ -61,7 +61,7 @@ test("regression: all extracted modules are loadable and expose expected API", (
 
 test("regression: index.html loads modules in correct order (store → composer → chat → sidebar → app)", () => {
   const html = fs.readFileSync(path.join(root, "src/renderer/index.html"), "utf8");
-  const order = ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "i18n.js", "bootstrap.js", "app.js"];
+  const order = ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "palette.js", "mentions.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "i18n.js", "bootstrap.js", "app.js"];
   let lastIdx = -1;
   for (const file of order) {
     const idx = html.indexOf(`src="${file}"`);
@@ -114,7 +114,7 @@ test("regression: new extracted modules expose expected API via static analysis"
 });
 
 test("regression: mention-service extracted from main.js", () => {
-  const mention = require("../src/main/mention-service.js");
+  const mention = require("../src/main/services/mention-service.js");
   assert.equal(typeof mention.scoreMentionCandidate, "function");
   assert.equal(typeof mention.createMentionService, "function");
   assert.ok(mention.MENTION_SKIP_DIRS.has("node_modules"));
@@ -127,7 +127,7 @@ test("regression: eslint + check still cover new modules", () => {
   assert.ok(pkg.scripts.lint, "lint script should exist");
   assert.ok(pkg.scripts.check, "check script should exist");
   // Verify new modules are present on disk and will be packaged via src/**/*
-  for (const mod of ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "bootstrap.js"]) {
+  for (const mod of ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "palette.js", "mentions.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "bootstrap.js"]) {
     assert.ok(fs.existsSync(path.join(root, "src/renderer", mod)), `${mod} should exist`);
   }
 });

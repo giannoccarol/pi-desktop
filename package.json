@@ -3,7 +3,7 @@
   "productName": "Pi Desktop",
   "version": "0.6.9",
   "description": "Desktop companion for the Pi coding agent: chat history, provider/model switching, and self-updating pi independent of the app.",
-  "main": "src/main/main.js",
+  "main": "src/main/core/main.js",
   "license": "MIT",
   "author": {
     "name": "Lorenzo",

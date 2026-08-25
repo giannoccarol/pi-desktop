@@ -6,15 +6,15 @@ const fs = require("fs");
 // execFile moved to mention-service.js
 
 const { RuntimeTabs } = require("./runtime-tabs");
-const sessionsStore = require("./sessions");
-const updater = require("./updater");
-const providerStore = require("./provider-store");
-const packageStore = require("./package-store");
-const packageResources = require("./package-resource-service");
-const piSettingsStore = require("./pi-settings-store");
-const authService = require("./auth-service");
-const { createMentionService } = require("./mention-service");
-const { UpdateService } = require("./update-service");
+const sessionsStore = require("../services/sessions");
+const updater = require("../updates/updater");
+const providerStore = require("../services/provider-store");
+const packageStore = require("../services/package-store");
+const packageResources = require("../services/package-resource-service");
+const piSettingsStore = require("../services/pi-settings-store");
+const authService = require("../services/auth-service");
+const { createMentionService } = require("../services/mention-service");
+const { UpdateService } = require("../updates/update-service");
 
 let win = null;
 let settings = null;

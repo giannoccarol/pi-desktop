@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { pathToFileURL } = require("url");
-const { whichPi } = require("./updater");
+const { whichPi } = require("../updates/updater");
 
 let cachedModule = null;
 let cachedRoot = null;

@@ -1,7 +1,7 @@
 "use strict";
 
 const { PiRpcClient } = require("./pi-rpc");
-const { whichPi } = require("./updater");
+const { whichPi } = require("../updates/updater");
 
 /**
  * Owns the external `pi --mode rpc` process and bridges it to the renderer.
