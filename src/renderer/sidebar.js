@@ -21,7 +21,7 @@ function addUserMessage(){ return window.piMedia ? window.piMedia.addUserMessage
 function renderAttachmentTray(){ return window.piComposer ? window.piComposer.renderAttachmentTray.apply(null, arguments) : void 0; }
 function renderQueuePanel(){ return window.piComposer ? window.piComposer.renderQueuePanel.apply(null, arguments) : void 0; }
 function autosize(){ return window.piComposer ? window.piComposer.autosize.apply(null, arguments) : void 0; }
-function getCachedSessionMessages(f){ return window.piSessionView ? window.piSessionView.getCachedSessionMessages(f) : null; }
+function getCachedSessionMessages(f, tabId=null){ return window.piSessionView ? window.piSessionView.getCachedSessionMessages(f, tabId) : null; }
 function setSessionLoading(f,o){ return window.piSessionView ? window.piSessionView.setSessionLoading(f,o) : void 0; }
 function clearSessionLoading(){ return window.piSessionView ? window.piSessionView.clearSessionLoading() : void 0; }
 function renderConversation(m,c){ return window.piSessionView ? window.piSessionView.renderConversation(m,c) : Promise.resolve(false); }
@@ -135,7 +135,7 @@ async function switchToTab(tabId) {
   state.pendingTabId = tabId;
   renderTabs();
   try {
-    const cached = target.sessionFile ? getCachedSessionMessages(target.sessionFile) : null;
+    const cached = getCachedSessionMessages(target.sessionFile, target.id);
     setSessionLoading(target.sessionFile || `tab:${tabId}`, { showSkeleton: !cached });
     resetQueueState();
     state.attachments = [];

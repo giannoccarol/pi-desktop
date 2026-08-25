@@ -9,18 +9,52 @@
   const sessionMessageCache = new Map();
   const SESSION_CACHE_MAX = 30;
 
-  function getCachedSessionMessages(file){
-    if(!file) return null;
-    return sessionMessageCache.get(file)?.messages || null;
+  function cacheKeyFor(file, tabId){
+    if(file) return file;
+    if(tabId) return `tab:${tabId}`;
+    return null;
   }
-  function cacheSessionMessages(file, messages){
-    if(!file || !Array.isArray(messages)) return;
-    sessionMessageCache.set(file,{messages, at: Date.now()});
-    if(sessionMessageCache.size > SESSION_CACHE_MAX){
+  function getCachedSessionMessages(file, tabId=null){
+    // supporta sia file che tabId (per draft senza file)
+    const key = cacheKeyFor(file, tabId);
+    if(!key) return null;
+    // prova anche con tabId se file non trovato (fallback per draft migrati)
+    let entry = sessionMessageCache.get(key);
+    if(!entry && file && tabId) entry = sessionMessageCache.get(`tab:${tabId}`);
+    if(!entry && tabId) entry = sessionMessageCache.get(tabId);
+    return entry?.messages || null;
+  }
+  function cacheSessionMessages(file, messages, tabId=null){
+    if(!Array.isArray(messages)) return;
+    const keys = [];
+    const primary = cacheKeyFor(file, tabId || state.activeTabId);
+    if(primary) keys.push(primary);
+    // per tab con file, tieni anche la chiave tab: per switch rapido anche se file cambia
+    const tabKey = state.activeTabId ? `tab:${state.activeTabId}` : (tabId ? `tab:${tabId}` : null);
+    if(tabKey && !keys.includes(tabKey)) keys.push(tabKey);
+    if(!keys.length) return;
+    const at = Date.now();
+    for(const k of keys){
+      sessionMessageCache.set(k,{messages, at});
+    }
+    while(sessionMessageCache.size > SESSION_CACHE_MAX){
       let oldestKey=null, oldestAt=Infinity;
       for(const [k,v] of sessionMessageCache){ if(v.at<oldestAt){oldestAt=v.at; oldestKey=k;}}
-      if(oldestKey && oldestKey!==file) sessionMessageCache.delete(oldestKey);
+      if(oldestKey && !keys.includes(oldestKey)) sessionMessageCache.delete(oldestKey);
+      else break;
     }
+  }
+  function messagesEqual(a,b){
+    if(!Array.isArray(a) || !Array.isArray(b)) return false;
+    if(a.length!==b.length) return false;
+    try{
+      if(window.piUtils?.messageListStats){
+        const ha=window.piUtils.messageListStats(a);
+        const hb=window.piUtils.messageListStats(b);
+        return ha.hash===hb.hash && ha.bytes===hb.bytes;
+      }
+    }catch{}
+    try{ return JSON.stringify(a)===JSON.stringify(b); }catch{ return false; }
   }
   function setSessionLoading(file, {showSkeleton=true}={}){
     state.openingSessionFile=file;
@@ -50,9 +84,14 @@
     const results=new Map();
     for(const m of displayMessages) if(m.role==="toolResult" && m.toolCallId) results.set(m.toolCallId,m);
     const consumed=new Set(); const CHUNK=20;
+    const renderFn = window.piChat?.renderFinalMessage || window.renderFinalMessage;
+    if(typeof renderFn !== "function"){
+      console.error("renderFinalMessage mancante", window.piChat);
+      throw new Error("renderFinalMessage non disponibile");
+    }
     for(let i=0;i<displayMessages.length;i++){
       if(!isCurrent()) return false;
-      window.piChat.renderFinalMessage(displayMessages[i],{results, consumed});
+      renderFn(displayMessages[i],{results, consumed});
       if((i+1)%CHUNK===0 && i+1<displayMessages.length){ window.piUi?.scheduleScroll(); await nextFrame(); }
     }
     return true;
@@ -67,13 +106,13 @@
     state.activeSessionFile=current.sessionFile||null;
     state.activeTabId=current.tabId||state.activeTabId;
     if(restoreTab && window.piSidebar?.restoreActiveTabContext) window.piSidebar.restoreActiveTabContext();
-    const identical=Array.isArray(paintedCache) && paintedCache.length===displayMessages.length;
+    const identical = Array.isArray(paintedCache) && messagesEqual(paintedCache, displayMessages);
     if(!identical){
       if(window.piChat?.clearChat) window.piChat.clearChat(); else { el.messages.innerHTML=""; state.streamAssistant=null; state.tools.clear(); }
       const painted=await renderConversation(displayMessages,isCurrent);
       if(painted===false||!isCurrent()) return false;
     }
-    cacheSessionMessages(state.activeSessionFile, displayMessages);
+    cacheSessionMessages(state.activeSessionFile, displayMessages, state.activeTabId);
     const hasContent=Boolean(displayMessages.length||state.localQueue.length);
     window.piUi?.setConversationMode(hasContent,false);
     el.emptyState.classList.toggle("hidden",hasContent);
