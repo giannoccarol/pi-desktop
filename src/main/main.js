@@ -134,6 +134,7 @@ function resolveWindowIcon() {
   try { candidates.push(path.join(app.getAppPath(), "icon.png")); } catch {}
   // System icon locations su Arch/Linux installato via pacman/deb
   candidates.push("/usr/share/pixmaps/pi-desktop.png");
+  candidates.push("/usr/share/icons/hicolor/1024x1024/apps/pi-desktop.png");
   candidates.push("/usr/share/icons/hicolor/512x512/apps/pi-desktop.png");
   candidates.push("/usr/share/icons/hicolor/256x256/apps/pi-desktop.png");
   candidates.push("/usr/share/icons/hicolor/128x128/apps/pi-desktop.png");
