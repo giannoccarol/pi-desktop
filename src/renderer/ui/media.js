@@ -161,6 +161,9 @@
     img.src = source;
     img.alt = caption;
     img.loading = "lazy";
+    // Quando l'immagine lazy carica, il layout cresce: se eravamo ancorati al
+    // fondo, riallinea la viewport invece di lasciare la chat a metà.
+    img.addEventListener("load", () => { window.piUi?.scheduleScroll(); });
     img.addEventListener("click", () => figure.classList.toggle("expanded"));
     const label = document.createElement("figcaption");
     label.textContent = caption;

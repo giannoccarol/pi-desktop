@@ -50,6 +50,27 @@
     };
   }
 
+  // Dopo un restore al fondo il contenuto continua a dimensionarsi (immagini
+  // lazy, tool card, highlight): senza re-pin la viewport resta a metà chat.
+  let bottomPinRaf = 0;
+  function pinBottomUntilSettled(maxFrames = 60) {
+    if (bottomPinRaf) cancelAnimationFrame(bottomPinRaf);
+    let frames = 0;
+    let lastHeight = -1;
+    const step = () => {
+      bottomPinRaf = 0;
+      const el = getEl();
+      if (!el.chat || getState().chatStickToBottom !== true) return;
+      el.chat.scrollTop = el.chat.scrollHeight;
+      queueMicrotask(updateScrollBottomVisibility);
+      if (el.chat.scrollHeight !== lastHeight && ++frames <= maxFrames) {
+        lastHeight = el.chat.scrollHeight;
+        bottomPinRaf = requestAnimationFrame(step);
+      }
+    };
+    bottomPinRaf = requestAnimationFrame(step);
+  }
+
   function restoreChatScrollState(snapshot, { fallbackToBottom = true } = {}) {
     const el = getEl();
     const state = getState();
@@ -60,6 +81,7 @@
     if (useBottom) {
       el.chat.scrollTop = el.chat.scrollHeight;
       state.chatStickToBottom = true;
+      pinBottomUntilSettled();
     } else {
       const maxTop = Math.max(0, el.chat.scrollHeight - el.chat.clientHeight);
       el.chat.scrollTop = Math.min(Math.max(0, Number(snapshot?.scrollTop) || 0), maxTop);
@@ -97,6 +119,7 @@
     el.chat.scrollTop = el.chat.scrollHeight;
     getState().chatStickToBottom = true;
     requestAnimationFrame(() => { el.chat.style.scrollBehavior = previous; });
+    pinBottomUntilSettled();
     queueMicrotask(updateScrollBottomVisibility);
   }
 
