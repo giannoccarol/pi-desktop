@@ -284,8 +284,8 @@ function compactToolArgs(toolName, rawArgs) { if(window.piForms) return window.p
   return fullToolArgs(rawArgs).slice(0, 160);
 }
 
-let sessionsTimer = null;
-let tabsTimer = null;
+var sessionsTimer = null;
+var tabsTimer = null;
 
 api.on("pi:maintenance-output", (line) => {
   if (state.maintenanceAppend) state.maintenanceAppend(line);
