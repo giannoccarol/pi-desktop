@@ -1,3 +1,11 @@
+# [0.7.0](https://github.com/giannoccarol/pi-desktop/compare/v0.6.9...v0.7.0) (2026-08-25)
+
+
+### Features
+
+* completa nuove funzionalità con test ([a0d951c](https://github.com/giannoccarol/pi-desktop/commit/a0d951ce62f2f6f128aeadb6e5da64a43ee2cc3c))
+* **renderer:** enhance renderer integrity checks and restructure module imports ([08ff6c9](https://github.com/giannoccarol/pi-desktop/commit/08ff6c99b2f407df5a7ad488f2745f485ffd3bd7))
+
 ## [0.6.9](https://github.com/giannoccarol/pi-desktop/compare/v0.6.8...v0.6.9) (2026-08-25)
 
 
