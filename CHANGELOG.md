@@ -1,3 +1,15 @@
+# [1.6.0](https://github.com/giannoccarol/pi-desktop/compare/v1.5.0...v1.6.0) (2026-08-25)
+
+
+### Bug Fixes
+
+* **renderer:** include session.js in index.html, risolve schermo bianco ([fa4701f](https://github.com/giannoccarol/pi-desktop/commit/fa4701f95d5ad2ab963d9e7d844aafe5575634b5))
+
+
+### Features
+
+* usa pi-logo-on-light/dark in taskbar, header e hero con supporto tema ([890dd99](https://github.com/giannoccarol/pi-desktop/commit/890dd99fcd9be3c02a657ab8ad0a825848f6b21c)), closes [#09090b](https://github.com/giannoccarol/pi-desktop/issues/09090b)
+
 # [1.5.0](https://github.com/giannoccarol/pi-desktop/compare/v1.4.1...v1.5.0) (2026-08-25)
 
 
