@@ -1,3 +1,10 @@
+## [0.6.9](https://github.com/giannoccarol/pi-desktop/compare/v0.6.8...v0.6.9) (2026-08-25)
+
+
+### Bug Fixes
+
+* **linux:** ripristina icona nella taskbar ([97885e7](https://github.com/giannoccarol/pi-desktop/commit/97885e705562af0f857f48cb694be31a04cb47b1))
+
 ## [0.6.8](https://github.com/giannoccarol/pi-desktop/compare/v0.6.7...v0.6.8) (2026-08-25)
 
 
