@@ -1,3 +1,10 @@
+## [0.7.2](https://github.com/giannoccarol/pi-desktop/compare/v0.7.1...v0.7.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* **renderer:** mantieni l'ancoraggio al fondo durante lo switch di tab/menu ([bd6f1f0](https://github.com/giannoccarol/pi-desktop/commit/bd6f1f0482dec4a5478d2d714ec6ea3ff5637b44))
+
 ## [0.7.1](https://github.com/giannoccarol/pi-desktop/compare/v0.7.0...v0.7.1) (2026-08-25)
 
 
