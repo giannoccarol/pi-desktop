@@ -1,3 +1,10 @@
+## [0.7.4](https://github.com/giannoccarol/pi-desktop/compare/v0.7.3...v0.7.4) (2026-08-25)
+
+
+### Bug Fixes
+
+* **main:** robust showWindow + gate A anti-release-rotta ([7f02857](https://github.com/giannoccarol/pi-desktop/commit/7f02857a20018b9c1356684d11754d248bf1e08e))
+
 ## [0.7.3](https://github.com/giannoccarol/pi-desktop/compare/v0.7.2...v0.7.3) (2026-08-25)
 
 
