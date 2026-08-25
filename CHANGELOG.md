@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/giannoccarol/pi-desktop/compare/v1.4.1...v1.5.0) (2026-08-25)
+
+
+### Features
+
+* settings check for app OTA (come gittree about) ([c81beb1](https://github.com/giannoccarol/pi-desktop/commit/c81beb1b3841fdf15f9107d62f5804eddc034ac3)), closes [#btn-app-update](https://github.com/giannoccarol/pi-desktop/issues/btn-app-update)
+
 ## [1.4.1](https://github.com/giannoccarol/pi-desktop/compare/v1.4.0...v1.4.1) (2026-08-25)
 
 # [1.4.0](https://github.com/giannoccarol/pi-desktop/compare/v1.3.0...v1.4.0) (2026-08-25)
