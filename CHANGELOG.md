@@ -1,3 +1,10 @@
+## [0.7.3](https://github.com/giannoccarol/pi-desktop/compare/v0.7.2...v0.7.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* **main:** evita 'Object has been destroyed' in showWindow / second-instance ([a0302d6](https://github.com/giannoccarol/pi-desktop/commit/a0302d6ca580282ace19b8f098302322e9cfd658))
+
 ## [0.7.2](https://github.com/giannoccarol/pi-desktop/compare/v0.7.1...v0.7.2) (2026-08-25)
 
 
