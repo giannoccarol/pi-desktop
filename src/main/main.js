@@ -118,6 +118,7 @@ function requestAuthPrompt(providerId, prompt, signal) {
 }
 
 function createWindow() {
+  const windowIcon = path.join(__dirname, "..", "..", "build", "icon.png");
   win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -125,6 +126,7 @@ function createWindow() {
     minHeight: 480,
     backgroundColor: "#0f1115",
     autoHideMenuBar: true,
+    icon: fs.existsSync(windowIcon) ? windowIcon : undefined,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "preload.js"),
       contextIsolation: true,
