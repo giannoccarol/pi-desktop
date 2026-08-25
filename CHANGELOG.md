@@ -1,3 +1,10 @@
+## [0.7.1](https://github.com/giannoccarol/pi-desktop/compare/v0.7.0...v0.7.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **test:** correct project-root resolution and recursive test glob after restructure ([a383f01](https://github.com/giannoccarol/pi-desktop/commit/a383f0144c6b79e8b34b403393ffa151b67d0ddf))
+
 # [0.7.0](https://github.com/giannoccarol/pi-desktop/compare/v0.6.9...v0.7.0) (2026-08-25)
 
 
