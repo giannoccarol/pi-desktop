@@ -38,7 +38,7 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Prepare build assets
-        run: node scripts/prepare-build-assets.js
+        run: node scripts/build/prepare-build-assets.js
       - name: Verify Linux package
         run: npx electron-builder --linux --dir --publish never
 
@@ -59,7 +59,7 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Prepare build assets
-        run: node scripts/prepare-build-assets.js
+        run: node scripts/build/prepare-build-assets.js
       - name: Verify unsigned Windows package
         run: npx electron-builder --win --dir --publish never
 
@@ -81,6 +81,6 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Prepare build assets
-        run: node scripts/prepare-build-assets.js
+        run: node scripts/build/prepare-build-assets.js
       - name: Verify macOS package
         run: npx electron-builder --mac --dir --publish never

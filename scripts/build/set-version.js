@@ -3,11 +3,11 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "..", "..");
 const version = process.argv[2];
 
 if (!version) {
-  console.error("Usage: node scripts/set-version.js 0.x.y  (es. 0.5.0, 0.100.100)");
+  console.error("Usage: node scripts/build/set-version.js 0.x.y  (es. 0.5.0, 0.100.100)");
   process.exit(1);
 }
 if (!/^0\.(\d{1,3})\.(\d{1,3})$/.test(version)) {
@@ -32,7 +32,7 @@ console.log(`package.json: ${old} -> ${version}`);
 spawnSync("npm", ["install", "--package-lock-only"], { cwd: root, stdio: "inherit" });
 
 // Verify
-const check = spawnSync("node", ["scripts/check-release-version.js", `v${version}`], { cwd: root, stdio: "inherit" });
+const check = spawnSync("node", [ "scripts/build/check-release-version.js", `v${version}`], { cwd: root, stdio: "inherit" });
 if (check.status !== 0) process.exit(check.status);
 
 console.log(`\nPronto per commit: git add package.json package-lock.json && git commit -m \"chore(release): ${version}\" && git tag v${version}`);

@@ -4,13 +4,13 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const utils = require("../src/renderer/lib/utils.js");
+const utils = require("../../src/renderer/lib/utils.js");
 const {
   hasVisibleAssistantContent,
   isRawCommandOutputText,
   sanitizeAssistantBlocks,
   collapseRetryAttempts,
-} = require("../src/renderer/lib/chat-utils.js");
+} = require("../../src/renderer/lib/chat-utils.js");
 
 // ---- utils pure ----
 test("utils: escapeHtml", () => {

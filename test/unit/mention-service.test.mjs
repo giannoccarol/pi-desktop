@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { scoreMentionCandidate, createMentionService } = require("../src/main/services/mention-service.js");
+const { scoreMentionCandidate, createMentionService } = require("../../src/main/services/mention-service.js");
 
 test("mention: scoreMentionCandidate ranking", () => {
   // exact basename match scores highest

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const persistence = require("../src/renderer/lib/persistence.js");
+const persistence = require("../../src/renderer/lib/persistence.js");
 
 function fakeStorage(initial = {}) {
   const store = { ...initial };

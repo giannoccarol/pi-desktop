@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const projectRoot = path.resolve(__dirname, '..');
+const projectRoot = path.resolve(__dirname, '..', '..');
 const source = path.join(projectRoot, 'icon.png');
 const buildDirectory = path.join(projectRoot, 'build');
 const destination = path.join(buildDirectory, 'icon.png');

@@ -84,7 +84,7 @@ function makeElectronMock() {
 
 function loadMainWithMock(electronMock) {
   // Clear cache for main.js and dependencies that require electron
-  const mainPath = path.join(__dirname, "../src/main/core/main.js");
+  const mainPath = path.join(__dirname, "../../src/main/core/main.js");
   // Use a fresh require with mocked electron via Module._load interception is hard;
   // Instead we use a child process style: replace require cache for 'electron'
   const Module = awaitImportHack();
@@ -148,7 +148,7 @@ test("hotkey: re-registration unregisters previous", () => {
 test("tray: module loads and exposes test helpers when mocked (integration)", async () => {
   // Verify the actual main.js file contains tray logic strings
   const fs = await import("node:fs");
-  const content = fs.readFileSync(path.join(__dirname, "../src/main/core/main.js"), "utf8");
+  const content = fs.readFileSync(path.join(__dirname, "../../src/main/core/main.js"), "utf8");
   assert.match(content, /function createTray/);
   assert.match(content, /function showWindow/);
   assert.match(content, /GLOBAL_HOTKEY/);

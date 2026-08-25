@@ -11,19 +11,19 @@
   },
   "homepage": "https://pi.dev",
   "scripts": {
-    "start": "node scripts/prepare-build-assets.js && electron .",
-    "check": "node scripts/check.js",
-    "verify": "node scripts/verify.js",
-    "verify:quick": "node scripts/verify.js --quick",
-    "prepare": "node scripts/install-hooks.js && node scripts/prepare-build-assets.js",
-    "test": "node --test test/*.test.mjs",
+    "start": "node scripts/build/prepare-build-assets.js && electron .",
+    "check": "node scripts/verify/check.js",
+    "verify": "node scripts/verify/verify.js",
+    "verify:quick": "node scripts/verify/verify.js --quick",
+    "prepare": "node scripts/hooks/install-hooks.js && node scripts/build/prepare-build-assets.js",
+    "test": "node --test test/",
     "test:legacy": "node test/rpc.test.mjs",
     "lint": "eslint src --ext .js,.mjs",
     "lint:fix": "eslint src --ext .js,.mjs --fix",
     "dist": "electron-builder",
-    "bump": "node scripts/set-version.js",
-    "release:check": "node scripts/check-release-version.js",
-    "release:assets": "node scripts/release-assets.js"
+    "bump": "node scripts/build/set-version.js",
+    "release:check": "node scripts/build/check-release-version.js",
+    "release:assets": "node scripts/build/release-assets.js"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^7.0.0",

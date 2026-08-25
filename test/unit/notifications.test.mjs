@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
 // runtime-events exports via module.exports in Node, but uses globalThis fallback
-const rt = require("../src/renderer/features/runtime-events.js");
+const rt = require("../../src/renderer/features/runtime-events.js");
 
 test("notifications: shouldNotify respects enabled flag and visibility", () => {
   assert.equal(rt.shouldNotify({ enabled: false, documentHidden: true, windowFocused: false }), false);

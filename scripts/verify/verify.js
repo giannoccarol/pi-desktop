@@ -6,7 +6,7 @@ const { spawnSync, execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "..", "..");
 const isCI = Boolean(process.env.CI);
 const isQuick = process.argv.includes("--quick");
 
@@ -22,9 +22,9 @@ function run(cmd, args, opts = {}) {
 
 let failed = false;
 
-// 1) Syntax check (scripts/check.js)
+// 1) Syntax check (scripts/verify/check.js)
 {
-  const r = run(process.execPath, ["scripts/check.js"]);
+  const r = run(process.execPath, ["scripts/verify/check.js"]);
   console.log(r.out);
   if (!r.ok) {
     console.error("FAIL: npm run check");

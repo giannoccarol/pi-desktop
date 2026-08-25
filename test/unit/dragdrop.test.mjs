@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const drag = require("../src/renderer/features/chat/dragdrop.js");
+const drag = require("../../src/renderer/features/chat/dragdrop.js");
 
 test("dragdrop: filterIgnoredPaths removes skip dirs and dotfiles", () => {
   const input = ["src/app.js", "node_modules/foo.js", ".git/HEAD", "dist/bundle.js", "src/.hidden/file.js", "valid/file.txt"];

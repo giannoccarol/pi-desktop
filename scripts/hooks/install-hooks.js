@@ -3,8 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const root = path.join(__dirname, "..");
-const src = path.join(root, "scripts/githooks/pre-commit");
+const root = path.join(__dirname, "..", "..");
+const src = path.join(root, "scripts/hooks/pre-commit");
 const dest = path.join(root, ".git/hooks/pre-commit");
 
 if (!fs.existsSync(src)) {
@@ -17,4 +17,4 @@ fs.chmodSync(dest, 0o755);
 console.log(`Hook installato: ${dest}`);
 
 // Configura core.hooksPath se si vuole usare .githooks versionato (opzionale)
-// spawnSync("git", ["config", "core.hooksPath", "scripts/githooks"], { cwd: root });
+// spawnSync("git", ["config", "core.hooksPath", "scripts/hooks"], { cwd: root });

@@ -88,10 +88,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/prepare-build-assets.js
+      - run: node scripts/build/prepare-build-assets.js
       - run: npx electron-builder --win --x64 --publish never
       - name: Validate and upload Windows OTA assets
-        run: node scripts/release-assets.js --platform win --directory dist --tag "$env:GITHUB_REF_NAME"
+        run: node scripts/build/release-assets.js --platform win --directory dist --tag "$env:GITHUB_REF_NAME"
 
   macos:
     name: macOS x64 and arm64 artifacts
@@ -116,7 +116,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/prepare-build-assets.js
+      - run: node scripts/build/prepare-build-assets.js
       - name: Build macOS installers
         shell: bash
         run: |
@@ -138,7 +138,7 @@ jobs:
           if [[ "$MACOS_OTA_ENABLED" == "true" ]]; then
             platform="mac"
           fi
-          node scripts/release-assets.js \
+          node scripts/build/release-assets.js \
             --platform "$platform" \
             --directory dist \
             --tag "$GITHUB_REF_NAME"
@@ -160,12 +160,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/prepare-build-assets.js
+      - run: node scripts/build/prepare-build-assets.js
       - name: Install Pacman packaging tools
         run: sudo apt-get update && sudo apt-get install --yes libarchive-tools
       - run: npx electron-builder --linux --x64 --publish never
       - name: Validate and upload Linux OTA assets
-        run: node scripts/release-assets.js --platform linux --directory dist --tag "$GITHUB_REF_NAME"
+        run: node scripts/build/release-assets.js --platform linux --directory dist --tag "$GITHUB_REF_NAME"
 
   publish:
     name: Publish complete release

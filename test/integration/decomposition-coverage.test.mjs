@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "..", "..");
 
 // Ensure window exists for renderer modules that expect browser global
 if (typeof globalThis.window === "undefined") globalThis.window = globalThis;
@@ -23,8 +23,8 @@ if (!globalThis.document) {
 globalThis.piStore = { el: {}, state: { providers:[], commandUsage:{}, settings:{ cwd:'/tmp' }, expandedProjects: new Set(['/tmp']), tabs:[], extensionStatuses:new Map(), extensionWidgets:new Map(), busy:false, activeUserMessage:null, lastAssistantErrored:false, tools:new Map(), directBashCard:null, nativeQueue:{steering:[],followUp:[]}, queuedUserMessages:[], localQueue:[] } };
 globalThis.piDesktop = { on(){}, listProviders: async()=>[], loginProvider: async()=>[], listTabs: async()=>[], getSettings: async()=>({cwd:'/tmp', language:'it'}), getMessages: async()=>({messages:[]}), getState: async()=>({}), getAvailableModels: async()=>({models:[]}), getThinkingLevels: async()=>({levels:[]}) };
 globalThis.i18n = { t:(k)=>k, getLang:()=>'it', setLang(){}, applyI18n(){} };
-globalThis.piUtils = require("../src/renderer/lib/utils.js");
-globalThis.piMessageView = require("../src/renderer/ui/message-view.js");
+globalThis.piUtils = require("../../src/renderer/lib/utils.js");
+globalThis.piMessageView = require("../../src/renderer/ui/message-view.js");
 globalThis.piChat = { toolDisplayName:(n)=>n||"tool" };
 globalThis.piChatUtils = { collapseRetryAttempts:(m)=>m, hasVisibleAssistantContent:()=>true };
 globalThis.piUi = { toast(){}, refreshIcons(){}, icon(n){return `<i data-lucide="${n}"></i>`}, scrollBottom(){}, jumpToBottom(){}, isNearBottom(){return true}, updateScrollBottomVisibility(){}, scheduleScrollVisibility(){}, scheduleScroll(){}, md(t){return t}, setConversationMode(){}, closeMenus(){}, setSidebarVisible(){}, applyTheme(){} };
@@ -40,7 +40,7 @@ globalThis.piSessionView = { getCachedSessionMessages:()=>null, cacheSessionMess
 globalThis.lucide = { createIcons(){}, icons:{} };
 
 test("decomposition: auth.js exposes expected API and is require-able in Node", () => {
-  const auth = require("../src/renderer/features/auth.js");
+  const auth = require("../../src/renderer/features/auth.js");
   assert.equal(typeof auth.loadProviderSettings, "function");
   assert.equal(typeof auth.renderProviderSettings, "function");
   assert.equal(typeof auth.loadNativePiSettings, "function");
@@ -53,7 +53,7 @@ test("decomposition: auth.js exposes expected API and is require-able in Node", 
 });
 
 test("decomposition: extension-bridge.js exposes expected API", () => {
-  const ext = require("../src/renderer/features/extension-bridge.js");
+  const ext = require("../../src/renderer/features/extension-bridge.js");
   assert.equal(typeof ext.handleUiRequest, "function");
   assert.equal(typeof ext.updateExtensionStatus, "function");
   assert.equal(typeof ext.updateExtensionWidget, "function");
@@ -65,7 +65,7 @@ test("decomposition: extension-bridge.js exposes expected API", () => {
 });
 
 test("decomposition: media.js exposes expected API and safeImageSource logic", () => {
-  const media = require("../src/renderer/ui/media.js");
+  const media = require("../../src/renderer/ui/media.js");
   assert.equal(typeof media.safeImageSource, "function");
   assert.equal(typeof media.renderMediaBlock, "function");
   assert.equal(typeof media.setToolCardResult, "function");
@@ -84,7 +84,7 @@ test("decomposition: media.js exposes expected API and safeImageSource logic", (
 });
 
 test("decomposition: bootstrap.js exposes wireUi and boot", () => {
-  const boot = require("../src/renderer/core/bootstrap.js");
+  const boot = require("../../src/renderer/core/bootstrap.js");
   assert.equal(typeof boot.wireUi, "function");
   assert.equal(typeof boot.boot, "function");
   const content = fs.readFileSync(path.join(root, "src/renderer/core/bootstrap.js"), "utf8");
@@ -93,7 +93,7 @@ test("decomposition: bootstrap.js exposes wireUi and boot", () => {
 });
 
 test("decomposition: runtime-events.js exposes both factories", () => {
-  const rt = require("../src/renderer/features/runtime-events.js");
+  const rt = require("../../src/renderer/features/runtime-events.js");
   assert.equal(typeof rt.createRuntimeEvents, "function");
   assert.equal(typeof rt.bindGlobalPiEvents, "function");
   const state = { tabs:[{id:"a", busy:false}], activeTabId:"a", lastAssistantErrored:false, lastAssistantErrorWrap:null, retryAttempt:0, busy:false, activeUserMessage:null, tools:new Map(), directBashCard:null, nativeQueue:{steering:[],followUp:[]}, queuedUserMessages:[], extensionStatuses:new Map(), extensionWidgets:new Map() };

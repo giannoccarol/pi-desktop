@@ -7,7 +7,7 @@ set -e
 
 echo ">> pre-commit: npm run verify (quick)"
 # quick = skip electron smoke (veloce), ma fa check + lint + renderer integrity + tests
-node scripts/verify.js --quick
+node scripts/verify/verify.js --quick
 
 # Se vuoi anche lo smoke completo su pre-commit, decommenta:
 # node scripts/verify.js

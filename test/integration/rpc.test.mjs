@@ -9,17 +9,17 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
-const { PiRpcClient } = require("../src/main/core/pi-rpc.js");
-const { RuntimeTabs } = require("../src/main/core/runtime-tabs.js");
-const sessionsStore = require("../src/main/services/sessions.js");
-const { semverCompare } = require("../src/main/updates/updater.js");
-const providerStore = require("../src/main/services/provider-store.js");
-const packageStore = require("../src/main/services/package-store.js");
-const piSettingsStore = require("../src/main/services/pi-settings-store.js");
-const { collapseRetryAttempts, hasVisibleAssistantContent } = require("../src/renderer/lib/chat-utils.js");
+const { PiRpcClient } = require("../../src/main/core/pi-rpc.js");
+const { RuntimeTabs } = require("../../src/main/core/runtime-tabs.js");
+const sessionsStore = require("../../src/main/services/sessions.js");
+const { semverCompare } = require("../../src/main/updates/updater.js");
+const providerStore = require("../../src/main/services/provider-store.js");
+const packageStore = require("../../src/main/services/package-store.js");
+const piSettingsStore = require("../../src/main/services/pi-settings-store.js");
+const { collapseRetryAttempts, hasVisibleAssistantContent } = require("../../src/renderer/lib/chat-utils.js");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MOCK = path.join(__dirname, "mock-pi.js");
+const MOCK = path.join(__dirname, "..", "mocks", "mock-pi.js");
 
 function startMock(extraArgs = []) {
   const client = new PiRpcClient(process.execPath, {
@@ -402,7 +402,7 @@ test("sessions: parse fixture files and list newest-first", () => {
 
 test("markdown: code blocks, tables, links are rendered safely", () => {
   global.window = {};
-  require("../src/renderer/lib/markdown.js");
+  require("../../src/renderer/lib/markdown.js");
   const md = global.window.renderMarkdown;
 
   const html = md("# Tit\n\n```js\nlet a = \"<script>\";\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ngoto [x](javascript:alert(1)) e [ok](https://pi.dev)");

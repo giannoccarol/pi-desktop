@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "..", "..");
 
 test("regression: modularization – app.js size guard vs HEAD", () => {
   const app = fs.readFileSync(path.join(root, "src/renderer/core/app.js"), "utf8");
@@ -20,17 +20,17 @@ test("regression: modularization – app.js size guard vs HEAD", () => {
 });
 
 test("regression: all extracted modules are loadable and expose expected API", () => {
-  const utils = require("../src/renderer/lib/utils.js");
+  const utils = require("../../src/renderer/lib/utils.js");
   assert.equal(typeof utils.escapeHtml, "function");
   assert.equal(typeof utils.formatBytes, "function");
   assert.equal(typeof utils.messageListStats, "function");
 
-  const nav = require("../src/renderer/lib/navigation.js");
+  const nav = require("../../src/renderer/lib/navigation.js");
   assert.equal(typeof nav.configuredProjects, "function");
   assert.equal(typeof nav.sessionsForProject, "function");
   assert.equal(typeof nav.tabDisplayTitle, "function");
 
-  const persistence = require("../src/renderer/lib/persistence.js");
+  const persistence = require("../../src/renderer/lib/persistence.js");
   assert.equal(typeof persistence.persistExpandedProjects, "function");
   assert.equal(typeof persistence.commandUsageScore, "function");
 
@@ -114,7 +114,7 @@ test("regression: new extracted modules expose expected API via static analysis"
 });
 
 test("regression: mention-service extracted from main.js", () => {
-  const mention = require("../src/main/services/mention-service.js");
+  const mention = require("../../src/main/services/mention-service.js");
   assert.equal(typeof mention.scoreMentionCandidate, "function");
   assert.equal(typeof mention.createMentionService, "function");
   assert.ok(mention.MENTION_SKIP_DIRS.has("node_modules"));
@@ -123,7 +123,7 @@ test("regression: mention-service extracted from main.js", () => {
 test("regression: eslint + check still cover new modules", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   // build config may be in package.json or electron-builder.yml – just verify scripts
-  assert.ok(pkg.scripts.test.includes("test/*.test.mjs"), "test script should run all mjs");
+  assert.ok(pkg.scripts.test.includes("test/"), "test script should run all mjs");
   assert.ok(pkg.scripts.lint, "lint script should exist");
   assert.ok(pkg.scripts.check, "check script should exist");
   // Verify new modules are present on disk and will be packaged via src/**/*

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.join(__dirname,"..");
+const root = path.join(__dirname,"..","..");
 
 test("session-view extracted: app.js delegates to piSessionView",()=>{
   const app=fs.readFileSync(path.join(root,"src/renderer/features/chat/session-view.js"),"utf8");
@@ -33,7 +33,7 @@ test("session cache: explicit tab aliases stay isolated and dirty entries are no
     getMessages:async(tabId)=>({messages:[{role:"user",content:`fresh:${tabId}`}] }),
     getState:async(tabId)=>({tabId,sessionFile:`/sessions/${tabId.slice(-1)}.jsonl`}),
   };
-  await import(`../src/renderer/features/chat/session-view.js?cache-test=${Date.now()}`);
+  await import(`../../src/renderer/features/chat/session-view.js?cache-test=${Date.now()}`);
   const cache=globalThis.piSessionView;
   const original=[{role:"user",content:"cached-a"}];
   cache.cacheSessionMessages("/sessions/a.jsonl",original,"tab-a");

@@ -58,7 +58,7 @@ jobs:
             echo "Minor/patch devono essere <=100 per 0.x" >&2
             exit 1
           fi
-          node scripts/set-version.js "$MANUAL_VERSION"
+          node scripts/build/set-version.js "$MANUAL_VERSION"
           git push origin main --follow-tags
           echo "Manual release $MANUAL_VERSION pushato"
           exit 0

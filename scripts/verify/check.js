@@ -4,7 +4,7 @@ const { execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "..", "..");
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (["node_modules", ".git", "dist"].includes(entry.name)) continue;
