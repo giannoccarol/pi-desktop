@@ -200,7 +200,7 @@ function resolveTrayIcon() {
   // Try dedicated tray assets first, then fallback to window icon
   const candidates = [];
   try { candidates.push(path.join(__dirname, "..", "..", "build", "tray.png")); } catch {}
-  try { candidates.push(path.join(__dirname, "..", "renderer", "img", "pi-logo-on-light.svg")); } catch {}
+  try { candidates.push(path.join(__dirname, "..", "..", "renderer", "img", "pi-logo-on-light.svg")); } catch {}
   const winIcon = resolveWindowIcon();
   if (winIcon) candidates.push(winIcon);
   for (const p of candidates) {
@@ -303,7 +303,7 @@ function createWindow() {
     autoHideMenuBar: true,
     icon: windowIcon,
     webPreferences: {
-      preload: path.join(__dirname, "..", "preload", "preload.js"),
+      preload: path.join(__dirname, "..", "..", "preload", "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -313,7 +313,7 @@ function createWindow() {
   win.on("closed", () => {
     win = null;
   });
-  win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+  win.loadFile(path.join(__dirname, "..", "..", "renderer", "index.html"));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: "deny" };
@@ -551,13 +551,13 @@ ipcMain.handle("window:popOutTab", async (_e, tabId) => {
       autoHideMenuBar: true,
       icon: resolveWindowIcon(),
       webPreferences: {
-        preload: path.join(__dirname, "..", "preload", "preload.js"),
+        preload: path.join(__dirname, "..", "..", "preload", "preload.js"),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: false,
       },
     });
-    const url = path.join(__dirname, "..", "renderer", "index.html");
+    const url = path.join(__dirname, "..", "..", "renderer", "index.html");
     // pass tabId via query so renderer can activate it
     await pop.loadFile(url, { query: { popOutTabId: id } });
     pop.webContents.setWindowOpenHandler(({ url }) => {
