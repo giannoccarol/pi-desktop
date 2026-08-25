@@ -4,7 +4,7 @@
   const el = window.piStore?.el;
   const state = window.piStore?.state;
   const api = window.piDesktop;
-  const t = window.i18n ? window.i18n.t : (k)=>k;
+  function t(k,v){ return window.i18n ? window.i18n.t(k,v) : String(k); }
 
   const sessionMessageCache = new Map();
   const SESSION_CACHE_MAX = 30;

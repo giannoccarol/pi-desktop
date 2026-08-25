@@ -1,7 +1,7 @@
 "use strict";
 // Extracted from app.js: pi status + app OTA updates
 (function(){
-const api=window.piDesktop; const el=window.piStore.el; const state=window.piStore.state; const t=window.i18n?window.i18n.t:(k,v)=>k; function toast(m,k,ms){return window.piUi.toast(m,k,ms);} function refreshIcons(){return window.piUi.refreshIcons();} function escapeHtml(s){return window.piUtils.escapeHtml(s);}
+const api=window.piDesktop; const el=window.piStore.el; const state=window.piStore.state; function t(k,v){ return window.i18n ? window.i18n.t(k,v) : String(k); } function toast(m,k,ms){return window.piUi.toast(m,k,ms);} function refreshIcons(){return window.piUi.refreshIcons();} function escapeHtml(s){return window.piUtils.escapeHtml(s);}
 async function refreshPiStatus(openModalOnError = false) {
   try {
     const st = await api.updateStatus();

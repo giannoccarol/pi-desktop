@@ -122,12 +122,21 @@ function resolveWindowIcon() {
   // Dev: projectRoot/build/icon.png / icon.png
   candidates.push(path.join(__dirname, "..", "..", "build", "icon.png"));
   candidates.push(path.join(__dirname, "..", "..", "icon.png"));
-  // Packaged: resourcesPath/build/icon.png (extraResources)
+  candidates.push(path.join(__dirname, "..", "..", "build", "icons", "512x512.png"));
+  // Packaged: resourcesPath/build/icon.png (buildResources) e varianti
   try { candidates.push(path.join(process.resourcesPath, "build", "icon.png")); } catch {}
+  try { candidates.push(path.join(process.resourcesPath, "build", "icons", "512x512.png")); } catch {}
+  try { candidates.push(path.join(process.resourcesPath, "app", "build", "icon.png")); } catch {}
   try { candidates.push(path.join(process.resourcesPath, "icon.png")); } catch {}
   // Fallback via app.getAppPath()
   try { candidates.push(path.join(app.getAppPath(), "build", "icon.png")); } catch {}
+  try { candidates.push(path.join(app.getAppPath(), "build", "icons", "512x512.png")); } catch {}
   try { candidates.push(path.join(app.getAppPath(), "icon.png")); } catch {}
+  // System icon locations su Arch/Linux installato via pacman/deb
+  candidates.push("/usr/share/pixmaps/pi-desktop.png");
+  candidates.push("/usr/share/icons/hicolor/512x512/apps/pi-desktop.png");
+  candidates.push("/usr/share/icons/hicolor/256x256/apps/pi-desktop.png");
+  candidates.push("/usr/share/icons/hicolor/128x128/apps/pi-desktop.png");
   for (const p of candidates) {
     try { if (p && fs.existsSync(p)) return p; } catch {}
   }

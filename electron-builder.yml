@@ -62,6 +62,11 @@ linux:
   executableName: pi-desktop
   synopsis: Desktop companion for the Pi coding agent
   description: Desktop companion for the Pi coding agent — chat history, provider switching, independent pi updates.
+  desktop:
+    Name: Pi Desktop
+    Comment: Desktop companion for the Pi coding agent
+    StartupWMClass: dev.pi.desktop
+    Icon: pi-desktop
   target:
     - AppImage
     - deb

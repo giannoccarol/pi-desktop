@@ -1,6 +1,6 @@
 "use strict";
 // Extracted from app.js: models/providers/thinking
-(function(){ const api=window.piDesktop; const el=window.piStore.el; const state=window.piStore.state; const t=window.i18n?window.i18n.t:(k,v)=>k; function toast(m,k,ms){return window.piUi.toast(m,k,ms);} function escapeHtml(s){return window.piUtils.escapeHtml(s);} function icon(n){return window.piUi.icon(n);} function refreshIcons(){return window.piUi.refreshIcons();}
+(function(){ const api=window.piDesktop; const el=window.piStore.el; const state=window.piStore.state; function t(k,v){ return window.i18n ? window.i18n.t(k,v) : String(k); } function toast(m,k,ms){return window.piUi.toast(m,k,ms);} function escapeHtml(s){return window.piUtils.escapeHtml(s);} function icon(n){return window.piUi.icon(n);} function refreshIcons(){return window.piUi.refreshIcons();}
 async function loadModels(force = false) {
   const now = Date.now();
   if (!force && state.modelsCache && now - state.modelsCacheAt < 60000) return state.modelsCache;

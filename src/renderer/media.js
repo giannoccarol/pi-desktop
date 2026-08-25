@@ -22,31 +22,34 @@
     return "wrench";
   }
 
-  // USER_STATUS built from message-view defs — keep same as app.js
-  const USER_STATUS = (() => {
-    const m = {};
-    const defs = (window.piMessageView && window.piMessageView.USER_STATUS_DEFS) || {};
-    for (const [k, def] of Object.entries(defs)) {
-      m[k] = { rank: def.rank, label: def.label || t(def.key) };
+  // USER_STATUS built from message-view defs — keep same as app.js, but defer t() to call-time (i18n loads after media)
+  const USER_STATUS_FALLBACK_DEFS = {
+    sending: { rank:0, key: "status.sending" },
+    localQueued: { rank:1, key: "status.queued", label: "in coda nell’app · non ancora inviato" },
+    received:{rank:1,key:"status.received"},
+    queued:{rank:1,key:"status.queued"},
+    processing:{rank:2,key:"status.processing"},
+    retrying:{rank:2,key:"status.retrying"},
+    done:{rank:3,key:"status.done"},
+    historical:{rank:3,key:"status.historical"},
+    failed:{rank:4,key:"status.failed"},
+    interrupted:{rank:4,key:"status.interrupted"},
+    error:{rank:4,key:"status.error"},
+  };
+  const USER_STATUS = new Proxy({}, {
+    get(_, prop){
+      const defs = window.piMessageView?.USER_STATUS_DEFS?.[prop];
+      if(defs) return { rank: defs.rank, key: defs.key, get label(){ return t(defs.key); } };
+      const fb = USER_STATUS_FALLBACK_DEFS[prop];
+      if(fb) return { rank: fb.rank, key: fb.key, get label(){ return fb.label || t(fb.key); } };
+      return undefined;
+    },
+    has(_, prop){ return !!(window.piMessageView?.USER_STATUS_DEFS?.[prop] || USER_STATUS_FALLBACK_DEFS[prop]); },
+    ownKeys(){ const a = Object.keys(window.piMessageView?.USER_STATUS_DEFS||{}); const b = Object.keys(USER_STATUS_FALLBACK_DEFS); return [...new Set([...a,...b])]; },
+    getOwnPropertyDescriptor(_, prop){
+      const v = this.get(_, prop); if(!v) return undefined; return { configurable:true, enumerable:true, value:v };
     }
-    // fallback if piMessageView not yet loaded
-    if (!Object.keys(m).length) {
-      return {
-        sending: { rank:0, label: t("status.sending") },
-        localQueued: { rank:1, label: "in coda nell’app · non ancora inviato" },
-        received:{rank:1,label:t("status.received")},
-        queued:{rank:1,label:t("status.queued")},
-        processing:{rank:2,label:t("status.processing")},
-        retrying:{rank:2,label:t("status.retrying")},
-        done:{rank:3,label:t("status.done")},
-        historical:{rank:3,label:t("status.historical")},
-        failed:{rank:4,label:t("status.failed")},
-        interrupted:{rank:4,label:t("status.interrupted")},
-        error:{rank:4,label:t("status.error")},
-      };
-    }
-    return m;
-  })();
+  });
 
   function messageTime(v) {
     if (window.piMessageView && window.piMessageView.messageTime) return window.piMessageView.messageTime(v, t);
