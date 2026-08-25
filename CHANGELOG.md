@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/giannoccarol/pi-desktop/compare/v1.3.0...v1.4.0) (2026-08-25)
+
+
+### Features
+
+* add pacman target for Arch (come gittree) ([2a0909d](https://github.com/giannoccarol/pi-desktop/commit/2a0909d3fe34ce137ef917cb0a6402c1b44d97f7))
+
 # [1.3.0](https://github.com/giannoccarol/pi-desktop/compare/v1.2.1...v1.3.0) (2026-08-25)
 
 
