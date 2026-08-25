@@ -1462,3 +1462,23 @@ html[data-theme="dark"] #chat-tooltip {
   #model-dock { min-height: 61px; margin-bottom: 7px; }
   #statusbar { display: none; }
 }
+
+/* App OTA (electron-updater) — come gittree #btn-update */
+#btn-app-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+#btn-app-update.hidden { display: none !important; }
+#btn-app-update:disabled { opacity: .7; cursor: wait; }
+#btn-app-update.is-downloading i { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+#btn-app-update span:empty { display: none; }

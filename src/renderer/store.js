@@ -176,6 +176,7 @@
     toasts: $("#toasts"),
     sidebarResizer: $("#sidebar-resizer"),
     chatTooltip: $("#chat-tooltip"),
+    btnAppUpdate: $("#btn-app-update"),
     btnScrollBottom: $("#btn-scroll-bottom"),
     searchClear: $("#search-clear"),
     globalSearch: document.querySelector(".global-search"),
