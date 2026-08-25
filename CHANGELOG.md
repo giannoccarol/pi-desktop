@@ -1,3 +1,16 @@
+# [0.6.0](https://github.com/giannoccarol/pi-desktop/compare/v0.5.0...v0.6.0) (2026-08-25)
+
+
+### Bug Fixes
+
+* **ci:** branches semantic-release invalidi (ERELEASEBRANCHES) ([b5a055d](https://github.com/giannoccarol/pi-desktop/commit/b5a055dfaada126e03e9dd309ecb6fc9e918eaf6))
+* **renderer:** time.now/minutes mostrano chiavi invece di traduzioni ([1e76c36](https://github.com/giannoccarol/pi-desktop/commit/1e76c3628e73dd5ad0b9c59d1700469f1bd73edb)), closes [#0f1115](https://github.com/giannoccarol/pi-desktop/issues/0f1115)
+
+
+### Features
+
+* **icons:** add new icon sizes for application assets ([fb28ad7](https://github.com/giannoccarol/pi-desktop/commit/fb28ad7a47c3c2e33b006357e763cd2f6ce20f71))
+
 # [1.6.0](https://github.com/giannoccarol/pi-desktop/compare/v1.5.0...v1.6.0) (2026-08-25)
 
 
