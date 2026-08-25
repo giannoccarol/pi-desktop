@@ -1,9 +1,19 @@
 name: Auto Versioning
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versione manuale 0.x.y (es. 0.5.1, 0.100.100) - lascia vuoto per auto da commit"
+        required: false
+        type: string
   push:
     branches:
       - main
+    paths-ignore:
+      - "CHANGELOG.md"
+      - "package.json"
+      - "package-lock.json"
 
 permissions:
   contents: write
@@ -32,7 +42,29 @@ jobs:
 
       - run: npm ci
 
+      - name: Manual version (0.x.y)
+        if: inputs.version != ''
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$MANUAL_VERSION" =~ ^0\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
+            echo "Versione manuale deve essere 0.x.y con x,y <=100 (es. 0.5.0, 0.100.100)" >&2
+            exit 1
+          fi
+          minor="$(echo "$MANUAL_VERSION" | cut -d. -f2)"
+          patch="$(echo "$MANUAL_VERSION" | cut -d. -f3)"
+          if [ "$minor" -gt 100 ] || [ "$patch" -gt 100 ]; then
+            echo "Minor/patch devono essere <=100 per 0.x" >&2
+            exit 1
+          fi
+          node scripts/set-version.js "$MANUAL_VERSION"
+          git push origin main --follow-tags
+          echo "Manual release $MANUAL_VERSION pushato"
+          exit 0
+
       - name: Run semantic-release
+        if: inputs.version == ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_AUTHOR_NAME: Lorenzo Giannoccaro

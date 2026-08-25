@@ -1,7 +1,7 @@
 {
   "name": "pi-desktop",
   "productName": "Pi Desktop",
-  "version": "1.6.0",
+  "version": "0.5.0",
   "description": "Desktop companion for the Pi coding agent: chat history, provider/model switching, and self-updating pi independent of the app.",
   "main": "src/main/main.js",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "lint": "eslint src --ext .js,.mjs",
     "lint:fix": "eslint src --ext .js,.mjs --fix",
     "dist": "electron-builder",
+    "bump": "node scripts/set-version.js",
     "release:check": "node scripts/check-release-version.js",
     "release:assets": "node scripts/release-assets.js"
   },

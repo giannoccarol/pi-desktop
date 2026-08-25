@@ -1,5 +1,5 @@
 {
-  "branches": ["main"],
+  "branches": [{ "name": "main", "range": "0.x", "channel": "latest" }],
   "tagFormat": "v${version}",
   "plugins": [
     [
