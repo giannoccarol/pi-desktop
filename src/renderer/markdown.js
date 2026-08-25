@@ -144,8 +144,10 @@
         const tag = ordered ? "ol" : "ul";
         let html = `<${tag}>`;
         for (const it of items) {
-          const marker = it.indent >= 2 ? "&nbsp;&nbsp;• " : "";
-          html += `<li>${marker ? marker : ""}${renderInline(esc(it.content))}</li>`;
+          // The browser owns list markers. Adding a literal bullet here caused
+          // indented items to render with duplicated markers ("• •").
+          const nested = it.indent >= 2 ? ' class="nested"' : "";
+          html += `<li${nested}>${renderInline(esc(it.content))}</li>`;
         }
         html += `</${tag}>`;
         out += html;

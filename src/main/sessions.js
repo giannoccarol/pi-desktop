@@ -22,11 +22,26 @@ function firstUserText(content) {
   return null;
 }
 
+// Cache of parsed session metadata keyed by file path. An entry is valid
+// while mtime+size are unchanged, so repeated listings stay cheap even with
+// thousands of sessions on disk.
+const sessionMetaCache = new Map(); // file -> { mtimeMs, size, parsed }
+
 /**
  * Parse one session file. Only reads the header plus a bounded number of
  * lines to extract title/preview; large sessions stay cheap to list.
  */
-function parseSessionFile(file) {
+function parseSessionFile(file, stat = null) {
+  let st = stat;
+  if (!st) {
+    try {
+      st = fs.statSync(file);
+    } catch {
+      return null;
+    }
+  }
+  const cached = sessionMetaCache.get(file);
+  if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) return cached.parsed;
   let fd;
   try {
     fd = fs.openSync(file, "r");
@@ -34,7 +49,7 @@ function parseSessionFile(file) {
     return null;
   }
   try {
-    const size = fs.fstatSync(fd).size;
+    const size = st.size;
     // Header line.
     const headBuf = Buffer.alloc(Math.min(4096, size));
     fs.readSync(fd, headBuf, 0, headBuf.length, 0);
@@ -82,8 +97,7 @@ function parseSessionFile(file) {
       }
     }
 
-    const stat = fs.statSync(file);
-    return {
+    const parsed = {
       file,
       id: header.id || path.basename(file, ".jsonl"),
       version: header.version ?? 1,
@@ -91,11 +105,14 @@ function parseSessionFile(file) {
       name: name || preview || "Nuova sessione",
       hasName: Boolean(name),
       preview,
-      timestamp: header.timestamp || stat.birthtime.toISOString(),
-      modified: stat.mtimeMs,
+      timestamp: header.timestamp || st.birthtime.toISOString(),
+      modified: st.mtimeMs,
       size,
       preference: Object.keys(preference).length ? preference : null,
     };
+    if (sessionMetaCache.size > 5000) sessionMetaCache.clear();
+    sessionMetaCache.set(file, { mtimeMs: st.mtimeMs, size: st.size, parsed });
+    return parsed;
   } catch {
     return null;
   } finally {
@@ -123,7 +140,14 @@ function listSessions(sessionsDir = defaultSessionsDir()) {
       continue;
     }
     for (const f of files) {
-      const parsed = parseSessionFile(path.join(dirPath, f));
+      const filePath = path.join(dirPath, f);
+      let st = null;
+      try {
+        st = fs.statSync(filePath);
+      } catch {
+        continue;
+      }
+      const parsed = parseSessionFile(filePath, st);
       if (parsed) out.push(parsed);
     }
   }
@@ -133,6 +157,7 @@ function listSessions(sessionsDir = defaultSessionsDir()) {
 
 function deleteSession(file) {
   fs.unlinkSync(file);
+  sessionMetaCache.delete(file);
 }
 
 module.exports = { defaultSessionsDir, listSessions, parseSessionFile, deleteSession };

@@ -348,6 +348,10 @@ test("markdown: code blocks, tables, links are rendered safely", () => {
   assert.match(html, /<table>/);
   assert.ok(!html.includes('href="javascript:'), "javascript: URLs must be neutralized");
   assert.ok(html.includes('href="https://pi.dev"'));
+
+  const listHtml = md("- primo\n  - secondo\n- terzo");
+  assert.ok(!listHtml.includes("•"), "list markers must be rendered by CSS, not duplicated in HTML");
+  assert.match(listHtml, /<li class="nested">/);
 });
 
 test("chat: recovered provider retries are collapsed and final failures remain", () => {

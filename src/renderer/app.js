@@ -233,6 +233,8 @@ const state = {
   extensionWidgets: new Map(),
   authFlow: null,
   openingSessionFile: null,
+  pendingTabId: null,
+  switchGeneration: 0,
   creatingChat: false,
 };
 
@@ -292,6 +294,13 @@ function basename(p) {
 function scrollBottom(force = false) {
   const near = el.chat.scrollHeight - el.chat.scrollTop - el.chat.clientHeight < 160;
   if (near || force) el.chat.scrollTop = el.chat.scrollHeight;
+}
+
+function jumpToBottom() {
+  const previous = el.chat.style.scrollBehavior;
+  el.chat.style.scrollBehavior = "auto";
+  el.chat.scrollTop = el.chat.scrollHeight;
+  requestAnimationFrame(() => { el.chat.style.scrollBehavior = previous; });
 }
 
 let renderQueued = false;
@@ -378,6 +387,72 @@ async function pickAttachments(kind) {
   } catch (err) {
     toast(t("toast.attachError", {msg: err.message}), "error");
   }
+}
+
+function clipboardImageExtension(mimeType) {
+  return { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" }[mimeType] || "png";
+}
+
+function bufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function pasteClipboardImages(event) {
+  const items = [...(event.clipboardData?.items || [])];
+  const imageItems = items.filter((item) => item.kind === "file" && item.type.startsWith("image/"));
+  if (!imageItems.length) return;
+  event.preventDefault();
+
+  const text = event.clipboardData?.getData("text/plain") || "";
+  if (text) {
+    const start = el.input.selectionStart;
+    const end = el.input.selectionEnd;
+    el.input.setRangeText(text, start, end, "end");
+  }
+  let added = 0;
+  for (const item of imageItems) {
+    if (state.attachments.length >= 12) break;
+    const file = item.getAsFile();
+    if (!file || file.size > 15 * 1024 * 1024) {
+      toast("Immagine incollata oltre il limite di 15 MB.", "warn");
+      continue;
+    }
+    const currentBytes = state.attachments.reduce((sum, attachment) => sum + (attachment.size || 0), 0);
+    if (currentBytes + file.size > 40 * 1024 * 1024) {
+      toast("Le immagini superano complessivamente 40 MB.", "warn");
+      continue;
+    }
+    const mimeType = item.type.toLowerCase();
+    state.attachments.push({
+      name: `clipboard-${new Date().toISOString().replace(/[:.]/g, "-")}.${clipboardImageExtension(mimeType)}`,
+      path: null,
+      size: file.size,
+      mimeType,
+      data: bufferToBase64(await file.arrayBuffer()),
+    });
+    added += 1;
+  }
+  renderAttachmentTray();
+  autosize();
+  if (added) toast(`${added} immagine${added === 1 ? "" : "i"} incollata${added === 1 ? "" : "e"}.`, "info", 2400);
+}
+
+function insertCodeBlock() {
+  const start = el.input.selectionStart;
+  const end = el.input.selectionEnd;
+  const selected = el.input.value.slice(start, end);
+  const fence = "```";
+  const inserted = selected ? `${fence}\n${selected}\n${fence}` : `${fence}\n\n${fence}`;
+  el.input.setRangeText(inserted, start, end, "end");
+  if (!selected) el.input.setSelectionRange(start + 4, start + 4);
+  autosize();
+  el.input.focus();
 }
 
 // ---------------------------------------------------------------------------
@@ -989,17 +1064,19 @@ async function refreshTabs() {
 function renderTabs() {
   el.chatTabs.innerHTML = "";
   for (const tab of state.tabs) {
+    const isLoading = tab.id === state.pendingTabId;
     const button = document.createElement("div");
-    button.className = `chat-tab${tab.id === state.activeTabId ? " active" : ""}${tab.busy ? " busy" : ""}`;
+    button.className = `chat-tab${tab.id === state.activeTabId ? " active" : ""}${tab.busy ? " busy" : ""}${isLoading ? " loading" : ""}`;
     button.dataset.tabId = tab.id;
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", tab.id === state.activeTabId ? "true" : "false");
+    button.setAttribute("aria-busy", isLoading ? "true" : "false");
     button.tabIndex = tab.id === state.activeTabId ? 0 : -1;
     button.innerHTML = `<span class="chat-tab-status"></span><span class="chat-tab-title"></span>` +
       `<button type="button" class="chat-tab-close" title="Chiudi tab" aria-label="Chiudi tab">${icon("x")}</button>`;
     const title = tabDisplayTitle(tab);
-    button.querySelector(".chat-tab-title").textContent = title;
-    button.title = `${title}${tab.busy ? " · in esecuzione" : ""}`;
+    button.querySelector(".chat-tab-title").textContent = isLoading ? "caricamento…" : title;
+    button.title = `${title}${tab.busy ? " · in esecuzione" : ""}${isLoading ? " · caricamento…" : ""}`;
     button.addEventListener("click", (event) => {
       if (event.target.closest(".chat-tab-close")) return;
       switchToTab(tab.id);
@@ -1020,26 +1097,46 @@ function renderTabs() {
 }
 
 async function switchToTab(tabId) {
-  if (!tabId || tabId === state.activeTabId || state.openingSessionFile || state.creatingChat) return;
+  if (!tabId || tabId === state.activeTabId || state.creatingChat) return;
   const target = state.tabs.find((tab) => tab.id === tabId);
   if (!target) return;
+  const generation = ++state.switchGeneration;
   stashActiveTabContext();
+  state.pendingTabId = tabId;
+  renderTabs();
   try {
-    setSessionLoading(target.sessionFile || `tab:${tabId}`);
+    const cached = target.sessionFile ? getCachedSessionMessages(target.sessionFile) : null;
+    setSessionLoading(target.sessionFile || `tab:${tabId}`, { showSkeleton: !cached });
     resetQueueState();
     state.attachments = [];
     await api.activateTab(tabId);
+    if (generation !== state.switchGeneration) return;
     if (target.cwd) state.settings = await api.activateProject(target.cwd);
+    if (generation !== state.switchGeneration) return;
     state.activeTabId = tabId;
     state.activeSessionFile = target.sessionFile || null;
     state.commands = [];
     el.statusCwd.textContent = target.cwd || state.settings?.cwd || "";
-    await reloadConversationFromRuntime({ restoreTab: true });
+    let painted = null;
+    if (cached) {
+      el.messages.innerHTML = "";
+      state.streamAssistant = null;
+      state.tools.clear();
+      el.emptyState.classList.add("hidden");
+      setConversationMode(true, false);
+      await renderConversation(cached, () => generation === state.switchGeneration);
+      jumpToBottom();
+      painted = cached;
+    }
+    await reloadConversationFromRuntime({ restoreTab: true, paintedCache: painted, switchGeneration: generation });
   } catch (err) {
     toast(`Cambio tab fallito: ${err.message}`, "error");
   } finally {
-    clearSessionLoading();
-    await refreshTabs();
+    if (generation === state.switchGeneration) {
+      if (state.pendingTabId === tabId) state.pendingTabId = null;
+      clearSessionLoading();
+      await refreshTabs();
+    }
   }
 }
 
@@ -1049,6 +1146,8 @@ async function closeChatTab(tabId) {
   if (tab.busy && !confirm("Questa chat sta ancora lavorando. Interromperla e chiudere il tab?")) return;
   const wasActive = tabId === state.activeTabId;
   if (wasActive) stashActiveTabContext();
+  state.pendingTabId = tabId;
+  renderTabs();
   try {
     const result = await api.closeTab(tabId);
     state.tabContexts.delete(tabId);
@@ -1064,6 +1163,11 @@ async function closeChatTab(tabId) {
     }
   } catch (err) {
     toast(`Chiusura tab fallita: ${err.message}`, "error");
+  } finally {
+    if (state.pendingTabId === tabId) {
+      state.pendingTabId = null;
+      renderTabs();
+    }
   }
 }
 
@@ -1130,9 +1234,9 @@ function renderProjects() {
       `</span>`;
     row.querySelector("svg, i")?.classList.add("project-chevron");
     row.querySelector(".project-title").textContent = basename(project.path) || project.path;
-    if (state.openingSessionFile || state.creatingChat) row.style.pointerEvents = "none";
+    if (state.creatingChat) row.style.pointerEvents = "none";
     row.addEventListener("click", (event) => {
-      if (state.openingSessionFile || state.creatingChat) return;
+      if (state.creatingChat) return;
       if (event.target.closest(".project-action")) return;
       if (event.target.closest(".project-menu")) return;
       if (state.expandedProjects.has(project.path)) state.expandedProjects.delete(project.path);
@@ -1141,14 +1245,14 @@ function renderProjects() {
     });
     row.querySelector(".project-new").addEventListener("click", (e) => {
       e.stopPropagation();
-      if (state.openingSessionFile || state.creatingChat) return;
+      if (state.creatingChat) return;
       newChat(project.path);
     });
     const menuBtn = row.querySelector(".project-remove");
     menuBtn.setAttribute("aria-expanded", state.openProjectMenu === project.path ? "true" : "false");
     menuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (state.openingSessionFile || state.creatingChat) return;
+      if (state.creatingChat) return;
       state.openProjectMenu = state.openProjectMenu === project.path ? null : project.path;
       renderProjects();
     });
@@ -1220,7 +1324,7 @@ function renderProjects() {
         item.querySelector(".session-title").textContent = displayName;
         item.addEventListener("click", async (ev) => {
           if (ev.target.closest(".sess-del")) return;
-          if (state.openingSessionFile || state.creatingChat) return;
+          if (state.creatingChat) return;
           if (session.tabId) await switchToTab(session.tabId);
           else if (openTab) await switchToTab(openTab.id);
           else await openHistorySession(session);
@@ -1232,7 +1336,7 @@ function renderProjects() {
         }
         deleteButton.addEventListener("click", async (e) => {
           e.stopPropagation();
-          if (state.openingSessionFile || state.creatingChat) return;
+          if (state.creatingChat) return;
           if (session.draft) return closeChatTab(session.tabId);
           if (!confirm("Eliminare definitivamente questa sessione?")) return;
           try {
@@ -1462,11 +1566,38 @@ function clearChat() {
   state.tools.clear();
 }
 
-function setSessionLoading(file) {
+// Cache of already-loaded conversations keyed by session file, so re-opening
+// a chat paints instantly while the fresh copy loads in the background.
+const sessionMessageCache = new Map(); // file -> { messages, at }
+const SESSION_CACHE_MAX = 30;
+
+function getCachedSessionMessages(file) {
+  if (!file) return null;
+  return sessionMessageCache.get(file)?.messages || null;
+}
+
+function cacheSessionMessages(file, messages) {
+  if (!file || !Array.isArray(messages)) return;
+  sessionMessageCache.set(file, { messages, at: Date.now() });
+  if (sessionMessageCache.size > SESSION_CACHE_MAX) {
+    let oldestKey = null;
+    let oldestAt = Infinity;
+    for (const [key, value] of sessionMessageCache) {
+      if (value.at < oldestAt) { oldestAt = value.at; oldestKey = key; }
+    }
+    if (oldestKey && oldestKey !== file) sessionMessageCache.delete(oldestKey);
+  }
+}
+
+function setSessionLoading(file, { showSkeleton = true } = {}) {
   state.openingSessionFile = file;
   document.body.classList.add("session-loading");
-  el.chat.classList.add("session-loading");
   el.statusActivity.textContent = t("session.loadingChat");
+  if (!showSkeleton) {
+    // Cached content stays visible; only the dim overlay is skipped.
+    return;
+  }
+  el.chat.classList.add("session-loading");
   // prepare skeleton
   el.messages.innerHTML = "";
   state.streamAssistant = null;
@@ -1492,62 +1623,116 @@ function clearSessionLoading() {
   renderProjects();
 }
 
-async function reloadConversationFromRuntime({ restoreTab = false } = {}) {
-  clearChat();
-  const msgs = await api.getMessages();
-  const displayMessages = collapseRetryAttempts(msgs.messages || []);
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+/**
+ * Render finalized messages yielding to the event loop every chunk so long
+ * conversations never freeze the UI while they paint.
+ */
+async function renderConversation(displayMessages, isCurrent = () => true) {
   const results = new Map();
   for (const message of displayMessages) {
     if (message.role === "toolResult" && message.toolCallId) results.set(message.toolCallId, message);
   }
   const consumed = new Set();
-  for (const message of displayMessages) renderFinalMessage(message, { results, consumed });
+  const CHUNK = 20;
+  for (let i = 0; i < displayMessages.length; i++) {
+    if (!isCurrent()) return false;
+    renderFinalMessage(displayMessages[i], { results, consumed });
+    if ((i + 1) % CHUNK === 0 && i + 1 < displayMessages.length) {
+      scheduleScroll();
+      await nextFrame();
+    }
+  }
+  return true;
+}
+
+async function reloadConversationFromRuntime({ restoreTab = false, paintedCache = null, switchGeneration = null } = {}) {
+  const isCurrent = () => switchGeneration == null || switchGeneration === state.switchGeneration;
+  const msgs = await api.getMessages();
+  if (!isCurrent()) return false;
+  const displayMessages = collapseRetryAttempts(msgs.messages || []);
   const current = await api.getState();
+  if (!isCurrent()) return false;
   state.activeSessionFile = current.sessionFile || null;
   state.activeTabId = current.tabId || state.activeTabId;
   if (restoreTab) restoreActiveTabContext();
+
+  // If the freshly fetched conversation matches what we painted from cache,
+  // keep the DOM as-is instead of flashing a full re-render.
+  const identical = Array.isArray(paintedCache)
+    && paintedCache.length === displayMessages.length;
+  if (!identical) {
+    clearChat();
+    const painted = await renderConversation(displayMessages, isCurrent);
+    if (painted === false || !isCurrent()) return false;
+  }
+  cacheSessionMessages(state.activeSessionFile, displayMessages);
+
   const hasContent = Boolean(displayMessages.length || state.localQueue.length);
   setConversationMode(hasContent, false);
   el.emptyState.classList.toggle("hidden", hasContent);
   setBusy(Boolean(current.isStreaming), { dispatchQueue: false });
   if (current.isStreaming && !state.streamAssistant) beginStreamAssistant();
   if (restoreTab && !current.isStreaming && state.localQueue.length) queueMicrotask(dispatchNextLocalMessage);
-  await refreshHeaderFromState();
-  await refreshStats();
-  await refreshSessions();
-  await refreshTabs();
-  scrollBottom(true);
+  jumpToBottom();
+
+  // Secondary data must not block the chat from appearing; run them in
+  // parallel after the messages are already on screen.
+  Promise.all([refreshHeaderFromState(), refreshStats(), refreshSessions(), refreshTabs()]).catch(() => {});
+  return true;
 }
 
 async function openHistorySession(session) {
-  if (state.openingSessionFile || state.creatingChat) return;
+  if (state.creatingChat) return;
   if (session.file === state.activeSessionFile && el.messages.querySelector(".chat-loading") == null && state.streamAssistant == null) {
     // evita rimbalzo se già aperta, ma consenti ricarico se necessario con doppio click intenzionale? Per ora blocca se già attiva
     // se l'utente clicca di nuovo sulla stessa chat già aperta non fare nulla
     // (rimuovi questo return se vuoi consentire il reload)
     // return;
   }
+  const generation = ++state.switchGeneration;
   stashActiveTabContext();
   try {
-    setSessionLoading(session.file);
+    const cached = getCachedSessionMessages(session.file);
+    setSessionLoading(session.file, { showSkeleton: !cached });
     resetQueueState();
     setBusy(false);
     state.settings = await api.activateProject(session.cwd);
+    if (generation !== state.switchGeneration) return;
     state.expandedProjects.add(session.cwd);
+    // Paint the cached copy immediately so the chat appears instantly; the
+    // authoritative reload below reconciles it in the background.
+    let painted = null;
+    if (cached) {
+      el.messages.innerHTML = "";
+      state.streamAssistant = null;
+      state.tools.clear();
+      el.emptyState.classList.add("hidden");
+      setConversationMode(true, false);
+      await renderConversation(cached, () => generation === state.switchGeneration);
+      if (generation !== state.switchGeneration) return;
+      jumpToBottom();
+      painted = cached;
+    }
     const opened = await api.openSession(session.file, session.cwd, session.preference, session.name || session.preview);
+    if (generation !== state.switchGeneration) return;
     state.commands = [];
     state.activeTabId = opened.tabId || state.activeTabId;
     state.activeSessionFile = session.file;
     el.statusCwd.textContent = session.cwd || "";
-    await reloadConversationFromRuntime({ restoreTab: true });
+    await reloadConversationFromRuntime({ restoreTab: true, paintedCache: painted, switchGeneration: generation });
   } catch (err) {
+    if (generation !== state.switchGeneration) return;
     // rimuovi skeleton e mostra errore
     clearChat();
     el.emptyState.classList.remove("hidden");
     setConversationMode(false, false);
     toast(`Impossibile aprire la sessione: ${err.message}`, "error");
   } finally {
-    clearSessionLoading();
+    if (generation === state.switchGeneration) clearSessionLoading();
   }
 }
 
@@ -1845,7 +2030,7 @@ async function compactSession() {
 }
 
 async function newChat(projectPath = state.settings?.cwd, parentSession = null) {
-  if (state.openingSessionFile || state.creatingChat) return;
+  if (state.creatingChat) return;
   stashActiveTabContext();
   state.creatingChat = true;
   document.body.classList.add("session-loading");
@@ -3459,6 +3644,7 @@ function wireUi() {
     state.slashSelection = 0;
     renderSlashSuggestions();
   });
+  el.input.addEventListener("paste", pasteClipboardImages);
   el.input.addEventListener("click", renderSlashSuggestions);
   el.input.addEventListener("blur", () => setTimeout(hideSlashSuggestions, 120));
   el.attachBtn.addEventListener("click", () => pickAttachments("files"));
