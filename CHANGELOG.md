@@ -1,3 +1,10 @@
+## [0.7.7](https://github.com/giannoccarol/pi-desktop/compare/v0.7.6...v0.7.7) (2026-08-25)
+
+
+### Bug Fixes
+
+* **renderer:** improve chat scrolling behavior and handle edge cases ([432c842](https://github.com/giannoccarol/pi-desktop/commit/432c8422d66d600804a3c34b201936614d93b94e))
+
 ## [0.7.6](https://github.com/giannoccarol/pi-desktop/compare/v0.7.5...v0.7.6) (2026-08-25)
 
 
