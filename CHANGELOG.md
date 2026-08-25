@@ -1,3 +1,10 @@
+## [0.7.5](https://github.com/giannoccarol/pi-desktop/compare/v0.7.4...v0.7.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **main:** update electron launch script and improve error handling ([db75c63](https://github.com/giannoccarol/pi-desktop/commit/db75c63230c23970ebc7e429633acce1f4ae2777))
+
 ## [0.7.4](https://github.com/giannoccarol/pi-desktop/compare/v0.7.3...v0.7.4) (2026-08-25)
 
 
