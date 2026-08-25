@@ -1,3 +1,10 @@
+## [0.6.7](https://github.com/giannoccarol/pi-desktop/compare/v0.6.6...v0.6.7) (2026-08-25)
+
+
+### Bug Fixes
+
+* **renderer:** stabilizza chat e ridisegna lo store plugin ([25cbd28](https://github.com/giannoccarol/pi-desktop/commit/25cbd28876f1e82fb73efffb4afbb9a35201c8d6))
+
 ## [0.6.6](https://github.com/giannoccarol/pi-desktop/compare/v0.6.5...v0.6.6) (2026-08-25)
 
 
