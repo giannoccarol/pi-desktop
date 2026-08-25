@@ -1,3 +1,10 @@
+# [0.8.0](https://github.com/giannoccarol/pi-desktop/compare/v0.7.7...v0.8.0) (2026-08-25)
+
+
+### Features
+
+* **chat:** enhance bulk rendering and scrolling behavior ([4ef3b52](https://github.com/giannoccarol/pi-desktop/commit/4ef3b52479f3623257fd4c3191ab7549b4822633)), closes [hi#load](https://github.com/hi/issues/load)
+
 ## [0.7.7](https://github.com/giannoccarol/pi-desktop/compare/v0.7.6...v0.7.7) (2026-08-25)
 
 
