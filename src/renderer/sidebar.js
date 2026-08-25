@@ -15,8 +15,10 @@ function truncate(s,n){ return window.piUtils ? window.piUtils.truncate(s,n) : (
 function preferenceLabel(p){ return window.piUtils ? window.piUtils.preferenceLabel(p) : (p?[p.provider,p.modelId,p.thinkingLevel].filter(Boolean).join(" · "):""); }
 function relTime(ms){ return window.piUtils ? window.piUtils.relTime(ms, Date.now(), (kk,vv)=>t(kk,vv)) : String(ms); }
 function tabDisplayTitle(tab){ return window.piNavigation ? window.piNavigation.tabDisplayTitle(tab, state.sessions) : (tab.title || t("session.newChat")); }
+function tabSubtitle(tab){ return window.piNavigation ? window.piNavigation.tabSubtitle(tab, state.sessions) : basename(tab.cwd || ""); }
+function tabTooltip(tab,title){ return window.piNavigation ? window.piNavigation.tabTooltip(tab,title,state.sessions) : title; }
 function configuredProjects(){ return window.piNavigation ? window.piNavigation.configuredProjects(state.settings) : [...new Set((Array.isArray(state.settings?.projects)?state.settings.projects:[state.settings?.cwd]).filter(Boolean))]; }
-function sessionsForProject(path){ return window.piNavigation ? window.piNavigation.sessionsForProject({sessions:state.sessions, tabs:state.tabs}, path) : state.sessions.filter(s=>s.cwd===path); }
+function sessionsForProject(path){ return window.piNavigation ? window.piNavigation.sessionsForProject({sessions:state.sessions, tabs:state.tabs, stableOrder:state.sessionOrder}, path) : state.sessions.filter(s=>s.cwd===path); }
 function addUserMessage(){ return window.piMedia ? window.piMedia.addUserMessage.apply(null, arguments) : null; }
 function renderAttachmentTray(){ return window.piComposer ? window.piComposer.renderAttachmentTray.apply(null, arguments) : void 0; }
 function renderQueuePanel(){ return window.piComposer ? window.piComposer.renderQueuePanel.apply(null, arguments) : void 0; }
@@ -29,13 +31,13 @@ function reloadConversationFromRuntime(o){ return window.piSessionView ? window.
 function openHistorySession(s){ return window.piSessionView ? window.piSessionView.openHistorySession(s) : Promise.resolve(); }
 function newChat(p){ return window.piSession ? window.piSession.newChat(p) : Promise.resolve(); }
 function setConversationMode(a,b){ return window.piUi ? window.piUi.setConversationMode(a,b) : void 0; }
-function jumpToBottom(){ return window.piUi ? window.piUi.jumpToBottom() : void 0; }
 function resetQueueState(){ return window.piComposer ? window.piComposer.resetQueueState.apply(null, arguments) : void 0; }
 var sessionsTimer = null;
 var tabsTimer = null;
 
 function stashActiveTabContext() {
   if (!state.activeTabId) return;
+  const existing = state.tabContexts.get(state.activeTabId);
   state.tabContexts.set(state.activeTabId, {
     input: el.input.value,
     attachments: state.attachments.slice(),
@@ -48,6 +50,7 @@ function stashActiveTabContext() {
       images: item.images || [],
       userMessage: null,
     })),
+    scrollState: window.piUi?.captureChatScrollState?.() || existing?.scrollState || null,
   });
 }
 
@@ -66,6 +69,12 @@ function restoreActiveTabContext() {
   renderAttachmentTray();
   renderQueuePanel();
   autosize();
+  return saved;
+}
+
+function restoreActiveTabScroll({ fallbackToBottom = true } = {}) {
+  const saved = state.tabContexts.get(state.activeTabId);
+  window.piUi?.restoreChatScrollState?.(saved?.scrollState || null, { fallbackToBottom });
 }
 
 async function refreshTabs() {
@@ -82,46 +91,66 @@ async function refreshTabs() {
   }
 }
 
+function createTabButton() {
+  const button = document.createElement("div");
+  button.setAttribute("role", "tab");
+  button.innerHTML = `<span class="chat-tab-status"></span>` +
+    `<span class="chat-tab-text"><span class="chat-tab-title"></span><span class="chat-tab-subtitle"></span></span>` +
+    `<button type="button" class="chat-tab-close" title="Chiudi tab" aria-label="Chiudi tab">${icon("x")}</button>`;
+  button.addEventListener("click", (event) => {
+    if (!event.target.closest(".chat-tab-close")) switchToTab(button.dataset.tabId);
+  });
+  button.addEventListener("auxclick", (event) => {
+    if (event.button === 1) {
+      event.preventDefault();
+      closeChatTab(button.dataset.tabId);
+    }
+  });
+  button.addEventListener("mousedown", (event) => {
+    if (event.button === 1) event.preventDefault();
+  });
+  button.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      switchToTab(button.dataset.tabId);
+    }
+  });
+  button.querySelector(".chat-tab-close").addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeChatTab(button.dataset.tabId);
+  });
+  return button;
+}
+
 function renderTabs() {
-  el.chatTabs.innerHTML = "";
-  for (const tab of state.tabs) {
+  const previousScrollLeft = el.chatTabs.scrollLeft;
+  const focusedTabId = document.activeElement?.closest?.(".chat-tab")?.dataset.tabId || null;
+  const existing = new Map([...el.chatTabs.querySelectorAll(":scope > .chat-tab")].map((node) => [node.dataset.tabId, node]));
+  for (const [index, tab] of state.tabs.entries()) {
     const isLoading = tab.id === state.pendingTabId;
-    const button = document.createElement("div");
-    button.className = `chat-tab${tab.id === state.activeTabId ? " active" : ""}${tab.busy ? " busy" : ""}${isLoading ? " loading" : ""}`;
+    const active = tab.id === state.activeTabId;
+    const button = existing.get(tab.id) || createTabButton();
+    existing.delete(tab.id);
     button.dataset.tabId = tab.id;
-    button.setAttribute("role", "tab");
-    button.setAttribute("aria-selected", tab.id === state.activeTabId ? "true" : "false");
+    button.className = `chat-tab${active ? " active" : ""}${tab.busy ? " busy" : ""}${isLoading ? " loading" : ""}`;
+    button.setAttribute("aria-selected", active ? "true" : "false");
     button.setAttribute("aria-busy", isLoading ? "true" : "false");
-    button.tabIndex = tab.id === state.activeTabId ? 0 : -1;
-    button.innerHTML = `<span class="chat-tab-status"></span><span class="chat-tab-title"></span>` +
-      `<button type="button" class="chat-tab-close" title="Chiudi tab" aria-label="Chiudi tab">${icon("x")}</button>`;
+    button.tabIndex = active ? 0 : -1;
     const title = tabDisplayTitle(tab);
-    button.querySelector(".chat-tab-title").textContent = isLoading ? t("session.loading") : title;
-    button.title = `${title}${tab.busy ? " · in esecuzione" : ""}${isLoading ? " · " + t("session.loading") : ""}`;
-    button.addEventListener("click", (event) => {
-      if (event.target.closest(".chat-tab-close")) return;
-      switchToTab(tab.id);
-    });
-    button.addEventListener("auxclick", (event) => {
-      if (event.button === 1) {
-        event.preventDefault();
-        closeChatTab(tab.id);
-      }
-    });
-    button.addEventListener("mousedown", (event) => {
-      if (event.button === 1) event.preventDefault();
-    });
-    button.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        switchToTab(tab.id);
-      }
-    });
-    button.querySelector(".chat-tab-close").addEventListener("click", (event) => {
-      event.stopPropagation();
-      closeChatTab(tab.id);
-    });
-    el.chatTabs.appendChild(button);
+    const subtitle = isLoading ? t("session.loading") : tabSubtitle(tab);
+    button.querySelector(".chat-tab-title").textContent = title;
+    const subtitleEl = button.querySelector(".chat-tab-subtitle");
+    subtitleEl.textContent = subtitle;
+    subtitleEl.classList.toggle("hidden", !subtitle);
+    button.title = `${tabTooltip(tab, title)}${isLoading ? "\n" + t("session.loading") : ""}`;
+    const currentAtIndex = el.chatTabs.children[index];
+    if (currentAtIndex !== button) el.chatTabs.insertBefore(button, currentAtIndex || null);
+  }
+  for (const node of existing.values()) node.remove();
+  el.chatTabs.scrollLeft = previousScrollLeft;
+  if (focusedTabId) {
+    const focused = [...el.chatTabs.children].find((node) => node.dataset.tabId === focusedTabId);
+    focused?.focus?.({ preventScroll: true });
   }
   refreshIcons();
 }
@@ -155,7 +184,7 @@ async function switchToTab(tabId) {
       el.emptyState.classList.add("hidden");
       setConversationMode(true, false);
       await renderConversation(cached, () => generation === state.switchGeneration);
-      jumpToBottom();
+      restoreActiveTabScroll({ fallbackToBottom: true });
       painted = cached;
     }
     await reloadConversationFromRuntime({ restoreTab: true, paintedCache: painted, switchGeneration: generation });
@@ -204,6 +233,11 @@ async function closeChatTab(tabId) {
 async function refreshSessions() {
   try {
     state.sessions = await api.listSessions();
+    const liveFiles = new Set(state.sessions.map((session) => session.file));
+    for (const key of state.sessionOrder.keys()) if (!liveFiles.has(key)) state.sessionOrder.delete(key);
+    for (const session of state.sessions) {
+      if (!state.sessionOrder.has(session.file)) state.sessionOrder.set(session.file, session.modified || Date.now());
+    }
     renderProjects();
   } catch (err) {
     console.error(err);
@@ -212,6 +246,7 @@ async function refreshSessions() {
 
 function renderProjects() {
   const q = (el.sessionSearch.value || "").toLowerCase().trim();
+  const previousScrollTop = el.projectsList.scrollTop;
   el.projectsList.innerHTML = "";
   const projects = configuredProjects().map((projectPath) => {
     const sessions = sessionsForProject(projectPath);
@@ -224,7 +259,7 @@ function renderProjects() {
 
   for (const project of projects) {
     const active = project.path === state.settings?.cwd;
-    const expanded = Boolean(q) || state.expandedProjects.has(project.path) || active;
+    const expanded = Boolean(q) || state.expandedProjects.has(project.path);
     const block = document.createElement("section");
     block.className = `project-block${active ? " active" : ""}${expanded ? " expanded" : ""}`;
     block.dataset.path = project.path;
@@ -313,6 +348,8 @@ function renderProjects() {
         const isLoading = session.file === state.openingSessionFile;
         const item = document.createElement("div");
         item.className = "session-item" + (isActive ? " active" : "") + (isLoading ? " loading" : "") + (openTab?.busy || session.busy ? " running" : "");
+        item.dataset.sessionFile = session.file || "";
+        item.dataset.tabId = session.tabId || openTab?.id || "";
         const displayName = session.hasName ? session.name : truncate(session.preview || t("session.newChat"), 120);
         const prefLabel = preferenceLabel(session.preference);
         const timeLabel = isLoading ? t("session.loading") : relTime(session.modified);
@@ -408,7 +445,18 @@ function renderProjects() {
   const draftCount = state.tabs.filter((tab) => !tab.sessionFile).length;
   const visibleCount = state.sessions.length + draftCount;
   el.sessionsCount.textContent = visibleCount ? `${visibleCount} chat` : "";
+  el.projectsList.scrollTop = previousScrollTop;
   refreshIcons();
+}
+
+function updateNavigationStatus(tabId) {
+  if (!tabId) return;
+  const tab = state.tabs.find((candidate) => candidate.id === tabId);
+  for (const item of el.projectsList.querySelectorAll(".session-item")) {
+    if (item.dataset.tabId === tabId || (tab?.sessionFile && item.dataset.sessionFile === tab.sessionFile)) {
+      item.classList.toggle("running", Boolean(tab?.busy));
+    }
+  }
 }
 
 function initSidebarResize() {
@@ -586,10 +634,14 @@ function refreshTabsSoon() {
 // Expose unified API – both piSidebar namespace and legacy globals
 if (typeof window !== "undefined") {
   window.piSidebar = Object.assign(window.piSidebar || {}, {
-    stashActiveTabContext, restoreActiveTabContext, refreshTabs, renderTabs, switchToTab, closeChatTab, refreshSessions, renderProjects, initSidebarResize, initChatTooltip, initSearchEnhancement, refreshSessionsSoon, refreshTabsSoon
+    stashActiveTabContext, restoreActiveTabContext, restoreActiveTabScroll,
+    refreshTabs, renderTabs, switchToTab, closeChatTab, refreshSessions,
+    renderProjects, updateNavigationStatus, initSidebarResize, initChatTooltip,
+    initSearchEnhancement, refreshSessionsSoon, refreshTabsSoon
   });
   window.stashActiveTabContext = stashActiveTabContext;
   window.restoreActiveTabContext = restoreActiveTabContext;
+  window.restoreActiveTabScroll = restoreActiveTabScroll;
   window.refreshTabs = refreshTabs;
   window.renderTabs = renderTabs;
   window.switchToTab = switchToTab;
@@ -603,4 +655,3 @@ if (typeof window !== "undefined") {
   window.refreshTabsSoon = refreshTabsSoon;
 }
 if (typeof module !== "undefined" && module.exports) module.exports = window.piSidebar;
-

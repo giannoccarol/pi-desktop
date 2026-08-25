@@ -33,12 +33,60 @@
 
   function icon(name) { return `<i data-lucide="${name}"></i>`; }
 
+  function chatBottomDistance() {
+    const el = getEl();
+    if (!el.chat) return 0;
+    return Math.max(0, el.chat.scrollHeight - el.chat.scrollTop - el.chat.clientHeight);
+  }
+
+  function captureChatScrollState() {
+    const el = getEl();
+    if (!el.chat) return null;
+    const bottomDistance = chatBottomDistance();
+    return {
+      scrollTop: el.chat.scrollTop,
+      bottomDistance,
+      stickToBottom: bottomDistance < 140,
+    };
+  }
+
+  function restoreChatScrollState(snapshot, { fallbackToBottom = true } = {}) {
+    const el = getEl();
+    const state = getState();
+    if (!el.chat) return;
+    const useBottom = snapshot?.stickToBottom ?? fallbackToBottom;
+    const previous = el.chat.style.scrollBehavior;
+    el.chat.style.scrollBehavior = "auto";
+    if (useBottom) {
+      el.chat.scrollTop = el.chat.scrollHeight;
+      state.chatStickToBottom = true;
+    } else {
+      const maxTop = Math.max(0, el.chat.scrollHeight - el.chat.clientHeight);
+      el.chat.scrollTop = Math.min(Math.max(0, Number(snapshot?.scrollTop) || 0), maxTop);
+      state.chatStickToBottom = false;
+    }
+    requestAnimationFrame(() => { el.chat.style.scrollBehavior = previous; });
+    queueMicrotask(updateScrollBottomVisibility);
+  }
+
+  function noteChatScroll() {
+    const state = getState();
+    state.chatStickToBottom = isNearBottom(140);
+  }
+
   function scrollBottom(force = false) {
     const el = getEl();
+    const state = getState();
     if (!el.chat) return;
-    const near = el.chat.scrollHeight - el.chat.scrollTop - el.chat.clientHeight < 160;
-    if (near || force) el.chat.scrollTop = el.chat.scrollHeight;
-    if (near || force) queueMicrotask(updateScrollBottomVisibility);
+    // Follow the live transcript based on the user's intent before the DOM grew.
+    // Recomputing "near bottom" after inserting a tall activity block makes the
+    // viewport appear to jump upwards even though the user never scrolled away.
+    const shouldFollow = force || state.chatStickToBottom !== false;
+    if (shouldFollow) {
+      el.chat.scrollTop = el.chat.scrollHeight;
+      state.chatStickToBottom = true;
+      queueMicrotask(updateScrollBottomVisibility);
+    }
   }
 
   function jumpToBottom() {
@@ -47,6 +95,7 @@
     const previous = el.chat.style.scrollBehavior;
     el.chat.style.scrollBehavior = "auto";
     el.chat.scrollTop = el.chat.scrollHeight;
+    getState().chatStickToBottom = true;
     requestAnimationFrame(() => { el.chat.style.scrollBehavior = previous; });
     queueMicrotask(updateScrollBottomVisibility);
   }
@@ -73,6 +122,7 @@
     if (scrollVisibilityRaf) return;
     scrollVisibilityRaf = requestAnimationFrame(() => {
       scrollVisibilityRaf = 0;
+      noteChatScroll();
       updateScrollBottomVisibility();
     });
   }
@@ -147,7 +197,13 @@
     refreshIcons();
   }
 
-  const api = { toast, refreshIcons, icon, scrollBottom, jumpToBottom, isNearBottom, updateScrollBottomVisibility, scheduleScrollVisibility, scheduleScroll, md, setConversationMode, closeMenus, setSidebarVisible, applyTheme };
+  const api = {
+    toast, refreshIcons, icon,
+    chatBottomDistance, captureChatScrollState, restoreChatScrollState, noteChatScroll,
+    scrollBottom, jumpToBottom, isNearBottom, updateScrollBottomVisibility,
+    scheduleScrollVisibility, scheduleScroll, md, setConversationMode,
+    closeMenus, setSidebarVisible, applyTheme,
+  };
   root.piUi = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

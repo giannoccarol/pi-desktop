@@ -27,7 +27,7 @@
     return [...new Set(values.filter(Boolean))];
   }
 
-  function sessionsForProject({ sessions, tabs }, projectPath) {
+  function sessionsForProject({ sessions, tabs, stableOrder }, projectPath) {
     const t = getT();
     const saved = sessions.filter((session) => session.cwd === projectPath);
     const drafts = tabs
@@ -50,7 +50,9 @@
       return String(a.file).localeCompare(String(b.file));
     });
     const savedSorted = [...saved].sort((a, b) => {
-      const diff = (b.modified || 0) - (a.modified || 0);
+      const aOrder = stableOrder?.get?.(a.file) ?? a.modified ?? 0;
+      const bOrder = stableOrder?.get?.(b.file) ?? b.modified ?? 0;
+      const diff = bOrder - aOrder;
       if (diff !== 0) return diff;
       return String(a.file).localeCompare(String(b.file));
     });

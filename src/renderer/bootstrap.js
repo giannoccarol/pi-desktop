@@ -40,6 +40,7 @@
     }
     if (el.btnScrollBottom) {
       el.btnScrollBottom.addEventListener("click", () => {
+        state.chatStickToBottom = true;
         try {
           el.chat.scrollTo({ top: el.chat.scrollHeight, behavior: "smooth" });
         } catch {

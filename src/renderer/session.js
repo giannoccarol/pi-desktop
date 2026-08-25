@@ -166,7 +166,7 @@ async function newChat(projectPath = state.settings?.cwd, parentSession = null) 
     state.commands = [];
     state.activeTabId = created.tabId || state.activeTabId;
     state.activeSessionFile = null;
-    state.tabContexts.set(state.activeTabId, { input: "", attachments: [], queueBehavior: "followUp", localQueue: [] });
+    state.tabContexts.set(state.activeTabId, { input: "", attachments: [], queueBehavior: "followUp", localQueue: [], scrollState: null });
     el.emptyState.classList.remove("hidden");
     el.statusCwd.textContent = projectPath || state.settings?.cwd || "";
     await refreshTabs();
@@ -183,4 +183,3 @@ async function newChat(projectPath = state.settings?.cwd, parentSession = null) 
     renderProjects();
   }
 }
-

@@ -13,6 +13,26 @@ test("ui: module exposes expected API", async () => {
   assert.equal(m.icon("moon"), '<i data-lucide="moon"></i>');
 });
 
+test("ui: live scroll follows prior user intent and restores each chat position", async () => {
+  globalThis.requestAnimationFrame=(fn)=>{ fn(); return 1; };
+  const chat={scrollHeight:1200,scrollTop:700,clientHeight:400,style:{scrollBehavior:""}};
+  globalThis.piStore={el:{chat},state:{chatStickToBottom:true,conversationActive:true}};
+  const ui=globalThis.piUi;
+  const snapshot=ui.captureChatScrollState();
+  assert.equal(snapshot.scrollTop,700);
+  assert.equal(snapshot.stickToBottom,true);
+  chat.scrollHeight=1500;
+  ui.scrollBottom();
+  assert.equal(chat.scrollTop,1500,"new content follows when the user was already at the bottom");
+  globalThis.piStore.state.chatStickToBottom=false;
+  chat.scrollTop=420;
+  chat.scrollHeight=1800;
+  ui.scrollBottom();
+  assert.equal(chat.scrollTop,420,"new content must not move a reader who scrolled up");
+  ui.restoreChatScrollState({scrollTop:260,stickToBottom:false});
+  assert.equal(chat.scrollTop,260);
+});
+
 test("message-view: messageTime handles null, ms, seconds, Date", async () => {
   const mv = await import("../src/renderer/message-view.js");
   const api = mv.default || globalThis.piMessageView;

@@ -213,6 +213,8 @@
     activeTabId: null,
     tabs: [],
     tabContexts: new Map(),
+    sessionOrder: new Map(),
+    chatStickToBottom: true,
     busy: false,
     activeUserMessage: null,
     lastAssistantErrored: false,

@@ -38,6 +38,16 @@ test("navigation: sessionsForProject merges drafts + saved sorted", () => {
   assert.equal(result.some((r) => r.file === "/s/other.jsonl"), false);
 });
 
+test("navigation: a live mtime update does not make sidebar rows jump", () => {
+  const sessions = [
+    { file: "/s/a.jsonl", cwd: "/proj", modified: 900 },
+    { file: "/s/b.jsonl", cwd: "/proj", modified: 800 },
+  ];
+  const stableOrder = new Map([["/s/a.jsonl", 300], ["/s/b.jsonl", 400]]);
+  const result = nav.sessionsForProject({ sessions, tabs: [], stableOrder }, "/proj");
+  assert.deepEqual(result.map((session) => session.file), ["/s/b.jsonl", "/s/a.jsonl"]);
+});
+
 test("navigation: tabDisplayTitle prefers session name", () => {
   const sessions = [
     { file: "/s/a.jsonl", hasName: true, name: "My Chat", preview: "hello" },

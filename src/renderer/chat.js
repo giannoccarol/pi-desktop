@@ -130,14 +130,9 @@ function activityBundleLabel(bundle) {
 }
 
 function bundleActivityMessages() {
-  // Normalize every activity-only assistant shell and every existing bundle
-  // to the same flat list before regrouping. This prevents one tool result
-  // (especially bash) from alternating between a bundle and a standalone card.
-  for (const bundle of [...el.messages.querySelectorAll(":scope > .activity-bundle")]) {
-    const list = bundle.querySelector(".activity-list");
-    for (const child of [...(list?.children || [])]) bundle.before(child);
-    bundle.remove();
-  }
+  // Streaming shells are temporary. Unwrap only the newly completed shells;
+  // existing bundles remain mounted so Chromium keeps both the outer scroll
+  // anchor and the <details> open state.
   for (const wrap of [...el.messages.querySelectorAll(":scope > .msg-assistant.activity-only")]) {
     const content = wrap.querySelector(":scope > .content");
     for (const child of [...(content?.children || [])]) wrap.before(child);
@@ -146,6 +141,11 @@ function bundleActivityMessages() {
 
   let bundle = null;
   for (const node of [...el.messages.children]) {
+    if (node.classList.contains("activity-bundle")) {
+      bundle = node;
+      updateActivityBundle(bundle);
+      continue;
+    }
     const activity = node.classList.contains("tool-card") || node.matches("details.think");
     if (!activity) {
       bundle = null;
@@ -162,6 +162,7 @@ function bundleActivityMessages() {
     updateActivityBundle(bundle);
   }
   refreshIcons();
+  scheduleScroll();
 }
 
 function renderContentBlocks(container, blocks, resultMap) {

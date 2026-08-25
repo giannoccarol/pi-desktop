@@ -21,6 +21,7 @@ function setToolCardResult(){ return window.piMedia ? window.piMedia.setToolCard
 function setUserMessageStatus(){ return window.piMedia ? window.piMedia.setUserMessageStatus.apply(null, arguments) : void 0; }
 function refreshSessionsSoon(){ return window.piSidebar ? window.piSidebar.refreshSessionsSoon.apply(null, arguments) : (window.refreshSessionsSoon ? window.refreshSessionsSoon() : void 0); }
 function refreshTabsSoon(){ return window.piSidebar ? window.piSidebar.refreshTabsSoon.apply(null, arguments) : (window.refreshTabsSoon ? window.refreshTabsSoon() : void 0); }
+function markActiveCacheDirty(){ return window.piSessionView?.markActiveCacheDirty?.(state.activeTabId); }
 
 function renderAttachmentTray() {
   el.attachmentTray.innerHTML = "";
@@ -399,6 +400,7 @@ async function sendMessage(rawBehavior) {
       files.map((file) => `- ${file.path}`).join("\n");
   }
 
+  markActiveCacheDirty();
   if (state.busy) {
     const behavior = state.directBashRunning ? "followUp" : rawBehavior || state.queueBehavior;
     const userMessage = addUserMessage(displayText, attachments, { timestamp: Date.now(), status: "sending" });
@@ -500,4 +502,3 @@ if (typeof window !== "undefined") {
   window.dispatchNextLocalMessage = dispatchNextLocalMessage;
 }
 if (typeof module !== "undefined" && module.exports) module.exports = window.piComposer;
-

@@ -7,42 +7,64 @@
   function t(k,v){ return window.i18n ? window.i18n.t(k,v) : String(k); }
 
   const sessionMessageCache = new Map();
-  const SESSION_CACHE_MAX = 30;
+  const SESSION_CACHE_MAX = 60;
 
-  function cacheKeyFor(file, tabId){
-    if(file) return file;
-    if(tabId) return `tab:${tabId}`;
+  function cacheKeysFor(file, tabId){
+    return [...new Set([
+      file || null,
+      tabId ? `tab:${tabId}` : null,
+    ].filter(Boolean))];
+  }
+  function getCachedSessionSnapshot(file, tabId=null, {allowDirty=false}={}){
+    const keys=cacheKeysFor(file,tabId);
+    for(const key of keys){
+      const entry=sessionMessageCache.get(key);
+      if(!entry || (entry.dirty && !allowDirty)) continue;
+      entry.at=Date.now();
+      return entry;
+    }
     return null;
   }
-  function getCachedSessionMessages(file, tabId=null){
-    // supporta sia file che tabId (per draft senza file)
-    const key = cacheKeyFor(file, tabId);
-    if(!key) return null;
-    // prova anche con tabId se file non trovato (fallback per draft migrati)
-    let entry = sessionMessageCache.get(key);
-    if(!entry && file && tabId) entry = sessionMessageCache.get(`tab:${tabId}`);
-    if(!entry && tabId) entry = sessionMessageCache.get(tabId);
-    return entry?.messages || null;
+  function getCachedSessionMessages(file, tabId=null, options){
+    return getCachedSessionSnapshot(file,tabId,options)?.messages || null;
   }
   function cacheSessionMessages(file, messages, tabId=null){
     if(!Array.isArray(messages)) return;
-    const keys = [];
-    const primary = cacheKeyFor(file, tabId || state.activeTabId);
-    if(primary) keys.push(primary);
-    // per tab con file, tieni anche la chiave tab: per switch rapido anche se file cambia
-    const tabKey = state.activeTabId ? `tab:${state.activeTabId}` : (tabId ? `tab:${tabId}` : null);
-    if(tabKey && !keys.includes(tabKey)) keys.push(tabKey);
+    const explicitTabId=tabId || null;
+    const keys=cacheKeysFor(file,explicitTabId);
     if(!keys.length) return;
     const at = Date.now();
+    const entry={messages,at,dirty:false,file:file||null,tabId:explicitTabId};
     for(const k of keys){
-      sessionMessageCache.set(k,{messages, at});
+      sessionMessageCache.set(k,entry);
     }
     while(sessionMessageCache.size > SESSION_CACHE_MAX){
       let oldestKey=null, oldestAt=Infinity;
-      for(const [k,v] of sessionMessageCache){ if(v.at<oldestAt){oldestAt=v.at; oldestKey=k;}}
-      if(oldestKey && !keys.includes(oldestKey)) sessionMessageCache.delete(oldestKey);
+      for(const [k,v] of sessionMessageCache){
+        if(!keys.includes(k) && v.at<oldestAt){oldestAt=v.at; oldestKey=k;}
+      }
+      if(oldestKey) sessionMessageCache.delete(oldestKey);
       else break;
     }
+  }
+  function markSessionCacheDirty(file,tabId=null){
+    for(const key of cacheKeysFor(file,tabId)){
+      const entry=sessionMessageCache.get(key);
+      if(entry) entry.dirty=true;
+    }
+  }
+  function markActiveCacheDirty(tabId=state.activeTabId){
+    const tab=state.tabs?.find?.((candidate)=>candidate.id===tabId);
+    markSessionCacheDirty(tab?.sessionFile || (tabId===state.activeTabId ? state.activeSessionFile : null),tabId);
+  }
+  async function refreshSessionCache(tabId=state.activeTabId){
+    if(!tabId) return false;
+    try{
+      const [msgs,current]=await Promise.all([api.getMessages(tabId),api.getState(tabId)]);
+      const displayMessages=window.piChatUtils.collapseRetryAttempts(msgs.messages||[]);
+      cacheSessionMessages(current.sessionFile||null,displayMessages,current.tabId||tabId);
+      return true;
+    }catch{return false;}
   }
   function messagesEqual(a,b){
     if(!Array.isArray(a) || !Array.isArray(b)) return false;
@@ -97,15 +119,17 @@
     return true;
   }
   async function reloadConversationFromRuntime({restoreTab=false, paintedCache=null, switchGeneration=null}={}){
-    const isCurrent=()=>switchGeneration==null || switchGeneration===state.switchGeneration;
-    const msgs=await api.getMessages();
+    const requestedTabId=state.activeTabId;
+    const isCurrent=()=>
+      (switchGeneration==null || switchGeneration===state.switchGeneration) &&
+      (!requestedTabId || requestedTabId===state.activeTabId);
+    const msgs=await api.getMessages(requestedTabId);
     if(!isCurrent()) return false;
     const displayMessages=window.piChatUtils.collapseRetryAttempts(msgs.messages||[]);
-    const current=await api.getState();
+    const current=await api.getState(requestedTabId);
     if(!isCurrent()) return false;
     state.activeSessionFile=current.sessionFile||null;
     state.activeTabId=current.tabId||state.activeTabId;
-    if(restoreTab && window.piSidebar?.restoreActiveTabContext) window.piSidebar.restoreActiveTabContext();
     const identical = Array.isArray(paintedCache) && messagesEqual(paintedCache, displayMessages);
     if(!identical){
       if(window.piChat?.clearChat) window.piChat.clearChat(); else { el.messages.innerHTML=""; state.streamAssistant=null; state.tools.clear(); }
@@ -113,13 +137,15 @@
       if(painted===false||!isCurrent()) return false;
     }
     cacheSessionMessages(state.activeSessionFile, displayMessages, state.activeTabId);
+    if(restoreTab && window.piSidebar?.restoreActiveTabContext) window.piSidebar.restoreActiveTabContext();
     const hasContent=Boolean(displayMessages.length||state.localQueue.length);
     window.piUi?.setConversationMode(hasContent,false);
     el.emptyState.classList.toggle("hidden",hasContent);
     if(window.piComposer?.setBusy) window.piComposer.setBusy(Boolean(current.isStreaming),{dispatchQueue:false});
     if(current.isStreaming && !state.streamAssistant) window.piChat.beginStreamAssistant();
     if(restoreTab && !current.isStreaming && state.localQueue.length) queueMicrotask(()=>window.piComposer?.dispatchNextLocalMessage?.());
-    window.piUi?.jumpToBottom();
+    if(restoreTab) window.piSidebar?.restoreActiveTabScroll?.({fallbackToBottom:true});
+    else window.piUi?.jumpToBottom();
     Promise.all([window.piSessionView?._refreshHeader?.() ?? Promise.resolve(), window.piComposer?.refreshStats?.() ?? Promise.resolve(), window.piSidebar?.refreshSessions?.() ?? Promise.resolve(), window.piSidebar?.refreshTabs?.() ?? Promise.resolve()]).catch(()=>{});
     return true;
   }
@@ -155,10 +181,17 @@
     }finally{ if(generation===state.switchGeneration) clearSessionLoading(); }
   }
   // expose for app.js compat
-  window.piSessionView={getCachedSessionMessages, cacheSessionMessages, setSessionLoading, clearSessionLoading, renderConversation, reloadConversationFromRuntime, openHistorySession, _refreshHeader: window.refreshHeaderFromState || null};
+  window.piSessionView={
+    getCachedSessionSnapshot, getCachedSessionMessages, cacheSessionMessages,
+    markSessionCacheDirty, markActiveCacheDirty, refreshSessionCache,
+    setSessionLoading, clearSessionLoading, renderConversation,
+    reloadConversationFromRuntime, openHistorySession,
+    _refreshHeader: window.refreshHeaderFromState || null,
+  };
   // also expose globals expected by inline handlers
   window.getCachedSessionMessages=getCachedSessionMessages;
   window.cacheSessionMessages=cacheSessionMessages;
+  window.markSessionCacheDirty=markSessionCacheDirty;
   window.setSessionLoading=setSessionLoading;
   window.clearSessionLoading=clearSessionLoading;
   window.renderConversation=renderConversation;

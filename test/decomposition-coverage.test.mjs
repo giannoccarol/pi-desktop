@@ -129,3 +129,12 @@ test("decomposition: app.js delegates and stays under 1000 lines", () => {
   const wireWrappers = (app.match(/function wireUi\(\)\{ return window\.piBootstrap\.wireUi/g) || []).length;
   assert.equal(wireWrappers, 1, "should have exactly one thin wireUi wrapper");
 });
+
+test("chat activity grouping keeps existing bundles mounted", () => {
+  const chat = fs.readFileSync(path.join(root, "src/renderer/chat.js"), "utf8");
+  const start = chat.indexOf("function bundleActivityMessages()");
+  const end = chat.indexOf("function renderContentBlocks", start);
+  const implementation = chat.slice(start, end);
+  assert.doesNotMatch(implementation, /querySelectorAll\(\":scope > \.activity-bundle\"\)[\s\S]*bundle\.remove\(\)/);
+  assert.match(implementation, /scheduleScroll\(\)/);
+});

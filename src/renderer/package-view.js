@@ -62,9 +62,9 @@ function renderPackageStore() {
       .join("");
     card.innerHTML =
       `<div class="package-card-icon">${icon(isInstalled ? "badge-check" : "package")}</div>` +
-      `<div class="package-card-content"><div class="package-card-title"><strong>${escapeHtml(pkg.name)}</strong>${pkg.version ? `<span>v${escapeHtml(pkg.version)}</span>` : ""}<span class="package-card-downloads">${icon("download")} ${formatDownloads(pkg.monthlyDownloads || pkg.downloads)} / mese</span></div>` +
+      `<div class="package-card-content"><div class="package-card-title"><strong>${escapeHtml(pkg.name)}</strong>${pkg.version ? `<span>v${escapeHtml(pkg.version)}</span>` : ""}${isInstalled ? `<span class="package-installed-badge">Installato</span>` : ""}</div>` +
       `<p>${escapeHtml(pkg.description)}</p><div class="package-card-meta">${tags}` +
-      `${pkg.publisher ? `<span>di ${escapeHtml(pkg.publisher)}</span>` : ""}</div></div>` +
+      `${pkg.publisher ? `<span>di ${escapeHtml(pkg.publisher)}</span>` : ""}<span class="package-card-downloads">${icon("download")} ${formatDownloads(pkg.monthlyDownloads || pkg.downloads)} / mese</span></div></div>` +
       `<div class="package-card-actions"><a class="icon-btn borderless tiny" href="${escapeHtml(pkg.npmUrl)}" title="Apri su npm" aria-label="Apri su npm">${icon("external-link")}</a>` +
       `<button class="btn ${isInstalled ? "ghost package-uninstall" : "primary package-install"}" ${state.packageBusy ? "disabled" : ""}>` +
       `${state.packageBusy === pkg.name ? "Attendi…" : isInstalled ? "Rimuovi" : "Installa"}</button></div>`;
@@ -76,7 +76,7 @@ function renderPackageStore() {
 }
 
 function renderNativePackageSections() {
-  el.packageInstalledCount.textContent = `(${state.installedPackages.length})`;
+  el.packageInstalledCount.textContent = String(state.installedPackages.length);
   el.packageInstalledList.innerHTML = "";
   if (!state.installedPackages.length) {
     el.packageInstalledList.innerHTML = `<div class="menu-empty">Nessun pacchetto configurato.</div>`;
@@ -84,8 +84,9 @@ function renderNativePackageSections() {
   for (const entry of state.installedPackages) {
     const row = document.createElement("div");
     row.className = "package-native-item";
+    const copy = document.createElement("div");
+    copy.className = "package-native-copy";
     const code = document.createElement("code");
-    code.className = "grow";
     code.textContent = entry.source;
     code.title = entry.source;
     const badge = document.createElement("span");
@@ -101,11 +102,15 @@ function renderNativePackageSections() {
     remove.textContent = "Rimuovi";
     remove.disabled = Boolean(state.packageBusy);
     remove.addEventListener("click", () => removeInstalledSource(entry));
-    row.append(code, badge, update, remove);
+    const actions = document.createElement("div");
+    actions.className = "package-native-actions";
+    copy.append(code, badge);
+    actions.append(update, remove);
+    row.append(copy, actions);
     el.packageInstalledList.appendChild(row);
   }
 
-  el.packageResourceCount.textContent = `(${state.packageResources.length})`;
+  el.packageResourceCount.textContent = String(state.packageResources.length);
   el.packageResourceList.innerHTML = "";
   if (!state.packageResources.length) {
     el.packageResourceList.innerHTML = `<div class="menu-empty">Nessuna risorsa rilevata.</div>`;

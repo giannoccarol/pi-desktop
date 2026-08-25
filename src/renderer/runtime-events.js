@@ -1,14 +1,19 @@
 "use strict";
 (function (root) {
-  function createRuntimeEvents({ state, el, api, t, icon, escapeHtml, textOfBlocks, compactToolArgs, fullToolArgs, toolIconName, makeToolCard, setToolCardResult, renderBlockMedia, beginStreamAssistant, streamApplyDelta, endStreamAssistant, setBusy, setUserMessageStatus, refreshStats, refreshSessionsSoon, refreshTabsSoon, refreshIcons, renderQueuePanel, renderTabs, renderProjects, handleUiRequest, scheduleScroll }) {
+  function createRuntimeEvents({ state, el, api, t, icon, escapeHtml, textOfBlocks, compactToolArgs, fullToolArgs, toolIconName, makeToolCard, setToolCardResult, renderBlockMedia, beginStreamAssistant, streamApplyDelta, endStreamAssistant, setBusy, setUserMessageStatus, refreshStats, refreshSessionsSoon, refreshTabsSoon, refreshIcons, renderQueuePanel, renderTabs, renderProjects, updateNavigationStatus, handleUiRequest, scheduleScroll }) {
     function handleEvent(msg) {
       if (msg.tabId) {
+        if (["agent_start","message_start","message_update","message_end","tool_execution_start","tool_execution_update","tool_execution_end"].includes(msg.type)) {
+          root.piSessionView?.markActiveCacheDirty?.(msg.tabId);
+        }
         const tab = state.tabs.find((c) => c.id === msg.tabId);
         if (tab) {
           if (msg.type === "agent_start") tab.busy = true;
           if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "pi-started") tab.busy = false;
           if (msg.type === "tab_status") tab.busy = Boolean(msg.busy);
-          renderTabs(); renderProjects();
+          renderTabs();
+          if (updateNavigationStatus) updateNavigationStatus(msg.tabId);
+          else renderProjects();
         }
         if (state.activeTabId && msg.tabId !== state.activeTabId && msg.type !== "extension_ui_request") {
           if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "tab_status") { refreshSessionsSoon(); refreshTabsSoon(); }
@@ -17,7 +22,7 @@
       }
       switch (msg.type) {
         case "agent_start": state.lastAssistantErrored=false; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(true); setUserMessageStatus(state.activeUserMessage,"processing"); break;
-        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); break;
+        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); root.piSessionView?.refreshSessionCache?.(msg.tabId); break;
         case "message_start":
           if (msg.message?.role==="assistant") { setUserMessageStatus(state.activeUserMessage,"processing"); beginStreamAssistant(); }
           else if (msg.message?.role==="user") { const txt=textOfBlocks(msg.message.content); const idx=state.queuedUserMessages.findIndex(e=>e.message===txt); if(idx>=0){ const [entry]=state.queuedUserMessages.splice(idx,1); state.activeUserMessage=entry.userMessage; setUserMessageStatus(entry.userMessage,"processing"); } }
@@ -68,18 +73,22 @@
     function renderQueuePanel(){ const fn=root.piComposer?root.piComposer.renderQueuePanel: window.renderQueuePanel; return fn?fn():void 0; }
     function renderTabs(){ const fn=root.piSidebar?root.piSidebar.renderTabs: window.renderTabs; return fn?fn():void 0; }
     function renderProjects(){ const fn=root.piSidebar?root.piSidebar.renderProjects: window.renderProjects; return fn?fn():void 0; }
+    function updateNavigationStatus(tabId){ const fn=root.piSidebar?.updateNavigationStatus; return fn?fn(tabId):renderProjects(); }
     function handleUiRequest(msg){ const fn=root.piExtensionBridge?root.piExtensionBridge.handleUiRequest: window.handleUiRequest; return fn?fn(msg):void 0; }
     function scheduleScroll(){ return root.piUi?root.piUi.scheduleScroll():void 0; }
     function toolDisplayName(n){ const fn=root.piChat?root.piChat.toolDisplayName: null; return fn?fn(n): (n||"tool"); }
     function toast(m,k,ms){ return root.piUi?root.piUi.toast(m,k,ms):void 0; }
     function handleEvent(msg){
       if (msg.tabId) {
+        if (["agent_start","message_start","message_update","message_end","tool_execution_start","tool_execution_update","tool_execution_end"].includes(msg.type)) {
+          root.piSessionView?.markActiveCacheDirty?.(msg.tabId);
+        }
         const tab = state.tabs.find((c) => c.id === msg.tabId);
         if (tab) {
           if (msg.type === "agent_start") tab.busy = true;
           if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "pi-started") tab.busy = false;
           if (msg.type === "tab_status") tab.busy = Boolean(msg.busy);
-          renderTabs(); renderProjects();
+          renderTabs(); updateNavigationStatus(msg.tabId);
         }
         if (state.activeTabId && msg.tabId !== state.activeTabId && msg.type !== "extension_ui_request") {
           if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "tab_status") { refreshSessionsSoon(); refreshTabsSoon(); }
@@ -88,7 +97,7 @@
       }
       switch (msg.type) {
         case "agent_start": state.lastAssistantErrored=false; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(true); setUserMessageStatus(state.activeUserMessage,"processing"); break;
-        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); break;
+        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); root.piSessionView?.refreshSessionCache?.(msg.tabId); break;
         case "message_start":
           if (msg.message?.role==="assistant") { setUserMessageStatus(state.activeUserMessage,"processing"); beginStreamAssistant(); }
           else if (msg.message?.role==="user") { const txt=textOfBlocks(msg.message.content); const idx=state.queuedUserMessages.findIndex(e=>e.message===txt); if(idx>=0){ const [entry]=state.queuedUserMessages.splice(idx,1); state.activeUserMessage=entry.userMessage; setUserMessageStatus(entry.userMessage,"processing"); } }

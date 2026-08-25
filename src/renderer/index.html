@@ -307,61 +307,86 @@
         <div class="grow"><h2 data-i18n="modal.packages.title">Store plugin</h2><p class="muted small" data-i18n="modal.packages.subtitle">Estensioni, skill e strumenti installati direttamente nella tua copia di pi.</p></div>
         <button id="btn-packages-close" class="icon-btn borderless" data-i18n-title="btn.close" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
       </div>
-      <div class="package-toolbar">
-        <div class="package-search grow">
-          <i data-lucide="search"></i>
-          <input id="package-search" type="search" data-i18n-placeholder="packages.search.placeholder" spellcheck="false" />
-        </div>
-        <label class="package-select" title="Filtra per tipo">
-          <span class="sr-only">Tipo</span>
-          <select id="package-type">
-            <option value="" data-i18n="packages.type.all">Tutti i tipi</option>
-            <option value="extension" data-i18n="packages.type.extension">Estensioni</option>
-            <option value="skill" data-i18n="packages.type.skill">Skill</option>
-            <option value="prompt" data-i18n="packages.type.prompt">Prompt</option>
-            <option value="theme" data-i18n="packages.type.theme">Temi</option>
-          </select>
-        </label>
-        <label class="package-select" title="Ordina catalogo">
-          <span class="sr-only">Ordina</span>
-          <select id="package-sort">
-            <option value="downloads" data-i18n="packages.sort.downloads">Più scaricati</option>
-            <option value="recent" data-i18n="packages.sort.recent">Più recenti</option>
-            <option value="name" data-i18n="packages.sort.name">Nome A–Z</option>
-          </select>
-        </label>
-        <button id="btn-packages-refresh" class="btn ghost"><i data-lucide="rotate-cw"></i> <span data-i18n="btn.refresh">Aggiorna</span></button>
-      </div>
       <div class="package-security-note">
         <i data-lucide="shield-alert"></i>
         <span data-i18n="packages.security">I plugin possono eseguire codice con i tuoi permessi. Installa solo pacchetti di cui riconosci autore e sorgente.</span>
       </div>
-      <div class="package-source-row">
-        <input id="package-source" class="grow" type="text" data-i18n-placeholder="packages.source.placeholder" spellcheck="false" />
-        <select id="package-scope" data-i18n-title="packages.scope.user">
-          <option value="user" data-i18n="packages.scope.user">Utente</option>
-          <option value="project" data-i18n="packages.scope.project">Progetto</option>
-        </select>
-        <button id="btn-package-source-install" class="btn primary" type="button"><i data-lucide="plus"></i> <span data-i18n="btn.installSource">Installa sorgente</span></button>
-        <button id="btn-packages-update" class="btn ghost" type="button"><i data-lucide="refresh-cw"></i> <span data-i18n="btn.updatePackages">Aggiorna pacchetti</span></button>
-        <button id="btn-models-update" class="btn ghost" type="button" data-i18n="btn.updateModels">Aggiorna modelli</button>
-      </div>
-      <details class="package-native-section">
-        <summary><span data-i18n="packages.installed">Pacchetti installati</span> <span id="package-installed-count" class="muted small"></span></summary>
-        <div id="package-installed-list" class="package-native-list"></div>
-      </details>
-      <details class="package-native-section">
-        <summary><span data-i18n="packages.resources">Risorse caricate (pi config)</span> <span id="package-resource-count" class="muted small"></span></summary>
-        <div id="package-resource-list" class="package-resource-list"></div>
-      </details>
-      <div id="package-list" class="package-list"><div class="menu-empty" data-i18n="packages.catalog.loading">Caricamento catalogo…</div></div>
-      <div class="package-pagination">
-        <button id="package-prev" class="btn ghost" type="button" data-i18n="btn.prev">← Precedente</button>
-        <span id="package-page-info" class="muted small">Pagina 1</span>
-        <button id="package-next" class="btn ghost" type="button" data-i18n="btn.next">Successiva →</button>
+      <div class="package-store-layout">
+        <aside class="package-store-sidebar">
+          <section class="package-side-section">
+            <div class="package-section-heading">
+              <span class="package-section-icon"><i data-lucide="box"></i></span>
+              <span><strong data-i18n="packages.environment.title">Il tuo ambiente</strong><small data-i18n="packages.environment.subtitle">Gestisci ciò che è già configurato.</small></span>
+            </div>
+            <div class="package-maintenance-actions">
+              <button id="btn-packages-update" class="btn ghost" type="button"><i data-lucide="refresh-cw"></i> <span data-i18n="btn.updatePackages">Aggiorna pacchetti</span></button>
+              <button id="btn-models-update" class="btn ghost" type="button"><i data-lucide="database"></i> <span data-i18n="btn.updateModels">Aggiorna modelli</span></button>
+            </div>
+          </section>
+          <details class="package-native-section" open>
+            <summary><span data-i18n="packages.installed">Pacchetti installati</span> <span id="package-installed-count" class="package-count"></span></summary>
+            <div id="package-installed-list" class="package-native-list"></div>
+          </details>
+          <details class="package-native-section">
+            <summary><span data-i18n="packages.resources">Risorse caricate</span> <span id="package-resource-count" class="package-count"></span></summary>
+            <div id="package-resource-list" class="package-resource-list"></div>
+          </details>
+          <details class="package-native-section package-manual-section">
+            <summary><span data-i18n="packages.manual.title">Installa da sorgente</span><i data-lucide="chevron-down"></i></summary>
+            <p data-i18n="packages.manual.subtitle">Per npm, Git o percorsi locali.</p>
+            <div class="package-source-row">
+              <input id="package-source" type="text" data-i18n-placeholder="packages.source.placeholder" spellcheck="false" />
+              <div class="package-source-actions">
+                <select id="package-scope" data-i18n-title="packages.scope.user">
+                  <option value="user" data-i18n="packages.scope.user">Utente</option>
+                  <option value="project" data-i18n="packages.scope.project">Progetto</option>
+                </select>
+                <button id="btn-package-source-install" class="btn primary" type="button"><i data-lucide="plus"></i> <span data-i18n="btn.installSource">Installa</span></button>
+              </div>
+            </div>
+          </details>
+        </aside>
+        <section class="package-catalog-section">
+          <div class="package-catalog-heading">
+            <div><h3 data-i18n="packages.catalog.title">Catalogo</h3><p data-i18n="packages.catalog.subtitle">Scopri plugin verificando autore, descrizione e popolarità.</p></div>
+            <button id="btn-packages-refresh" class="icon-btn borderless" data-i18n-title="btn.refresh" data-i18n-aria-label="btn.refresh"><i data-lucide="rotate-cw"></i></button>
+          </div>
+          <div class="package-toolbar">
+            <div class="package-search grow">
+              <i data-lucide="search"></i>
+              <input id="package-search" type="search" data-i18n-placeholder="packages.search.placeholder" spellcheck="false" />
+            </div>
+            <div class="package-filter-row">
+              <label class="package-select" title="Filtra per tipo">
+                <span class="sr-only">Tipo</span>
+                <select id="package-type">
+                  <option value="" data-i18n="packages.type.all">Tutti i tipi</option>
+                  <option value="extension" data-i18n="packages.type.extension">Estensioni</option>
+                  <option value="skill" data-i18n="packages.type.skill">Skill</option>
+                  <option value="prompt" data-i18n="packages.type.prompt">Prompt</option>
+                  <option value="theme" data-i18n="packages.type.theme">Temi</option>
+                </select>
+              </label>
+              <label class="package-select" title="Ordina catalogo">
+                <span class="sr-only">Ordina</span>
+                <select id="package-sort">
+                  <option value="downloads" data-i18n="packages.sort.downloads">Più scaricati</option>
+                  <option value="recent" data-i18n="packages.sort.recent">Più recenti</option>
+                  <option value="name" data-i18n="packages.sort.name">Nome A–Z</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div id="package-list" class="package-list"><div class="menu-empty" data-i18n="packages.catalog.loading">Caricamento catalogo…</div></div>
+          <div class="package-pagination">
+            <button id="package-prev" class="btn ghost" type="button" data-i18n="btn.prev">← Precedente</button>
+            <span id="package-page-info" class="muted small">Pagina 1</span>
+            <button id="package-next" class="btn ghost" type="button" data-i18n="btn.next">Successiva →</button>
+          </div>
+        </section>
       </div>
       <pre id="package-log" class="log hidden"></pre>
-      <div class="row gap end">
+      <div class="package-footer">
         <a id="package-catalog-link" class="btn ghost" href="https://pi.dev/packages" data-i18n="btn.officialCatalog">Catalogo ufficiale</a>
         <button id="btn-packages-done" class="btn primary" data-i18n="btn.done">Fine</button>
       </div>
