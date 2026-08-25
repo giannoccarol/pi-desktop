@@ -168,14 +168,10 @@ async function switchToTab(tabId) {
     setSessionLoading(target.sessionFile || `tab:${tabId}`, { showSkeleton: !cached });
     resetQueueState();
     state.attachments = [];
-    await api.activateTab(tabId);
-    if (generation !== state.switchGeneration) return;
-    if (target.cwd) state.settings = await api.activateProject(target.cwd);
-    if (generation !== state.switchGeneration) return;
-    state.activeTabId = tabId;
-    state.activeSessionFile = target.sessionFile || null;
-    state.commands = [];
-    el.statusCwd.textContent = target.cwd || state.settings?.cwd || "";
+    const activate = Promise.all([
+      api.activateTab(tabId),
+      target.cwd ? api.activateProject(target.cwd) : Promise.resolve(null),
+    ]);
     let painted = null;
     if (cached) {
       el.messages.innerHTML = "";
@@ -184,10 +180,23 @@ async function switchToTab(tabId) {
       el.emptyState.classList.add("hidden");
       setConversationMode(true, false);
       await renderConversation(cached, () => generation === state.switchGeneration);
-      restoreActiveTabScroll({ fallbackToBottom: true });
+      if (generation !== state.switchGeneration) return;
       painted = cached;
     }
+    const [, settings] = await activate;
+    if (generation !== state.switchGeneration) return;
+    if (settings) state.settings = settings;
+    state.activeTabId = tabId;
+    state.activeSessionFile = target.sessionFile || null;
+    state.commands = [];
+    el.statusCwd.textContent = target.cwd || state.settings?.cwd || "";
     await reloadConversationFromRuntime({ restoreTab: true, paintedCache: painted, switchGeneration: generation });
+    if (generation === state.switchGeneration) {
+      const saved = state.tabContexts.get(tabId);
+      if (!saved?.scrollState || saved.scrollState.stickToBottom !== false) {
+        await window.piUi?.waitUntilPinnedToBottom?.();
+      }
+    }
   } catch (err) {
     toast(`Cambio tab fallito: ${err.message}`, "error");
   } finally {

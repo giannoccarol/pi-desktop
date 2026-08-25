@@ -540,8 +540,8 @@ body.session-loading .session-item:not(.loading) { opacity: .45; }
   content: "";
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--bg) 55%, transparent);
-  backdrop-filter: blur(1px);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(6px);
   pointer-events: none;
 }
 

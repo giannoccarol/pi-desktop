@@ -130,7 +130,21 @@ function activityBundleLabel(bundle) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function bundleActivityMessages() {
+let bulkRender = false;
+function beginBulkRender() {
+  if (bulkRender) return;
+  bulkRender = true;
+  window.piUi?.pauseIconRefresh?.();
+}
+function endBulkRender() {
+  if (!bulkRender) return;
+  bulkRender = false;
+  bundleActivityMessages({ skipIcons: true, skipScroll: true });
+  window.piUi?.resumeIconRefresh?.();
+}
+
+function bundleActivityMessages(opts = {}) {
+  if (bulkRender) return;
   // Streaming shells are temporary. Unwrap only the newly completed shells;
   // existing bundles remain mounted so Chromium keeps both the outer scroll
   // anchor and the <details> open state.
@@ -162,8 +176,8 @@ function bundleActivityMessages() {
     bundle.querySelector(".activity-list").appendChild(node);
     updateActivityBundle(bundle);
   }
-  refreshIcons();
-  scheduleScroll();
+  if (!opts.skipIcons) refreshIcons();
+  if (!opts.skipScroll) scheduleScroll();
 }
 
 function renderContentBlocks(container, blocks, resultMap) {
@@ -455,6 +469,7 @@ function updateActivityBundle(bundle) {
 if (typeof window !== "undefined") {
   window.piChat = Object.assign(window.piChat || {}, {
     renderFinalMessage, toolDisplayName, activityBundleLabel, bundleActivityMessages, renderContentBlocks, beginStreamAssistant, mountStreamAssistant, streamEnsureBlock, streamApplyDelta, renderStreamTextNode, queueStreamRender, endStreamAssistant, clearChat, updateActivityBundle, smartTitle, maybeAutoTitle, hasVisibleAssistantContent: typeof hasVisibleAssistantContent!=="undefined"?hasVisibleAssistantContent:undefined,
+    beginBulkRender, endBulkRender,
     initVirtualization, disableVirtualization, enableVirtualization
   });
   window.renderFinalMessage = renderFinalMessage;

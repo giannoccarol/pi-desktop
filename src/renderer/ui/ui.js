@@ -23,7 +23,14 @@
     n.addEventListener("mouseleave", () => { n.querySelector(".toast-progress").style.animationPlayState = "running"; t = setTimeout(close, 1800); });
   }
 
+  let iconRefreshPaused = 0;
+  function pauseIconRefresh() { iconRefreshPaused += 1; }
+  function resumeIconRefresh() {
+    iconRefreshPaused = Math.max(0, iconRefreshPaused - 1);
+    if (iconRefreshPaused === 0) refreshIcons();
+  }
   function refreshIcons() {
+    if (iconRefreshPaused) return;
     try {
       if (root.lucide) root.lucide.createIcons({ icons: root.lucide.icons });
     } catch (err) {
@@ -52,10 +59,8 @@
 
   // Dopo un restore al fondo il contenuto continua a dimensionarsi (immagini
   // lazy, tool card, highlight): senza re-pin la viewport resta a metà chat.
-  // Uno stabile di un solo frame non basta: lucide/virtualization cambiano
-  // l'altezza 1–2 frame dopo. Serve anche scroll-behavior:auto per tutta la pin.
   let bottomPinRaf = 0;
-  function pinBottomUntilSettled(maxFrames = 90) {
+  function pinBottomUntilSettled({ maxFrames = 90, stableFrames = 8, maxDistance = 4 } = {}) {
     if (bottomPinRaf) cancelAnimationFrame(bottomPinRaf);
     const elStart = getEl();
     const previousBehavior = elStart.chat ? elStart.chat.style.scrollBehavior : "";
@@ -63,24 +68,54 @@
     let frames = 0;
     let stable = 0;
     let lastHeight = -1;
-    const finish = () => {
-      bottomPinRaf = 0;
-      const el = getEl();
-      if (el.chat) el.chat.style.scrollBehavior = previousBehavior;
-      queueMicrotask(updateScrollBottomVisibility);
-    };
-    const step = () => {
-      const el = getEl();
-      if (!el.chat || getState().chatStickToBottom !== true) return finish();
-      el.chat.scrollTop = el.chat.scrollHeight;
-      const height = el.chat.scrollHeight;
-      if (height === lastHeight) stable += 1;
-      else { stable = 0; lastHeight = height; }
-      frames += 1;
-      if (stable >= 8 || frames >= maxFrames) return finish();
+    return new Promise((resolve) => {
+      const finish = () => {
+        bottomPinRaf = 0;
+        const el = getEl();
+        if (el.chat) el.chat.style.scrollBehavior = previousBehavior;
+        queueMicrotask(updateScrollBottomVisibility);
+        resolve();
+      };
+      const step = () => {
+        const el = getEl();
+        if (!el.chat || getState().chatStickToBottom !== true) return finish();
+        el.chat.scrollTop = el.chat.scrollHeight;
+        const height = el.chat.scrollHeight;
+        const atBottom = chatBottomDistance() <= maxDistance;
+        if (height === lastHeight && atBottom) stable += 1;
+        else { stable = 0; lastHeight = height; }
+        frames += 1;
+        if (stable >= stableFrames || frames >= maxFrames) return finish();
+        bottomPinRaf = requestAnimationFrame(step);
+      };
       bottomPinRaf = requestAnimationFrame(step);
-    };
-    bottomPinRaf = requestAnimationFrame(step);
+    });
+  }
+
+  function waitForChatMedia(root, timeoutMs = 400) {
+    const images = [...(root?.querySelectorAll?.("img") || [])].filter((img) => !img.complete);
+    if (!images.length) return Promise.resolve();
+    return Promise.race([
+      Promise.all(images.map((img) => (typeof img.decode === "function" ? img.decode() : Promise.resolve()).catch(() => {}))),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+  }
+
+  async function waitUntilPinnedToBottom() {
+    const el = getEl();
+    if (!el.chat) return;
+    el.chat.style.scrollBehavior = "auto";
+    el.chat.scrollTop = el.chat.scrollHeight;
+    getState().chatStickToBottom = true;
+    const media = waitForChatMedia(el.messages, 400);
+    await Promise.all([
+      media,
+      pinBottomUntilSettled({ maxFrames: 48, stableFrames: 4, maxDistance: 4 }),
+    ]);
+    el.chat.scrollTop = el.chat.scrollHeight;
+    if (chatBottomDistance() > 4) {
+      await pinBottomUntilSettled({ maxFrames: 24, stableFrames: 3, maxDistance: 4 });
+    }
   }
 
   function restoreChatScrollState(snapshot, { fallbackToBottom = true } = {}) {
@@ -232,9 +267,9 @@
   }
 
   const api = {
-    toast, refreshIcons, icon,
+    toast, refreshIcons, pauseIconRefresh, resumeIconRefresh, icon,
     chatBottomDistance, captureChatScrollState, restoreChatScrollState, noteChatScroll,
-    scrollBottom, jumpToBottom, isNearBottom, updateScrollBottomVisibility,
+    scrollBottom, jumpToBottom, waitUntilPinnedToBottom, isNearBottom, updateScrollBottomVisibility,
     scheduleScrollVisibility, scheduleScroll, md, setConversationMode,
     closeMenus, setSidebarVisible, applyTheme,
   };

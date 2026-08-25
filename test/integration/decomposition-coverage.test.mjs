@@ -132,7 +132,7 @@ test("decomposition: app.js delegates and stays under 1000 lines", () => {
 
 test("chat activity grouping keeps existing bundles mounted", () => {
   const chat = fs.readFileSync(path.join(root, "src/renderer/features/chat/chat.js"), "utf8");
-  const start = chat.indexOf("function bundleActivityMessages()");
+  const start = chat.indexOf("function bundleActivityMessages");
   const end = chat.indexOf("function renderContentBlocks", start);
   const implementation = chat.slice(start, end);
   assert.doesNotMatch(implementation, /querySelectorAll\(\":scope > \.activity-bundle\"\)[\s\S]*bundle\.remove\(\)/);

@@ -8,6 +8,8 @@ test("ui: module exposes expected API", async () => {
   assert.equal(typeof m.refreshIcons, "function");
   assert.equal(typeof m.icon, "function");
   assert.equal(typeof m.scrollBottom, "function");
+  assert.equal(typeof m.jumpToBottom, "function");
+  assert.equal(typeof m.waitUntilPinnedToBottom, "function");
   assert.equal(typeof m.applyTheme, "function");
   assert.equal(typeof m.setConversationMode, "function");
   assert.equal(m.icon("moon"), '<i data-lucide="moon"></i>');
@@ -36,6 +38,9 @@ test("ui: live scroll follows prior user intent and restores each chat position"
   ui.jumpToBottom();
   assert.equal(chat.scrollTop,2400,"opening a chat pins immediately to the latest message");
   assert.equal(globalThis.piStore.state.chatStickToBottom,true);
+  chat.scrollHeight=2600;
+  await ui.waitUntilPinnedToBottom();
+  assert.equal(chat.scrollTop,2600,"loading stays until the viewport is confirmed at the bottom");
 });
 
 test("message-view: messageTime handles null, ms, seconds, Date", async () => {
