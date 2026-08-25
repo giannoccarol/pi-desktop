@@ -1,6 +1,39 @@
 "use strict";
 // Sidebar + tabs – extracted from app.js monolith. Loaded before app.js, globals shared.
 
+// Explicit deps – no reliance on app.js bare globals (fragile across script order)
+const el = window.piStore ? window.piStore.el : {};
+const state = window.piStore ? window.piStore.state : {};
+const api = window.piDesktop;
+function t(k, v){ return window.i18n ? window.i18n.t(k, v) : String(k); }
+function toast(m,k,ms){ return window.piUi ? window.piUi.toast(m,k,ms) : void 0; }
+function icon(n){ return window.piUi ? window.piUi.icon(n) : `<i data-lucide="${n}"></i>`; }
+function refreshIcons(){ return window.piUi ? window.piUi.refreshIcons() : void 0; }
+function escapeHtml(s){ return window.piUtils ? window.piUtils.escapeHtml(s) : String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function basename(p){ return window.piUtils ? window.piUtils.basename(p) : String(p||"").split(/[\\/]/).pop()||""; }
+function truncate(s,n){ return window.piUtils ? window.piUtils.truncate(s,n) : (s&&String(s).length>n? String(s).slice(0,n-1)+"…":String(s)); }
+function preferenceLabel(p){ return window.piUtils ? window.piUtils.preferenceLabel(p) : (p?[p.provider,p.modelId,p.thinkingLevel].filter(Boolean).join(" · "):""); }
+function relTime(ms){ return window.piUtils ? window.piUtils.relTime(ms, Date.now(), (kk,vv)=>t(kk,vv)) : String(ms); }
+function tabDisplayTitle(tab){ return window.piNavigation ? window.piNavigation.tabDisplayTitle(tab, state.sessions) : (tab.title || t("session.newChat")); }
+function configuredProjects(){ return window.piNavigation ? window.piNavigation.configuredProjects(state.settings) : [...new Set((Array.isArray(state.settings?.projects)?state.settings.projects:[state.settings?.cwd]).filter(Boolean))]; }
+function sessionsForProject(path){ return window.piNavigation ? window.piNavigation.sessionsForProject({sessions:state.sessions, tabs:state.tabs}, path) : state.sessions.filter(s=>s.cwd===path); }
+function addUserMessage(){ return window.piMedia ? window.piMedia.addUserMessage.apply(null, arguments) : null; }
+function renderAttachmentTray(){ return window.piComposer ? window.piComposer.renderAttachmentTray.apply(null, arguments) : void 0; }
+function renderQueuePanel(){ return window.piComposer ? window.piComposer.renderQueuePanel.apply(null, arguments) : void 0; }
+function autosize(){ return window.piComposer ? window.piComposer.autosize.apply(null, arguments) : void 0; }
+function getCachedSessionMessages(f){ return window.piSessionView ? window.piSessionView.getCachedSessionMessages(f) : null; }
+function setSessionLoading(f,o){ return window.piSessionView ? window.piSessionView.setSessionLoading(f,o) : void 0; }
+function clearSessionLoading(){ return window.piSessionView ? window.piSessionView.clearSessionLoading() : void 0; }
+function renderConversation(m,c){ return window.piSessionView ? window.piSessionView.renderConversation(m,c) : Promise.resolve(false); }
+function reloadConversationFromRuntime(o){ return window.piSessionView ? window.piSessionView.reloadConversationFromRuntime(o) : Promise.resolve(false); }
+function openHistorySession(s){ return window.piSessionView ? window.piSessionView.openHistorySession(s) : Promise.resolve(); }
+function newChat(p){ return window.piSession ? window.piSession.newChat(p) : Promise.resolve(); }
+function setConversationMode(a,b){ return window.piUi ? window.piUi.setConversationMode(a,b) : void 0; }
+function jumpToBottom(){ return window.piUi ? window.piUi.jumpToBottom() : void 0; }
+function resetQueueState(){ return window.piComposer ? window.piComposer.resetQueueState.apply(null, arguments) : void 0; }
+let sessionsTimer = null;
+let tabsTimer = null;
+
 function stashActiveTabContext() {
   if (!state.activeTabId) return;
   state.tabContexts.set(state.activeTabId, {
@@ -63,8 +96,8 @@ function renderTabs() {
     button.innerHTML = `<span class="chat-tab-status"></span><span class="chat-tab-title"></span>` +
       `<button type="button" class="chat-tab-close" title="Chiudi tab" aria-label="Chiudi tab">${icon("x")}</button>`;
     const title = tabDisplayTitle(tab);
-    button.querySelector(".chat-tab-title").textContent = isLoading ? "caricamento…" : title;
-    button.title = `${title}${tab.busy ? " · in esecuzione" : ""}${isLoading ? " · caricamento…" : ""}`;
+    button.querySelector(".chat-tab-title").textContent = isLoading ? t("session.loading") : title;
+    button.title = `${title}${tab.busy ? " · in esecuzione" : ""}${isLoading ? " · " + t("session.loading") : ""}`;
     button.addEventListener("click", (event) => {
       if (event.target.closest(".chat-tab-close")) return;
       switchToTab(tab.id);
@@ -202,8 +235,8 @@ function renderProjects() {
     row.innerHTML =
       `${icon("chevron-right")} ${icon("folder")}<span class="project-title"></span>` +
       `<span class="project-actions">` +
-      `<button class="project-action project-new" title="Nuova chat in ${escapeHtml(basename(project.path))}" aria-label="${escapeHtml(t("session.newChat"))}">${icon("plus")}</button>` +
-      `<button class="project-action project-remove" title="Rimuovi dalla sidebar" aria-label="Rimuovi progetto">${icon("ellipsis")}</button>` +
+      `<button class="project-action project-new" title="${escapeHtml(t("project.newChat.title", {name: basename(project.path)}))}" aria-label="${escapeHtml(t("session.newChat"))}">${icon("plus")}</button>` +
+      `<button class="project-action project-remove" title="${escapeHtml(t("project.remove.title"))}" aria-label="${escapeHtml(t("project.menu.remove"))}">${icon("ellipsis")}</button>` +
       `</span>`;
     row.querySelector("svg, i")?.classList.add("project-chevron");
     row.querySelector(".project-title").textContent = basename(project.path) || project.path;
@@ -234,12 +267,12 @@ function renderProjects() {
     projectMenu.className = "project-menu" + (state.openProjectMenu === project.path ? "" : " hidden");
     projectMenu.setAttribute("role", "menu");
     projectMenu.innerHTML =
-      `<button class="project-menu-item danger" role="menuitem" data-action="remove">${icon("trash-2")}<span>Rimuovi dalla sidebar</span></button>` +
-      `<button class="project-menu-item" role="menuitem" data-action="copy">${icon("copy")}<span>Copia percorso</span></button>`;
+      `<button class="project-menu-item danger" role="menuitem" data-action="remove">${icon("trash-2")}<span>${escapeHtml(t("project.menu.remove"))}</span></button>` +
+      `<button class="project-menu-item" role="menuitem" data-action="copy">${icon("copy")}<span>${escapeHtml(t("project.menu.copy"))}</span></button>`;
     projectMenu.querySelector('[data-action="remove"]').addEventListener("click", async (e) => {
       e.stopPropagation();
       state.openProjectMenu = null;
-      if (!confirm(`Rimuovere “${basename(project.path)}” dalla sidebar? Le chat salvate non verranno eliminate.`)) {
+      if (!confirm(t("confirm.removeProject", {name: basename(project.path)}))) {
         renderProjects();
         return;
       }
@@ -250,7 +283,7 @@ function renderProjects() {
         if (wasActive) await newChat(state.settings.cwd);
         else await refreshSessions();
       } catch (err) {
-        toast(`Impossibile rimuovere il progetto: ${err.message}`, "error");
+        toast(t("toast.removeProjectFail", {msg: err.message}), "error");
       }
     });
     projectMenu.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
@@ -258,7 +291,7 @@ function renderProjects() {
       state.openProjectMenu = null;
       try {
         await navigator.clipboard.writeText(project.path);
-        toast("Percorso copiato.");
+        toast(t("toast.copyPath"));
       } catch {
         toast(project.path, "info");
       }
@@ -282,7 +315,7 @@ function renderProjects() {
         item.className = "session-item" + (isActive ? " active" : "") + (isLoading ? " loading" : "") + (openTab?.busy || session.busy ? " running" : "");
         const displayName = session.hasName ? session.name : truncate(session.preview || t("session.newChat"), 120);
         const prefLabel = preferenceLabel(session.preference);
-        const timeLabel = isLoading ? "caricamento…" : relTime(session.modified);
+        const timeLabel = isLoading ? t("session.loading") : relTime(session.modified);
         // custom tooltip data — no native title to avoid browser tooltip clash
         item.removeAttribute("title");
         item.dataset.tooltipTitle = displayName;
@@ -292,7 +325,7 @@ function renderProjects() {
         item.setAttribute("aria-busy", isLoading ? "true" : "false");
         item.innerHTML =
           `<div class="session-title"></div>` +
-          `<div class="session-meta"><span>${isLoading ? "caricamento…" : relTime(session.modified)}</span>` +
+          `<div class="session-meta"><span>${isLoading ? t("session.loading") : relTime(session.modified)}</span>` +
           `<button class="sess-del" title="Elimina sessione" aria-label="Elimina sessione">${icon("trash-2")}</button></div>`;
         item.querySelector(".session-title").textContent = displayName;
         item.addEventListener("click", async (ev) => {
@@ -325,17 +358,41 @@ function renderProjects() {
       if (!candidates.length) {
         const empty = document.createElement("div");
         empty.className = "project-empty";
-        empty.textContent = q ? "Nessuna chat corrispondente" : "Nessuna chat";
+        empty.textContent = q ? t("project.empty.noMatch") : t("project.empty.none");
         chats.appendChild(empty);
-      } else if (!q && candidates.length > limit) {
-        const more = document.createElement("button");
-        more.className = "project-more";
-        more.textContent = `Mostra altre ${Math.min(6, candidates.length - limit)}`;
-        more.addEventListener("click", () => {
-          state.projectLimits.set(project.path, limit + 6);
-          renderProjects();
-        });
-        chats.appendChild(more);
+      } else if (!q) {
+        const hasMore = candidates.length > limit;
+        const canLess = limit > 6;
+        if (hasMore || canLess) {
+          const actions = document.createElement("div");
+          actions.className = "project-more-wrap";
+          if (hasMore) {
+            const more = document.createElement("button");
+            more.className = "project-more";
+            const tr = window.i18n ? window.i18n.t : (k, v) => k;
+            more.textContent = tr("project.showMore", { n: Math.min(6, candidates.length - limit) });
+            // fallback if i18n missing placeholder
+            if (more.textContent === "project.showMore") more.textContent = `Mostra altre ${Math.min(6, candidates.length - limit)}`;
+            more.addEventListener("click", () => {
+              state.projectLimits.set(project.path, limit + 6);
+              renderProjects();
+            });
+            actions.appendChild(more);
+          }
+          if (canLess) {
+            const less = document.createElement("button");
+            less.className = "project-more project-less";
+            const tr = window.i18n ? window.i18n.t : (k, v) => k;
+            less.textContent = tr("project.showLess");
+            if (less.textContent === "project.showLess") less.textContent = "Mostra meno";
+            less.addEventListener("click", () => {
+              state.projectLimits.set(project.path, 6);
+              renderProjects();
+            });
+            actions.appendChild(less);
+          }
+          chats.appendChild(actions);
+        }
       }
       block.appendChild(chats);
     }
@@ -345,7 +402,7 @@ function renderProjects() {
   if (!projects.length) {
     const empty = document.createElement("div");
     empty.className = "menu-empty";
-    empty.textContent = q ? "Nessun progetto o chat trovato." : "Aggiungi il tuo primo progetto.";
+    empty.textContent = q ? t("project.empty.noProject") : t("project.empty.addFirst");
     el.projectsList.appendChild(empty);
   }
   const draftCount = state.tabs.filter((tab) => !tab.sessionFile).length;
@@ -525,4 +582,25 @@ function refreshTabsSoon() {
   clearTimeout(tabsTimer);
   tabsTimer = setTimeout(refreshTabs, 250);
 }
+
+// Expose unified API – both piSidebar namespace and legacy globals
+if (typeof window !== "undefined") {
+  window.piSidebar = Object.assign(window.piSidebar || {}, {
+    stashActiveTabContext, restoreActiveTabContext, refreshTabs, renderTabs, switchToTab, closeChatTab, refreshSessions, renderProjects, initSidebarResize, initChatTooltip, initSearchEnhancement, refreshSessionsSoon, refreshTabsSoon
+  });
+  window.stashActiveTabContext = stashActiveTabContext;
+  window.restoreActiveTabContext = restoreActiveTabContext;
+  window.refreshTabs = refreshTabs;
+  window.renderTabs = renderTabs;
+  window.switchToTab = switchToTab;
+  window.closeChatTab = closeChatTab;
+  window.refreshSessions = refreshSessions;
+  window.renderProjects = renderProjects;
+  window.initSidebarResize = initSidebarResize;
+  window.initChatTooltip = initChatTooltip;
+  window.initSearchEnhancement = initSearchEnhancement;
+  window.refreshSessionsSoon = refreshSessionsSoon;
+  window.refreshTabsSoon = refreshTabsSoon;
+}
+if (typeof module !== "undefined" && module.exports) module.exports = window.piSidebar;
 

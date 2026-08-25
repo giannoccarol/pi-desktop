@@ -1,6 +1,30 @@
 "use strict";
 // Chat rendering + streaming – extracted from app.js monolith. Loaded before app.js, globals shared.
 
+// Explicit deps – no bare globals from app.js
+const el = window.piStore ? window.piStore.el : {};
+const state = window.piStore ? window.piStore.state : {};
+function t(k, v){ return window.i18n ? window.i18n.t(k, v) : String(k); }
+function toast(m,k,ms){ return window.piUi ? window.piUi.toast(m,k,ms) : void 0; }
+function icon(n){ return window.piUi ? window.piUi.icon(n) : `<i data-lucide="${n}"></i>`; }
+function refreshIcons(){ return window.piUi ? window.piUi.refreshIcons() : void 0; }
+function escapeHtml(s){ return window.piUtils ? window.piUtils.escapeHtml(s) : String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function fmtCost(c){ return window.piUtils ? window.piUtils.fmtCost(c) : ""; }
+function textOfBlocks(c){ return window.piUtils ? window.piUtils.textOfBlocks(c) : (typeof c==="string"?c:""); }
+function isActivityOnly(b){ return window.piUtils ? window.piUtils.isActivityOnly(b) : false; }
+function hasVisibleAssistantContent(b){ return window.piChatUtils ? window.piChatUtils.hasVisibleAssistantContent(b) : false; }
+function toolIconName(n){ return window.piUtils ? window.piUtils.toolIconName(n) : "wrench"; }
+function md(text){ return window.piUi ? window.piUi.md(text) : String(text ?? ""); }
+function setConversationMode(a,b){ return window.piUi ? window.piUi.setConversationMode(a,b) : void 0; }
+function scheduleScroll(){ return window.piUi ? window.piUi.scheduleScroll() : void 0; }
+function makeToolCard(){ return window.piMedia ? window.piMedia.makeToolCard.apply(null, arguments) : null; }
+function setToolCardResult(){ return window.piMedia ? window.piMedia.setToolCardResult.apply(null, arguments) : void 0; }
+function renderMediaBlock(){ return window.piMedia ? window.piMedia.renderMediaBlock.apply(null, arguments) : null; }
+function renderBlockMedia(){ return window.piMedia ? window.piMedia.renderBlockMedia.apply(null, arguments) : null; }
+function addUserMessage(){ return window.piMedia ? window.piMedia.addUserMessage.apply(null, arguments) : null; }
+function compactToolArgs(){ return window.piForms ? window.piForms.compactToolArgs.apply(null, arguments) : String(arguments[1]||"").slice(0,160); }
+function fullToolArgs(a){ return window.piUtils ? window.piUtils.fullToolArgs(a) : String(a||""); }
+
 function renderFinalMessage(message, resultMap) {
   el.emptyState.classList.add("hidden");
   setConversationMode(true);
@@ -97,11 +121,11 @@ function activityBundleLabel(bundle) {
   const searches = counts(["grep", "find", "search"]);
   const shells = tools.filter((tool) => tool?.startsWith("bash") || tool === "shell" || tool === "powershell").length;
   const parts = [];
-  if (edits) parts.push(edits === 1 ? "ha modificato un file" : `ha modificato ${edits} file`);
-  if (reads) parts.push(reads === 1 ? "ha letto un file" : `ha letto ${reads} file`);
-  if (searches) parts.push(searches === 1 ? "ha effettuato una ricerca" : `ha effettuato ${searches} ricerche`);
-  if (shells) parts.push(shells === 1 ? "ha eseguito un comando" : `ha eseguito ${shells} comandi`);
-  const label = parts.length ? parts.join(" e ") : "ha elaborato il contesto";
+  if (edits) parts.push(edits === 1 ? t("activity.edited.one") : t("activity.edited.many", {n: edits}));
+  if (reads) parts.push(reads === 1 ? t("activity.read.one") : t("activity.read.many", {n: reads}));
+  if (searches) parts.push(searches === 1 ? t("activity.search.one") : t("activity.search.many", {n: searches}));
+  if (shells) parts.push(shells === 1 ? t("activity.shell.one") : t("activity.shell.many", {n: shells}));
+  const label = parts.length ? parts.join(" e ") : t("activity.context");
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -131,7 +155,7 @@ function bundleActivityMessages() {
       bundle = document.createElement("details");
       bundle.className = "activity-bundle";
       bundle.open = true;
-      bundle.innerHTML = `<summary>${icon("paperclip")}<span class="activity-label">Attività</span><span class="activity-count"></span></summary><div class="activity-list"></div>`;
+      bundle.innerHTML = `<summary>${icon("paperclip")}<span class="activity-label">${escapeHtml(t("tool.activity"))}</span><span class="activity-count"></span></summary><div class="activity-list"></div>`;
       el.messages.insertBefore(bundle, node);
     }
     bundle.querySelector(".activity-list").appendChild(node);
@@ -151,7 +175,7 @@ function renderContentBlocks(container, blocks, resultMap) {
       if (!String(block.thinking || "").trim()) continue;
       const det = document.createElement("details");
       det.className = "think";
-      det.innerHTML = `<summary>Ragionamento</summary><div class="think-body"></div>`;
+      det.innerHTML = `<summary>${escapeHtml(t("tool.thinking"))}</summary><div class="think-body"></div>`;
       det.querySelector(".think-body").textContent = block.thinking || "";
       container.appendChild(det);
     } else if (block.type === "toolCall") {
@@ -203,7 +227,7 @@ function streamEnsureBlock(idx, type) {
     } else if (type === "thinking") {
       node = document.createElement("details");
       node.className = "think";
-      node.innerHTML = `<summary>Ragionamento</summary><div class="think-body"></div>`;
+      node.innerHTML = `<summary>${escapeHtml(t("tool.thinking"))}</summary><div class="think-body"></div>`;
       sa.content.appendChild(node);
     } else if (type === "toolcall") {
       node = makeToolCard("…", "", sa.content);
@@ -353,19 +377,30 @@ function updateActivityBundle(bundle) {
   const labelEl = bundle.querySelector(".activity-label");
   if (labelEl) labelEl.textContent = (typeof activityBundleLabel === "function" ? activityBundleLabel(bundle) : "");
   const cnt = bundle.querySelector(".activity-count");
-  if (cnt) cnt.textContent = count ? `${count} attività` : "";
+  if (cnt) cnt.textContent = count ? t("tool.activityCount", {n: count}) : "";
 }
 
-// expose for app.js delegation
+// expose for app.js delegation – unified piChat namespace + legacy globals
 if (typeof window !== "undefined") {
-  window.piChat = window.piChat || {};
-  window.piChat.clearChat = clearChat;
-  window.piChat.updateActivityBundle = updateActivityBundle;
-  // also keep globals for backward compat
+  window.piChat = Object.assign(window.piChat || {}, {
+    renderFinalMessage, toolDisplayName, activityBundleLabel, bundleActivityMessages, renderContentBlocks, beginStreamAssistant, mountStreamAssistant, streamEnsureBlock, streamApplyDelta, renderStreamTextNode, queueStreamRender, endStreamAssistant, clearChat, updateActivityBundle, hasVisibleAssistantContent: typeof hasVisibleAssistantContent!=="undefined"?hasVisibleAssistantContent:undefined
+  });
+  window.renderFinalMessage = renderFinalMessage;
+  window.toolDisplayName = toolDisplayName;
+  window.activityBundleLabel = activityBundleLabel;
+  window.bundleActivityMessages = bundleActivityMessages;
+  window.renderContentBlocks = renderContentBlocks;
+  window.beginStreamAssistant = beginStreamAssistant;
+  window.mountStreamAssistant = mountStreamAssistant;
+  window.streamEnsureBlock = streamEnsureBlock;
+  window.streamApplyDelta = streamApplyDelta;
+  window.renderStreamTextNode = renderStreamTextNode;
+  window.queueStreamRender = queueStreamRender;
+  window.endStreamAssistant = endStreamAssistant;
   window.clearChat = clearChat;
   window.updateActivityBundle = updateActivityBundle;
+  window.hasVisibleAssistantContent = hasVisibleAssistantContent;
 }
 if (typeof module !== "undefined" && module.exports) {
-  module.exports.clearChat = clearChat;
-  module.exports.updateActivityBundle = updateActivityBundle;
+  module.exports = window.piChat;
 }

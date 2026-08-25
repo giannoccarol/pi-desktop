@@ -1,6 +1,27 @@
 "use strict";
 // Composer + queue – extracted from app.js monolith (head). Loaded before app.js, globals shared.
 
+// Explicit deps – no bare globals from app.js
+const el = window.piStore ? window.piStore.el : {};
+const state = window.piStore ? window.piStore.state : {};
+const api = window.piDesktop;
+function t(k, v){ return window.i18n ? window.i18n.t(k, v) : String(k); }
+function toast(m,k,ms){ return window.piUi ? window.piUi.toast(m,k,ms) : void 0; }
+function icon(n){ return window.piUi ? window.piUi.icon(n) : `<i data-lucide="${n}"></i>`; }
+function refreshIcons(){ return window.piUi ? window.piUi.refreshIcons() : void 0; }
+function escapeHtml(s){ return window.piUtils ? window.piUtils.escapeHtml(s) : String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function formatBytes(b){ return window.piUtils ? window.piUtils.formatBytes(b) : String(b); }
+function clipboardImageExtension(m){ return window.piUtils ? window.piUtils.clipboardImageExtension(m) : "png"; }
+function bufferToBase64(b){ return window.piUtils ? window.piUtils.bufferToBase64(b) : ""; }
+function fmtCost(c){ return window.piUtils ? window.piUtils.fmtCost(c) : ""; }
+function fmtTokens(n){ return window.piUtils ? window.piUtils.fmtTokens(n) : ""; }
+function addUserMessage(){ return window.piMedia ? window.piMedia.addUserMessage.apply(null, arguments) : null; }
+function makeToolCard(){ return window.piMedia ? window.piMedia.makeToolCard.apply(null, arguments) : null; }
+function setToolCardResult(){ return window.piMedia ? window.piMedia.setToolCardResult.apply(null, arguments) : void 0; }
+function setUserMessageStatus(){ return window.piMedia ? window.piMedia.setUserMessageStatus.apply(null, arguments) : void 0; }
+function refreshSessionsSoon(){ return window.piSidebar ? window.piSidebar.refreshSessionsSoon.apply(null, arguments) : (window.refreshSessionsSoon ? window.refreshSessionsSoon() : void 0); }
+function refreshTabsSoon(){ return window.piSidebar ? window.piSidebar.refreshTabsSoon.apply(null, arguments) : (window.refreshTabsSoon ? window.refreshTabsSoon() : void 0); }
+
 function renderAttachmentTray() {
   el.attachmentTray.innerHTML = "";
   el.attachmentTray.classList.toggle("hidden", !state.attachments.length);
@@ -459,4 +480,24 @@ function autosize() {
   el.input.style.height = "auto";
   el.input.style.height = Math.min(el.input.scrollHeight, 220) + "px";
 }
+
+// Unified export – both piComposer namespace and legacy globals
+if (typeof window !== "undefined") {
+  window.piComposer = Object.assign(window.piComposer || {}, {
+    renderAttachmentTray, pickAttachments, pasteClipboardImages, insertCodeBlock, refreshStats, setBusy, cancelQueuedMessagesForStop, finishInterruptedRendering, abortCurrentWork, clearComposerAfterQueue, renderQueuePanel, editLocalMessage, removeLocalMessage, deliverQueuedItem, forceLocalMessage, dispatchNextLocalMessage, resetQueueState, sendMessage, runDirectBash, autosize
+  });
+  window.renderAttachmentTray = renderAttachmentTray;
+  window.pickAttachments = pickAttachments;
+  window.pasteClipboardImages = pasteClipboardImages;
+  window.refreshStats = refreshStats;
+  window.setBusy = setBusy;
+  window.abortCurrentWork = abortCurrentWork;
+  window.renderQueuePanel = renderQueuePanel;
+  window.sendMessage = sendMessage;
+  window.runDirectBash = runDirectBash;
+  window.autosize = autosize;
+  window.resetQueueState = resetQueueState;
+  window.dispatchNextLocalMessage = dispatchNextLocalMessage;
+}
+if (typeof module !== "undefined" && module.exports) module.exports = window.piComposer;
 

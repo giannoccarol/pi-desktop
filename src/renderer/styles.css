@@ -366,6 +366,9 @@ html[data-theme="dark"] .global-search:focus-within {
   transition: background .14s, color .14s;
 }
 .project-more:hover { color: var(--text); background: var(--hover); }
+.project-more-wrap { display: flex; gap: 6px; margin: 4px 0 2px 2px; flex-wrap: wrap; }
+.project-more-wrap .project-more { margin: 0; }
+.project-less { opacity: .85; }
 .history-head { display: flex; align-items: center; padding: 13px 10px 4px; }
 .history-head .side-section-title { flex: 1; }
 .session-search-wrap, .menu-search {
