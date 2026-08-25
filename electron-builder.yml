@@ -1,0 +1,83 @@
+appId: dev.pi.desktop
+productName: Pi Desktop
+copyright: Copyright © 2026 Lorenzo
+
+asar: true
+compression: maximum
+generateUpdatesFilesForAllChannels: true
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+  - "!test/**"
+  - "!**/*.map"
+  - "!**/*.md"
+
+extraResources: []
+
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+publish:
+  provider: github
+  owner: giannoccarol
+  repo: pi-desktop
+  releaseType: release
+
+win:
+  icon: build/icon.png
+  executableName: Pi Desktop
+  target:
+    - target: nsis
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Pi Desktop
+  uninstallDisplayName: Pi Desktop
+  deleteAppDataOnUninstall: false
+
+mac:
+  icon: build/icon.png
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  target:
+    - dmg
+    - zip
+
+dmg:
+  title: Pi Desktop ${version}
+
+linux:
+  icon: build/icon.png
+  category: Development
+  executableName: pi-desktop
+  synopsis: Desktop companion for the Pi coding agent
+  description: Desktop companion for the Pi coding agent — chat history, provider switching, independent pi updates.
+  target:
+    - AppImage
+    - deb
+
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libasound2
+
+appImage:
+  artifactName: ${productName}-${version}-${os}-${arch}.${ext}

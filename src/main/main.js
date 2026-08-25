@@ -3,6 +3,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
+// execFile moved to mention-service.js
 
 const { RuntimeTabs } = require("./runtime-tabs");
 const sessionsStore = require("./sessions");
@@ -12,12 +13,18 @@ const packageStore = require("./package-store");
 const packageResources = require("./package-resource-service");
 const piSettingsStore = require("./pi-settings-store");
 const authService = require("./auth-service");
+const { createMentionService } = require("./mention-service");
+const { UpdateService } = require("./update-service");
 
 let win = null;
 let settings = null;
+let appUpdateService = null;
 let nextAuthRequestId = 1;
 const pendingAuthRequests = new Map();
 const authControllers = new Map();
+let sessionsListCache = null;
+let sessionsListCacheAt = 0;
+const SESSIONS_CACHE_TTL_MS = 750;
 
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 
@@ -131,6 +138,12 @@ function createWindow() {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: "deny" };
   });
+  if (!appUpdateService) {
+    appUpdateService = new UpdateService(win);
+  } else {
+    appUpdateService.setWindow(win);
+  }
+  appUpdateService.initialize();
 }
 
 // Single instance lock.
@@ -150,15 +163,20 @@ if (!app.requestSingleInstanceLock()) {
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
+    // Warm start: pre-spawn an ephemeral pi process so the first "nuova chat"
+    // appears instantly instead of waiting for a cold spawn.
+    ensureRuntime().catch((err) => console.warn("[warm-start] fallito:", err.message));
   });
 }
 
 app.on("window-all-closed", () => {
+  appUpdateService?.destroy();
   runtime.stop();
   app.quit();
 });
 
 app.on("will-quit", () => {
+  appUpdateService?.destroy();
   runtime.stop();
 });
 
@@ -274,6 +292,12 @@ ipcMain.handle("dialog:pickFiles", async (_e, kind = "files") => {
   });
 });
 
+// Ricerca file/cartelle per le menzioni @ — delegata a mention-service per testabilità
+const mentionService = createMentionService(() => settings?.cwd);
+const searchMentionCandidates = mentionService.searchMentionCandidates;
+
+ipcMain.handle("fs:searchFiles", (_e, query) => searchMentionCandidates(query));
+
 ipcMain.handle("projects:add", async () => {
   const res = await dialog.showOpenDialog(win, {
     title: "Aggiungi un progetto",
@@ -290,6 +314,8 @@ ipcMain.handle("projects:add", async () => {
 
 ipcMain.handle("projects:activate", (_e, projectPath) => {
   const resolved = resolveProjectPath(projectPath);
+  const alreadyListed = (settings.projects || []).includes(resolved);
+  if (settings.cwd === resolved && alreadyListed) return publicSettings();
   settings.projects = [...new Set([...(settings.projects || []), resolved])];
   settings.cwd = resolved;
   saveSettings();
@@ -313,13 +339,18 @@ ipcMain.handle("shell:openExternal", (_e, url) => {
 });
 
 ipcMain.handle("sessions:list", () => {
-  return sessionsStore.listSessions(sessionsDir()).map((session) => ({
+  const now = Date.now();
+  if (sessionsListCache && now - sessionsListCacheAt < SESSIONS_CACHE_TTL_MS) return sessionsListCache;
+  const listed = sessionsStore.listSessions(sessionsDir()).map((session) => ({
     ...session,
     preference: {
       ...(session.preference || {}),
       ...(settings.sessionPreferences?.[session.file] || {}),
     },
   }));
+  sessionsListCache = listed;
+  sessionsListCacheAt = now;
+  return listed;
 });
 
 ipcMain.handle("sessions:delete", async (_e, file) => {
@@ -332,6 +363,8 @@ ipcMain.handle("sessions:delete", async (_e, file) => {
   const openTab = runtime.list().find((tab) => tab.sessionFile === resolvedFile);
   if (openTab) runtime.close(openTab.id);
   sessionsStore.deleteSession(resolvedFile);
+  sessionsListCache = null;
+  sessionsListCacheAt = 0;
   if (settings.sessionPreferences) delete settings.sessionPreferences[resolvedFile];
   saveSettings();
   return { ok: true };
@@ -359,31 +392,38 @@ ipcMain.handle("pi:listTabs", () => runtime.list());
 ipcMain.handle("pi:activateTab", (_e, tabId) => runtime.activate(tabId));
 ipcMain.handle("pi:closeTab", (_e, tabId) => runtime.close(tabId));
 
-ipcMain.handle("pi:prompt", async (_e, { message, images, streamingBehavior }) => {
+ipcMain.handle("pi:prompt", async (_e, { message, images, streamingBehavior, tabId }) => {
   await ensureRuntime();
-  return runtime.prompt(message, images, streamingBehavior);
+  return runtime.prompt(message, images, streamingBehavior, tabId);
 });
-ipcMain.handle("pi:steer", async (_e, { message, images }) => {
+ipcMain.handle("pi:steer", async (_e, { message, images, tabId }) => {
   await ensureRuntime();
-  return runtime.steer(message, images);
+  return runtime.steer(message, images, tabId);
 });
-ipcMain.handle("pi:followUp", async (_e, { message, images }) => {
+ipcMain.handle("pi:followUp", async (_e, { message, images, tabId }) => {
   await ensureRuntime();
-  return runtime.followUp(message, images);
+  return runtime.followUp(message, images, tabId);
 });
-ipcMain.handle("pi:abort", () => runtime.abort());
+ipcMain.handle("pi:abort", (_e, tabId) => runtime.abort(tabId));
 ipcMain.handle("pi:forceStop", () => runtime.forceStopAndRecover());
-ipcMain.handle("pi:newSession", (_e, { cwd, parentSession } = {}) =>
-  runtime.newSession({
+ipcMain.handle("pi:newSession", async (_e, { cwd, parentSession } = {}) => {
+  const t0 = Date.now();
+  try {
+    return await runtime.newSession({
     cwd: cwd || settings.cwd,
     piPath: settings.piPath || undefined,
     provider: settings.lastModel?.provider,
     model: settings.lastModel?.modelId,
     thinkingLevel: settings.lastThinkingLevel,
-    sessionDir: settings.sessionsDir ? sessionsDir() : undefined,
-    parentSession,
-  })
-);
+      sessionDir: settings.sessionsDir ? sessionsDir() : undefined,
+      parentSession,
+    });
+  } finally {
+    const ms = Date.now() - t0;
+    if (ms > 2000) console.warn(`[pi:newSession] lento: ${ms}ms (cwd=${cwd || settings.cwd})`);
+    else console.log(`[pi:newSession] ${ms}ms`);
+  }
+});
 ipcMain.handle("pi:openSession", async (_e, { sessionPath, cwd, preference, title }) => {
   const stored = settings.sessionPreferences?.[sessionPath];
   const selected = safePreference(preference || stored);
@@ -396,16 +436,17 @@ ipcMain.handle("pi:openSession", async (_e, { sessionPath, cwd, preference, titl
     sessionDir: settings.sessionsDir ? sessionsDir() : undefined,
     title: typeof title === "string" ? title.slice(0, 120) : undefined,
   });
-  await rememberCurrentPreference();
+  // Preference persistence is secondary to click-to-chat latency.
+  rememberCurrentPreference().catch(() => {});
   return result;
 });
-ipcMain.handle("pi:getState", async () => {
+ipcMain.handle("pi:getState", async (_e, tabId) => {
   await ensureRuntime();
-  return runtime.getState();
+  return runtime.getState(tabId);
 });
-ipcMain.handle("pi:getMessages", async () => {
+ipcMain.handle("pi:getMessages", async (_e, tabId) => {
   await ensureRuntime();
-  return runtime.getMessages();
+  return runtime.getMessages(tabId);
 });
 ipcMain.handle("pi:getAvailableModels", async () => {
   await ensureRuntime();
@@ -657,7 +698,14 @@ ipcMain.handle("packages:update", async (_e, target) => {
   return installed;
 });
 
-// --- updates (independent of the app) ---------------------------------------
+// --- app OTA (electron-updater, GitHub Releases) ----------------------------
+
+ipcMain.handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null }));
+ipcMain.handle("update:check", async () => (appUpdateService ? appUpdateService.check(true) : { success: false, error: "Updater not initialized" }));
+ipcMain.handle("update:download", async () => (appUpdateService ? appUpdateService.download() : { success: false, error: "Updater not initialized" }));
+ipcMain.handle("update:install", () => (appUpdateService ? appUpdateService.install() : { success: false, error: "Updater not initialized" }));
+
+// --- pi CLI updates (independent of the app) --------------------------------
 
 ipcMain.handle("pi:updateStatus", () => updater.status(settings));
 

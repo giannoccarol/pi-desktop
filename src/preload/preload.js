@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
   pickDirectory: (title) => ipcRenderer.invoke("dialog:pickDirectory", title),
   pickFiles: (kind) => ipcRenderer.invoke("dialog:pickFiles", kind),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
+  searchFiles: (query) => ipcRenderer.invoke("fs:searchFiles", query),
   addProject: () => ipcRenderer.invoke("projects:add"),
   activateProject: (projectPath) => ipcRenderer.invoke("projects:activate", projectPath),
   removeProject: (projectPath) => ipcRenderer.invoke("projects:remove", projectPath),
@@ -24,16 +25,16 @@ contextBridge.exposeInMainWorld("piDesktop", {
   listTabs: () => ipcRenderer.invoke("pi:listTabs"),
   activateTab: (tabId) => ipcRenderer.invoke("pi:activateTab", tabId),
   closeTab: (tabId) => ipcRenderer.invoke("pi:closeTab", tabId),
-  prompt: (message, images, streamingBehavior) =>
-    ipcRenderer.invoke("pi:prompt", { message, images, streamingBehavior }),
-  steer: (message, images) => ipcRenderer.invoke("pi:steer", { message, images }),
-  followUp: (message, images) => ipcRenderer.invoke("pi:followUp", { message, images }),
-  abort: () => ipcRenderer.invoke("pi:abort"),
+  prompt: (message, images, streamingBehavior, tabId) =>
+    ipcRenderer.invoke("pi:prompt", { message, images, streamingBehavior, tabId }),
+  steer: (message, images, tabId) => ipcRenderer.invoke("pi:steer", { message, images, tabId }),
+  followUp: (message, images, tabId) => ipcRenderer.invoke("pi:followUp", { message, images, tabId }),
+  abort: (tabId) => ipcRenderer.invoke("pi:abort", tabId),
   forceStop: () => ipcRenderer.invoke("pi:forceStop"),
   newSession: (cwd, parentSession) => ipcRenderer.invoke("pi:newSession", { cwd, parentSession }),
   openSession: (sessionPath, cwd, preference, title) => ipcRenderer.invoke("pi:openSession", { sessionPath, cwd, preference, title }),
-  getState: () => ipcRenderer.invoke("pi:getState"),
-  getMessages: () => ipcRenderer.invoke("pi:getMessages"),
+  getState: (tabId) => ipcRenderer.invoke("pi:getState", tabId),
+  getMessages: (tabId) => ipcRenderer.invoke("pi:getMessages", tabId),
   getAvailableModels: () => ipcRenderer.invoke("pi:getAvailableModels"),
   setModel: (provider, modelId) => ipcRenderer.invoke("pi:setModel", { provider, modelId }),
   setThinkingLevel: (level) => ipcRenderer.invoke("pi:setThinkingLevel", { level }),
@@ -62,7 +63,12 @@ contextBridge.exposeInMainWorld("piDesktop", {
   setProjectTrust: (decision) => ipcRenderer.invoke("piSettings:setTrust", decision),
   savePiSettings: (patch, trustDecision) => ipcRenderer.invoke("piSettings:save", { patch, trustDecision }),
 
-  // updates
+  // app OTA (electron-updater)
+  getAppUpdateState: () => ipcRenderer.invoke("update:getState"),
+  checkAppUpdate: () => ipcRenderer.invoke("update:check"),
+  downloadAppUpdate: () => ipcRenderer.invoke("update:download"),
+  installAppUpdate: () => ipcRenderer.invoke("update:install"),
+  // pi CLI updates
   updateStatus: () => ipcRenderer.invoke("pi:updateStatus"),
   maintenance: (kind) => ipcRenderer.invoke("pi:maintenance", kind),
 
@@ -87,7 +93,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
 
   // events from main
   on(channel, cb) {
-    if (channel !== "pi:event" && channel !== "pi:maintenance-output" && channel !== "pi:package-output" && channel !== "pi:auth-request") return () => {};
+    if (channel !== "pi:event" && channel !== "pi:maintenance-output" && channel !== "pi:package-output" && channel !== "pi:auth-request" && channel !== "update:state") return () => {};
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on(channel, handler);
     listeners.set(cb, handler);

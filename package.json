@@ -13,37 +13,28 @@
   "scripts": {
     "start": "electron .",
     "check": "node scripts/check.js",
-    "test": "node test/rpc.test.mjs",
-    "dist": "electron-builder"
+    "test": "node --test test/*.test.mjs",
+    "test:legacy": "node test/rpc.test.mjs",
+    "lint": "eslint src --ext .js,.mjs",
+    "lint:fix": "eslint src --ext .js,.mjs --fix",
+    "dist": "electron-builder",
+    "release:check": "node scripts/check-release-version.js",
+    "release:assets": "node scripts/release-assets.js"
   },
-  "build": {
-    "appId": "dev.pi.desktop",
-    "productName": "Pi Desktop",
-    "files": [
-      "src/**/*",
-      "package.json",
-      "!test/**"
-    ],
-    "linux": {
-      "maintainer": "Lorenzo <lorenzo@pi.dev>",
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Development"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "win": {
-      "target": "nsis"
-    }
-  },
+
   "devDependencies": {
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^12.0.1",
+    "@semantic-release/release-notes-generator": "^14.0.3",
     "electron": "^43.4.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "eslint": "^8.57.0",
+    "semantic-release": "^24.2.3"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "lucide": "^1.34.0"
   }
 }
