@@ -39,6 +39,8 @@ jobs:
         run: npm test
       - name: Prepare build assets
         run: node scripts/build/prepare-build-assets.js
+      - name: Verify (check + renderer integrity + lint + tests + smoke)
+        run: xvfb-run -a npm run verify
       - name: Verify Linux package
         run: npx electron-builder --linux --dir --publish never
 

@@ -96,29 +96,30 @@ let failed = false;
   else log("test", "ok - tutti i test passati");
 }
 
-// 5) Smoke electron (solo locale, non in CI, opzionale ma utile per white-screen)
+// 5) Smoke electron (rileva white-screen + Object has been destroyed)
 {
-  if (isCI || isQuick) {
-    log("smoke", isQuick ? "skip --quick" : "skip in CI");
+  if (isQuick) {
+    log("smoke", "skip --quick");
   } else {
     console.log("\n== smoke (electron) ==");
-    const r = spawnSync("npx", ["electron", ".", "--enable-logging"], { cwd: root, encoding: "utf8", timeout: 15000 });
+    // In CI senza DISPLAY usa xvfb-run, in locale usa npx electron direttamente
+    const hasDisplay = Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
+    const needXvfb = isCI && !hasDisplay;
+    if (needXvfb) {
+      try { require("child_process").execFileSync("which", ["xvfb-run"], { stdio: "pipe" }); }
+      catch { log("smoke", "skip - xvfb-run non disponibile in CI"); }
+    }
+    const r = spawnSync(process.execPath, ["scripts/verify/smoke-electron.js"], { cwd: root, encoding: "utf8", timeout: 25000, env: { ...process.env, SMOKE_TIMEOUT: "12000" } });
     const out = (r.stdout || "") + (r.stderr || "");
-    // cerca ReferenceError o white-screen
-    if (/ReferenceError|openSessionTree is not defined|agente avviato/i.test(out)) {
-      if (/ReferenceError|is not defined/.test(out)) {
-        console.error("FAIL: smoke electron - ReferenceError rilevato:\n", out.slice(-2000));
-        failed = true;
-      } else if (/agente avviato/.test(out)) {
-        log("smoke", "ok - '[pi-desktop] agente avviato' rilevato, nessun ReferenceError");
-      } else {
-        console.log(out.slice(-2000));
-        log("smoke", "warn - output ambiguo, verifica manuale");
-      }
+    console.log(out.slice(-3500));
+    if (r.status !== 0) {
+      if (/ReferenceError|is not defined/.test(out)) console.error("FAIL: smoke - ReferenceError");
+      else if (/Object has been destroyed/i.test(out)) console.error("FAIL: smoke - Object has been destroyed (showWindow/second-instance)");
+      else if (/Uncaught Exception/i.test(out)) console.error("FAIL: smoke - Uncaught Exception nel main");
+      else console.error("FAIL: smoke electron");
+      failed = true;
     } else {
-      // electron potrebbe essere stato killato da timeout, ma se non c'è errore consideriamo ok se check precedenti ok
-      console.log(out.slice(-1500));
-      log("smoke", "skip/ok - nessun ReferenceError (timeout atteso)");
+      log("smoke", "ok - nessun ReferenceError / Object destroyed, 'agente avviato' ok + second-instance testato");
     }
   }
 }

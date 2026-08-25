@@ -30,8 +30,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run verify:quick
       - run: npm run release:check
-      - run: npm run lint
 
   prepare-release:
     name: Create atomic draft

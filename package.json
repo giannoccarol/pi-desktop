@@ -15,6 +15,7 @@
     "check": "node scripts/verify/check.js",
     "verify": "node scripts/verify/verify.js",
     "verify:quick": "node scripts/verify/verify.js --quick",
+    "verify:smoke": "node scripts/verify/smoke-electron.js",
     "prepare": "node scripts/hooks/install-hooks.js && node scripts/build/prepare-build-assets.js",
     "test": "node --test \"test/**/*.test.mjs\"",
     "test:legacy": "node test/rpc.test.mjs",

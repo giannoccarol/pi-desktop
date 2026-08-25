@@ -148,18 +148,21 @@ function resolveWindowIcon() {
 }
 
 function showWindow() {
-  if (!win || win.isDestroyed()) {
-    if (win && win.isDestroyed()) win = null;
-    createWindow();
+  // Guard robusto: isDestroyed() stesso può lanciare "Object has been destroyed" su win distrutta in Electron <30
+  let destroyed = false;
+  try { destroyed = !win || (typeof win.isDestroyed === "function" && win.isDestroyed()); } catch { destroyed = true; }
+  if (destroyed) {
+    try { if (win) win = null; } catch {}
+    try { createWindow(); } catch (err) { console.warn("[showWindow] createWindow fallita:", err.message); }
     return;
   }
   try {
     if (win.isMinimized()) win.restore();
     if (!win.isVisible()) win.show();
     win.focus();
-  } catch {
-    // Window was destroyed between checks (race during quit / second-instance)
-    win = null;
+  } catch (err) {
+    console.warn("[showWindow] accesso a win distrutta:", err.message);
+    try { win = null; } catch {}
     try { createWindow(); } catch {}
   }
 }
@@ -321,6 +324,15 @@ function createWindow() {
   appUpdateService.initialize();
   return win;
 }
+
+// Evita dialog "A JavaScript error occurred in the main process" su eccezioni non catturate
+// (showWindow/second-instance race). Logga e continua.
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
 
 // Single instance lock.
 if (!app.requestSingleInstanceLock()) {
