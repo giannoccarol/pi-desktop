@@ -1,3 +1,10 @@
+# [0.9.0](https://github.com/giannoccarol/pi-desktop/compare/v0.8.0...v0.9.0) (2026-08-25)
+
+
+### Features
+
+* **sessions:** add session preview and enhance IPC sanitization ([e251bb7](https://github.com/giannoccarol/pi-desktop/commit/e251bb75b2f06267b941c906d60a551f69a3b93f))
+
 # [0.8.0](https://github.com/giannoccarol/pi-desktop/compare/v0.7.7...v0.8.0) (2026-08-25)
 
 
