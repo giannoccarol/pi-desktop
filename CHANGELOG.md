@@ -1,3 +1,10 @@
+## [0.6.6](https://github.com/giannoccarol/pi-desktop/compare/v0.6.5...v0.6.6) (2026-08-25)
+
+
+### Bug Fixes
+
+* **renderer,build:** icone Arch + i18n labels saltate ([01b3df2](https://github.com/giannoccarol/pi-desktop/commit/01b3df2eed6fe65a37a74dfe0d226966cfb3350f))
+
 ## [0.6.5](https://github.com/giannoccarol/pi-desktop/compare/v0.6.4...v0.6.5) (2026-08-25)
 
 ## [0.6.4](https://github.com/giannoccarol/pi-desktop/compare/v0.6.3...v0.6.4) (2026-08-25)
