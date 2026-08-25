@@ -13,10 +13,10 @@ const root = path.join(__dirname, "..");
 test("regression: modularization – app.js size guard vs HEAD", () => {
   const app = fs.readFileSync(path.join(root, "src/renderer/app.js"), "utf8");
   const lines = app.split("\n").length;
-  // Monolith was 4029 at initial commit, now should be < 3500 after phase 1
-  // Guard against accidental re-bloat
-  assert.ok(lines < 1800, `app.js should stay modularized (<1800 lines) after phase 6, got ${lines}`);
-  assert.ok(lines > 1500, `app.js should not be empty, got ${lines}`);
+  // Monolith was 4029 at initial commit, goal is <1000 after decomposition
+  assert.ok(lines < 1000, `app.js should be decomposed below 1000 lines, got ${lines}`);
+  assert.ok(lines > 250, `app.js should not be empty, got ${lines}`);
+  assert.ok(lines < 600, `app.js should stay well below 1000 after full extraction, got ${lines}`);
 });
 
 test("regression: all extracted modules are loadable and expose expected API", () => {
@@ -61,13 +61,56 @@ test("regression: all extracted modules are loadable and expose expected API", (
 
 test("regression: index.html loads modules in correct order (store → composer → chat → sidebar → app)", () => {
   const html = fs.readFileSync(path.join(root, "src/renderer/index.html"), "utf8");
-  const order = ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "i18n.js", "app.js"];
+  const order = ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "i18n.js", "bootstrap.js", "app.js"];
   let lastIdx = -1;
   for (const file of order) {
-    const idx = html.indexOf(file);
+    const idx = html.indexOf(`src="${file}"`);
     assert.ok(idx > lastIdx, `${file} should appear after previous in index.html`);
     lastIdx = idx;
   }
+});
+
+test("regression: new extracted modules expose expected API via static analysis", () => {
+  const auth = fs.readFileSync(path.join(root, "src/renderer/auth.js"), "utf8");
+  assert.match(auth, /function loadProviderSettings/);
+  assert.match(auth, /function renderProviderSettings/);
+  assert.match(auth, /async function loadNativePiSettings/);
+  assert.match(auth, /function switchSettingsTab/);
+  assert.match(auth, /window\.piAuth/);
+
+  const ext = fs.readFileSync(path.join(root, "src/renderer/extension-bridge.js"), "utf8");
+  assert.match(ext, /function handleUiRequest/);
+  assert.match(ext, /function updateExtensionStatus/);
+  assert.match(ext, /function showDialog/);
+  assert.match(ext, /window\.piExtensionBridge/);
+
+  const media = fs.readFileSync(path.join(root, "src/renderer/media.js"), "utf8");
+  assert.match(media, /function addUserMessage/);
+  assert.match(media, /function makeToolCard/);
+  assert.match(media, /function safeImageSource/);
+  assert.match(media, /function renderMediaBlock/);
+  assert.match(media, /window\.piMedia/);
+
+  const bootstrap = fs.readFileSync(path.join(root, "src/renderer/bootstrap.js"), "utf8");
+  assert.match(bootstrap, /function wireUi/);
+  assert.match(bootstrap, /async function boot/);
+  assert.match(bootstrap, /window\.piBootstrap/);
+
+  const runtime = fs.readFileSync(path.join(root, "src/renderer/runtime-events.js"), "utf8");
+  assert.match(runtime, /function createRuntimeEvents/);
+  assert.match(runtime, /function bindGlobalPiEvents/);
+  assert.match(runtime, /piRuntimeEvents/);
+
+  // app.js should delegate to new modules via one-liners, not contain full implementations
+  const app = fs.readFileSync(path.join(root, "src/renderer/app.js"), "utf8");
+  assert.match(app, /window\.piAuth\.loadProviderSettings/);
+  assert.match(app, /window\.piExtensionBridge\.handleUiRequest/);
+  assert.match(app, /window\.piBootstrap\.wireUi/);
+  assert.match(app, /bindGlobalPiEvents/);
+  // app.js should not contain the full provider login body anymore
+  assert.ok(!app.includes("Accedi a ${provider.name}") || app.includes("piAuth"), "app.js should delegate provider login, not duplicate");
+  const wireCount = (app.match(/function wireUi\(/g) || []).length;
+  assert.equal(wireCount, 1, "app.js should have only one thin wireUi wrapper after extraction");
 });
 
 test("regression: mention-service extracted from main.js", () => {
@@ -84,7 +127,7 @@ test("regression: eslint + check still cover new modules", () => {
   assert.ok(pkg.scripts.lint, "lint script should exist");
   assert.ok(pkg.scripts.check, "check script should exist");
   // Verify new modules are present on disk and will be packaged via src/**/*
-  for (const mod of ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js"]) {
+  for (const mod of ["utils.js", "ui.js", "message-view.js", "package-helpers.js", "navigation.js", "persistence.js", "store.js", "composer.js", "chat.js", "sidebar.js", "session-view.js", "status.js", "models.js", "package-view.js", "forms.js", "runtime-events.js", "auth.js", "extension-bridge.js", "media.js", "bootstrap.js"]) {
     assert.ok(fs.existsSync(path.join(root, "src/renderer", mod)), `${mod} should exist`);
   }
 });

@@ -42,6 +42,81 @@
     function bind() { api.on("pi:event", handleEvent); }
     return { handleEvent, bind };
   }
-  root.piRuntimeEvents = { createRuntimeEvents };
-  if (typeof module!=="undefined"&&module.exports) module.exports={ createRuntimeEvents };
+  // Direct global binding used by app.js — resolves deps via window at call time.
+  function bindGlobalPiEvents() {
+    const api = root.piDesktop;
+    const el = root.piStore ? root.piStore.el : {};
+    const state = root.piStore ? root.piStore.state : {};
+    const t = root.i18n ? root.i18n.t : (k,v)=>k;
+    function icon(n){ return root.piUi?root.piUi.icon(n):`<i data-lucide="${n}"></i>`; }
+    function escapeHtml(s){ return root.piUtils?root.piUtils.escapeHtml(s):String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+    function textOfBlocks(c){ return root.piUtils?root.piUtils.textOfBlocks(c): (typeof c==="string"?c:""); }
+    function toolIconName(n){ return root.piUtils?root.piUtils.toolIconName(n):"wrench"; }
+    function compactToolArgs(n,a){ return root.piForms?root.piForms.compactToolArgs(n,a,state.settings?.cwd): String(a||"").slice(0,160); }
+    function fullToolArgs(a){ return root.piUtils?root.piUtils.fullToolArgs(a): String(a||""); }
+    function setUserMessageStatus(w,s){ return root.piMedia?root.piMedia.setUserMessageStatus(w,s): (window.setUserMessageStatus?window.setUserMessageStatus(w,s):void 0); }
+    function makeToolCard(n,pr,pa){ return root.piMedia?root.piMedia.makeToolCard(n,pr,pa): (window.makeToolCard?window.makeToolCard(n,pr,pa):null); }
+    function setToolCardResult(c,tx,er,co){ return root.piMedia?root.piMedia.setToolCardResult(c,tx,er,co): (window.setToolCardResult?window.setToolCardResult(c,tx,er,co):void 0); }
+    function renderBlockMedia(p,c,pr){ return root.piMedia?root.piMedia.renderBlockMedia(p,c,pr): (window.renderBlockMedia?window.renderBlockMedia(p,c,pr):void 0); }
+    function beginStreamAssistant(){ return root.piChat?root.piChat.beginStreamAssistant(): (window.beginStreamAssistant?window.beginStreamAssistant():void 0); }
+    function streamApplyDelta(m){ return root.piChat?root.piChat.streamApplyDelta(m): (window.streamApplyDelta?window.streamApplyDelta(m):void 0); }
+    function endStreamAssistant(m){ return root.piChat?root.piChat.endStreamAssistant(m): (window.endStreamAssistant?window.endStreamAssistant(m):void 0); }
+    function setBusy(b,opts){ const fn=root.piComposer?root.piComposer.setBusy: window.setBusy; return fn?fn(b,opts):void 0; }
+    function refreshStats(){ const fn=root.piComposer?root.piComposer.refreshStats: window.refreshStats; return fn?fn():void 0; }
+    function refreshSessionsSoon(){ const fn=root.piSidebar?root.piSidebar.refreshSessionsSoon: window.refreshSessionsSoon; return fn?fn():void 0; }
+    function refreshTabsSoon(){ const fn=root.piSidebar?root.piSidebar.refreshTabsSoon: window.refreshTabsSoon; return fn?fn():void 0; }
+    function renderQueuePanel(){ const fn=root.piComposer?root.piComposer.renderQueuePanel: window.renderQueuePanel; return fn?fn():void 0; }
+    function renderTabs(){ const fn=root.piSidebar?root.piSidebar.renderTabs: window.renderTabs; return fn?fn():void 0; }
+    function renderProjects(){ const fn=root.piSidebar?root.piSidebar.renderProjects: window.renderProjects; return fn?fn():void 0; }
+    function handleUiRequest(msg){ const fn=root.piExtensionBridge?root.piExtensionBridge.handleUiRequest: window.handleUiRequest; return fn?fn(msg):void 0; }
+    function scheduleScroll(){ return root.piUi?root.piUi.scheduleScroll():void 0; }
+    function toolDisplayName(n){ const fn=root.piChat?root.piChat.toolDisplayName: null; return fn?fn(n): (n||"tool"); }
+    function toast(m,k,ms){ return root.piUi?root.piUi.toast(m,k,ms):void 0; }
+    function handleEvent(msg){
+      if (msg.tabId) {
+        const tab = state.tabs.find((c) => c.id === msg.tabId);
+        if (tab) {
+          if (msg.type === "agent_start") tab.busy = true;
+          if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "pi-started") tab.busy = false;
+          if (msg.type === "tab_status") tab.busy = Boolean(msg.busy);
+          renderTabs(); renderProjects();
+        }
+        if (state.activeTabId && msg.tabId !== state.activeTabId && msg.type !== "extension_ui_request") {
+          if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "tab_status") { refreshSessionsSoon(); refreshTabsSoon(); }
+          return;
+        }
+      }
+      switch (msg.type) {
+        case "agent_start": state.lastAssistantErrored=false; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(true); setUserMessageStatus(state.activeUserMessage,"processing"); break;
+        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); break;
+        case "message_start":
+          if (msg.message?.role==="assistant") { setUserMessageStatus(state.activeUserMessage,"processing"); beginStreamAssistant(); }
+          else if (msg.message?.role==="user") { const txt=textOfBlocks(msg.message.content); const idx=state.queuedUserMessages.findIndex(e=>e.message===txt); if(idx>=0){ const [entry]=state.queuedUserMessages.splice(idx,1); state.activeUserMessage=entry.userMessage; setUserMessageStatus(entry.userMessage,"processing"); } }
+          break;
+        case "message_update": streamApplyDelta(msg); break;
+        case "message_end": endStreamAssistant(msg.message); break;
+        case "turn_end": refreshStats(); break;
+        case "tool_execution_start": { const name=msg.toolName||"tool"; const card=state.tools.get(msg.toolCallId)||makeToolCard(name, compactToolArgs(name,msg.args)); card.dataset.tool=name.toLowerCase(); const nEl=card.querySelector(".tool-name"); if(nEl) nEl.innerHTML=`${icon(toolIconName(name))} ${escapeHtml(toolDisplayName(name))}`; const a=card.querySelector(".tool-args"); if(a){ a.textContent=compactToolArgs(name,msg.args); a.title=fullToolArgs(msg.args); } state.tools.set(msg.toolCallId,card); if(root.piUi) root.piUi.refreshIcons(); break; }
+        case "tool_execution_update": { const card=state.tools.get(msg.toolCallId); if(card){ const pre=card.querySelector(".tool-body pre"); if(pre) pre.textContent=textOfBlocks(msg.partialResult?.content); renderBlockMedia(card.querySelector(".tool-body"), msg.partialResult?.content, "Anteprima"); } break; }
+        case "tool_execution_end": { const card=state.tools.get(msg.toolCallId); if(card){ setToolCardResult(card, textOfBlocks(msg.result?.content), Boolean(msg.isError), msg.result?.content); state.tools.delete(msg.toolCallId); } break; }
+        case "bash_execution_update": { if(state.directBashCard){ const pre=state.directBashCard.querySelector(".tool-body pre"); if(pre) pre.textContent+=(msg.delta||""); scheduleScroll(); } break; }
+        case "queue_update": state.nativeQueue={steering:msg.steering||[], followUp:msg.followUp||[]}; renderQueuePanel(); break;
+        case "compaction_start": el.statusActivity.textContent="compazione del contesto…"; break;
+        case "compaction_end": el.statusActivity.textContent=""; toast("Contesto compattato.","info"); break;
+        case "auto_retry_start": state.lastAssistantErrorWrap?.remove(); state.lastAssistantErrorWrap=null; state.lastAssistantErrored=false; state.retryAttempt=msg.attempt||state.retryAttempt+1; el.statusActivity.textContent=`errore transitorio — retry ${msg.attempt}/${msg.maxAttempts}`; setUserMessageStatus(state.activeUserMessage,"retrying"); if (state.activeUserMessage?.isConnected) { const stEl=state.activeUserMessage.querySelector(".message-status"); const receivedAt=state.activeUserMessage.dataset.receivedAt; if (stEl) stEl.textContent=`ricevuto${receivedAt?` alle ${receivedAt}`:""} · provider non disponibile, tentativo ${msg.attempt}/${msg.maxAttempts}…`; } break;
+        case "auto_retry_end": el.statusActivity.textContent=state.busy?"agente al lavoro…":""; if(msg.success){ state.lastAssistantErrored=false; setUserMessageStatus(state.activeUserMessage,"processing"); } else { state.lastAssistantErrored=true; setUserMessageStatus(state.activeUserMessage,"failed"); toast(`Richiesta fallita dopo ${msg.attempt} tentativi`,"error"); } break;
+        case "summarization_retry_scheduled": el.statusActivity.textContent=`riepilogo in retry ${msg.attempt}/${msg.maxAttempts}`; break;
+        case "summarization_retry_attempt_start": el.statusActivity.textContent="nuovo tentativo di riepilogo…"; break;
+        case "summarization_retry_finished": el.statusActivity.textContent=state.busy?"agente al lavoro…":""; break;
+        case "extension_error": toast(`Estensione in errore: ${msg.error}`,"error"); break;
+        case "extension_ui_request": handleUiRequest(msg); break;
+        case "pi-exit": if(msg.info&&!msg.info.expected) toast("Il processo pi si è chiuso. Ripartirà al prossimo comando.","warn",6000); setUserMessageStatus(state.activeUserMessage,"error"); state.activeUserMessage=null; setBusy(false); break;
+        default: break;
+      }
+    }
+    if (api && api.on) api.on("pi:event", handleEvent);
+    return handleEvent;
+  }
+  root.piRuntimeEvents = { createRuntimeEvents, bindGlobalPiEvents };
+  if (typeof module!=="undefined"&&module.exports) module.exports={ createRuntimeEvents, bindGlobalPiEvents };
 })(typeof window!=="undefined"?window:globalThis);

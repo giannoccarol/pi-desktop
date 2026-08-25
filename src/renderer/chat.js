@@ -331,3 +331,41 @@ function endStreamAssistant(message) {
   refreshIcons();
 }
 
+
+// Extracted from app.js - clearChat + updateActivityBundle
+function clearChat() {
+  // delegated via piStore globals - same as app.js
+  const el = (typeof window !== "undefined" && window.piStore) ? window.piStore.el : {};
+  const state = (typeof window !== "undefined" && window.piStore) ? window.piStore.state : {};
+  function updateScrollBottomVisibility(){ return window.piUi ? window.piUi.updateScrollBottomVisibility() : void 0; }
+  el.messages.innerHTML = "";
+  state.streamAssistant = null;
+  state.activeUserMessage = null;
+  state.lastAssistantErrored = false;
+  state.lastAssistantErrorWrap = null;
+  state.retryAttempt = 0;
+  if (state.tools) state.tools.clear();
+  queueMicrotask(updateScrollBottomVisibility);
+}
+
+function updateActivityBundle(bundle) {
+  const count = bundle.querySelectorAll(".tool-card, details.think").length;
+  const labelEl = bundle.querySelector(".activity-label");
+  if (labelEl) labelEl.textContent = (typeof activityBundleLabel === "function" ? activityBundleLabel(bundle) : "");
+  const cnt = bundle.querySelector(".activity-count");
+  if (cnt) cnt.textContent = count ? `${count} attività` : "";
+}
+
+// expose for app.js delegation
+if (typeof window !== "undefined") {
+  window.piChat = window.piChat || {};
+  window.piChat.clearChat = clearChat;
+  window.piChat.updateActivityBundle = updateActivityBundle;
+  // also keep globals for backward compat
+  window.clearChat = clearChat;
+  window.updateActivityBundle = updateActivityBundle;
+}
+if (typeof module !== "undefined" && module.exports) {
+  module.exports.clearChat = clearChat;
+  module.exports.updateActivityBundle = updateActivityBundle;
+}
