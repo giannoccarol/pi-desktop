@@ -1,3 +1,10 @@
+## [0.6.8](https://github.com/giannoccarol/pi-desktop/compare/v0.6.7...v0.6.8) (2026-08-25)
+
+
+### Bug Fixes
+
+* **ui:** uniforma tipografia e leggibilità ([67a8c28](https://github.com/giannoccarol/pi-desktop/commit/67a8c281929ec2b339ea3bd9af988425f5bf5335))
+
 ## [0.6.7](https://github.com/giannoccarol/pi-desktop/compare/v0.6.6...v0.6.7) (2026-08-25)
 
 
