@@ -1,3 +1,10 @@
+## [0.6.4](https://github.com/giannoccarol/pi-desktop/compare/v0.6.3...v0.6.4) (2026-08-25)
+
+
+### Bug Fixes
+
+* **renderer:** evita SyntaxError su globali condivisi (var vs const) ([a9454db](https://github.com/giannoccarol/pi-desktop/commit/a9454dbc9b1f3e9ce49b0b564b5cdeeba20b899a))
+
 ## [0.6.3](https://github.com/giannoccarol/pi-desktop/compare/v0.6.2...v0.6.3) (2026-08-25)
 
 ## [0.6.2](https://github.com/giannoccarol/pi-desktop/compare/v0.6.1...v0.6.2) (2026-08-25)
