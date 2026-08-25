@@ -36,6 +36,10 @@
     else if (window.initSearchEnhancement) window.initSearchEnhancement();
     if (window.piDragDrop && window.piDragDrop.initDragDrop) window.piDragDrop.initDragDrop();
     else if (typeof initDragDrop === "function") initDragDrop();
+    // virtualization for chat tool cards
+    try { (window.piChat && window.piChat.initVirtualization && window.piChat.initVirtualization()) || (typeof initVirtualization === "function" && initVirtualization()); } catch {}
+    // costs dashboard periodic refresh
+    try { if (window.piCosts && window.piCosts.renderProjectCosts) setInterval(() => window.piCosts.renderProjectCosts(), 15000); } catch {}
     if (el.chat) {
       el.chat.addEventListener("scroll", scheduleScrollVisibility, { passive: true });
       window.addEventListener("resize", scheduleScrollVisibility);
@@ -340,12 +344,36 @@
         toast(lang === "en" ? "Language: English" : "Lingua: Italiano");
       });
     }
+    // Notification toggles in General settings
+    if (el.settingNotificationsEnabled) {
+      const isEnabled = (() => { try { const v = localStorage.getItem("pi-desktop-notifications-enabled"); return v === null ? true : v !== "false" && v !== "0"; } catch { return true; } })();
+      const isSound = (() => { try { return localStorage.getItem("pi-desktop-notifications-sound") === "true"; } catch { return false; } })();
+      el.settingNotificationsEnabled.checked = isEnabled;
+      if (el.settingNotificationsSound) el.settingNotificationsSound.checked = isSound;
+      el.settingNotificationsEnabled.addEventListener("change", () => {
+        try { localStorage.setItem("pi-desktop-notifications-enabled", String(el.settingNotificationsEnabled.checked)); } catch {}
+        if (el.settingNotificationsEnabled.checked && typeof Notification !== "undefined" && Notification.permission === "default") {
+          try { Notification.requestPermission().catch(() => {}); } catch {}
+        }
+      });
+      if (el.settingNotificationsSound) {
+        el.settingNotificationsSound.addEventListener("change", () => {
+          try { localStorage.setItem("pi-desktop-notifications-sound", String(el.settingNotificationsSound.checked)); } catch {}
+        });
+      }
+    }
     if (i18n) i18n.applyI18n();
     el.btnSettingsOpen.addEventListener("click", () => {
       el.settingCwd.textContent = state.settings.cwd || "";
       el.settingPiPath.value = state.settings.piPath || "";
       el.settingSessionsDir.value = state.settings.sessionsDir || "";
       if (el.settingLanguage) el.settingLanguage.value = (i18n && i18n.getLang()) || state.settings.language || "it";
+      if (el.settingNotificationsEnabled) {
+        try { const v = localStorage.getItem("pi-desktop-notifications-enabled"); el.settingNotificationsEnabled.checked = v === null ? true : v !== "false" && v !== "0"; } catch { el.settingNotificationsEnabled.checked = true; }
+      }
+      if (el.settingNotificationsSound) {
+        try { el.settingNotificationsSound.checked = localStorage.getItem("pi-desktop-notifications-sound") === "true"; } catch { el.settingNotificationsSound.checked = false; }
+      }
       (window.switchSettingsTab||window.piAuth?.switchSettingsTab)?.("general");
       el.modalSettings.showModal();
       if (i18n) i18n.applyI18n();
@@ -476,6 +504,14 @@
     wireUi();
     // setupAppUpdates via piStatus
     (window.setupAppUpdates||window.piStatus?.setupAppUpdates)?.();
+    // Explicit permission request for notifications if enabled
+    try {
+      const v = localStorage.getItem("pi-desktop-notifications-enabled");
+      const enabled = v === null ? true : v !== "false" && v !== "0";
+      if (enabled && typeof Notification !== "undefined" && Notification.permission === "default" && typeof Notification.requestPermission === "function") {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch {}
     const savedTheme = localStorage.getItem("pi-desktop-theme");
     const preferredTheme = savedTheme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     applyTheme(preferredTheme);
@@ -498,7 +534,8 @@
     await Promise.all([
       (window.refreshSessions||window.piSidebar?.refreshSessions)?.(),
       (window.refreshTabs||window.piSidebar?.refreshTabs)?.(),
-      (window.refreshPiStatus||window.piStatus?.refreshPiStatus)?.(false)
+      (window.refreshPiStatus||window.piStatus?.refreshPiStatus)?.(false),
+      (window.refreshGitStatus||window.piStatus?.refreshGitStatus)?.()
     ]);
     el.emptyState.classList.remove("hidden");
     el.input.focus();
@@ -506,7 +543,8 @@
     setInterval(() => {
       (window.refreshSessions||window.piSidebar?.refreshSessions)?.();
       (window.refreshPiStatus||window.piStatus?.refreshPiStatus)?.();
-    }, 30000);
+      (window.refreshGitStatus||window.piStatus?.refreshGitStatus)?.();
+    }, 10000);
   }
 
   window.piBootstrap = { wireUi, boot };

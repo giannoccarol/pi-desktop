@@ -14,6 +14,7 @@ const packageResources = require("../services/package-resource-service");
 const piSettingsStore = require("../services/pi-settings-store");
 const authService = require("../services/auth-service");
 const { createMentionService } = require("../services/mention-service");
+const gitService = require("../services/git-service");
 const { UpdateService } = require("../updates/update-service");
 
 let win = null;
@@ -156,28 +157,97 @@ function showWindow() {
   win.focus();
 }
 
+function tTray(key, vars = {}) {
+  const lang = (settings && settings.language === "en") ? "en" : "it";
+  const dict = {
+    it: { "tray.show": "Mostra Pi Desktop", "tray.newChat": "Nuova chat", "tray.quit": "Esci", "tray.tooltip": "Pi Desktop" },
+    en: { "tray.show": "Show Pi Desktop", "tray.newChat": "New chat", "tray.quit": "Quit", "tray.tooltip": "Pi Desktop" },
+  };
+  let str = (dict[lang] && dict[lang][key]) || dict.it[key] || key;
+  for (const [k, v] of Object.entries(vars)) str = str.replace(`{${k}}`, String(v));
+  return str;
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
-    { label: "Mostra Pi Desktop", click: () => showWindow() },
-    { label: "Nuova chat", click: () => { showWindow(); if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } },
+    { label: tTray("tray.show"), click: () => showWindow() },
+    { label: tTray("tray.newChat"), click: () => { showWindow(); if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } },
     { type: "separator" },
-    { label: "Esci", role: "quit" },
+    { label: tTray("tray.quit"), role: "quit" },
   ]);
+}
+
+function updateTrayTooltip(status = "") {
+  try {
+    if (!tray) return;
+    const base = tTray("tray.tooltip");
+    const text = status ? `${base} — ${status}` : base;
+    tray.setToolTip(text);
+  } catch {}
+}
+
+function resolveTrayIcon() {
+  // Try dedicated tray assets first, then fallback to window icon
+  const candidates = [];
+  try { candidates.push(path.join(__dirname, "..", "..", "build", "tray.png")); } catch {}
+  try { candidates.push(path.join(__dirname, "..", "renderer", "img", "pi-logo-on-light.svg")); } catch {}
+  const winIcon = resolveWindowIcon();
+  if (winIcon) candidates.push(winIcon);
+  for (const p of candidates) {
+    try { if (p && fs.existsSync(p)) return p; } catch {}
+  }
+  return winIcon || null;
 }
 
 function createTray() {
   if (tray) return tray;
   try {
-    const iconPath = resolveWindowIcon();
-    if (!iconPath) return null;
-    const image = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    let image = null;
+    const iconPath = resolveTrayIcon();
+    if (iconPath) {
+      try {
+        // SVG not supported for Tray on some platforms — try PNG fallback via buffer if needed
+        if (iconPath.endsWith(".svg")) {
+          try {
+            const svgContent = fs.readFileSync(iconPath, "utf8");
+            // Fallback: try to create from path directly, Electron will rasterize if possible; otherwise use empty
+            image = nativeImage.createFromPath(iconPath);
+            if (image.isEmpty() && svgContent) {
+              // Try create from buffer (may still be empty on some platforms, but we handle)
+              const buf = Buffer.from(svgContent);
+              const fromBuf = nativeImage.createFromBuffer(buf);
+              if (!fromBuf.isEmpty()) image = fromBuf;
+            }
+          } catch {}
+        } else {
+          image = nativeImage.createFromPath(iconPath);
+        }
+        if (image && !image.isEmpty()) {
+          try { image = image.resize({ width: 16, height: 16 }); } catch {}
+        } else {
+          image = null;
+        }
+      } catch {}
+    }
+    if (!image || image.isEmpty()) {
+      try { image = nativeImage.createEmpty(); } catch { return null; }
+      if (image.isEmpty()) {
+        // last resort: 16x16 transparent PNG buffer
+        try {
+          const emptyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6AQbEAw0SE8gGAAAAO0lEQVQ4y2NgGAXD/////4MhwI8wMjL6HwQzMDAwMDEwMTAwMDEwMTAwMDEwMTAwMDEwMTAwMDEwMTAwAAD//wMA9DERfkAAAAASUVORK5CYII=", "base64");
+          image = nativeImage.createFromBuffer(emptyPng);
+        } catch {}
+      }
+    }
     tray = new Tray(image);
-    tray.setToolTip("Pi Desktop");
+    updateTrayTooltip();
     tray.setContextMenu(buildTrayMenu());
     tray.on("click", () => showWindow());
     return tray;
   } catch (err) {
     console.warn("[tray] creazione fallita:", err.message);
+    try { tray?.destroy(); } catch {}
+    tray = null;
     return null;
   }
 }
@@ -288,6 +358,9 @@ if (process.env.NODE_ENV === "test" || typeof globalThis.__PI_TEST__ !== "undefi
       setTray: (v) => { tray = v; },
       setWin: (v) => { win = v; },
       getWin: () => win,
+      updateTrayTooltip,
+      resolveTrayIcon,
+      tTray,
     };
   } catch {}
 }
@@ -425,6 +498,43 @@ ipcMain.handle("fs:listDropped", async (_e, absPath) => {
       return rel;
     } catch { return []; }
   } catch { return []; }
+});
+
+ipcMain.handle("git:getStatus", async (_e, cwd) => {
+  const target = cwd || settings?.cwd || process.cwd();
+  try { return await gitService.getGitStatus(target); } catch { return { isGit:false, branch:null, dirty:0, label:"" }; }
+});
+
+ipcMain.handle("window:popOutTab", async (_e, tabId) => {
+  try {
+    const id = String(tabId||"").trim();
+    const tab = id ? runtime.list().find((t)=>t.id===id) : null;
+    const title = tab ? (tab.title || tab.sessionFile || id) : "Pi Desktop";
+    const pop = new BrowserWindow({
+      width: 1024,
+      height: 720,
+      minWidth: 640,
+      minHeight: 480,
+      title,
+      backgroundColor: "#0f1115",
+      autoHideMenuBar: true,
+      icon: resolveWindowIcon(),
+      webPreferences: {
+        preload: path.join(__dirname, "..", "preload", "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+      },
+    });
+    const url = path.join(__dirname, "..", "renderer", "index.html");
+    // pass tabId via query so renderer can activate it
+    await pop.loadFile(url, { query: { popOutTabId: id } });
+    pop.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+      return { action: "deny" };
+    });
+    return { ok:true, tabId:id };
+  } catch (err) { return { ok:false, error: String(err?.message||err) }; }
 });
 
 ipcMain.handle("projects:add", async () => {

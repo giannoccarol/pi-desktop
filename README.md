@@ -19,18 +19,18 @@ Pi Desktop **non incorpora una copia di pi**. Avvia il binario `pi` già present
 
 | Area | Dettagli |
 |---|---|
-| 🎨 Interfaccia | layout chiaro/scuro ispirato al mockup, cronologia compatta, dock provider/modello/ragionamento e icone Lucide |
-| 💬 Chat | tab multi-chat con runtime indipendenti, switch senza interrompere le chat in corso, streaming token-per-token, thinking collassabile, tool call con output e immagini live, coda gestibile per messaggio (`Dopo`, `Forza`, modifica e rimozione), retry, Stop con recupero forzato della singola sessione e comandi shell diretti `!`/`!!` |
+| 🎨 Interfaccia | layout chiaro/scuro ispirato al mockup, cronologia compatta, dock provider/modello/ragionamento e icone Lucide; tray + hotkey globale `Cmd+Shift+P`; notifiche di sistema a turno completato |
+| 💬 Chat | tab multi-chat con runtime indipendenti, switch senza interrompere le chat in corso, streaming token-per-token, thinking collassabile, tool call con output e immagini live, diff-view per `edit`/`write` (unified/split, copia), virtualizzazione `IntersectionObserver` per 200+ messaggi, coda gestibile per messaggio (`Dopo`, `Forza`, modifica e rimozione), retry, Stop con recupero forzato della singola sessione e comandi shell diretti `!`/`!!` |
 | ⌨️ Comandi | palette completa e IntelliSense inline digitando `/`; include comandi built-in, prompt, skill ed estensioni e ordina automaticamente quelli cliccati più spesso |
-| 🗂️ Progetti e cronologia | più cartelle nella sidebar, ricerca globale, apertura via `switch_session`, `sessionDir` personalizzato e memoria di provider/modello/sforzo per chat |
-| 🌳 Sessioni native | albero della conversazione, fork da un nodo, clone, nuova sessione figlia, rinomina, compattazione manuale/automatica, copia ultima risposta ed export HTML |
-| 📎 Composer | immagini RPC con anteprima, persistenza e visualizzazione nella cronologia, riferimenti a file locali e blocchi di codice |
+| 🗂️ Progetti e cronologia | più cartelle nella sidebar, ricerca globale, apertura via `switch_session`, `sessionDir` personalizzato e memoria di provider/modello/sforzo per chat; integrazione Git (branch/dirty) e dashboard costi/token per progetto |
+| 🌳 Sessioni native | albero della conversazione, fork da un nodo, clone, nuova sessione figlia, rinomina, compattazione manuale/automatica, copia ultima risposta ed export HTML; auto-titolo intelligente, Git Graph e condivisione via link |
+| 📎 Composer | immagini RPC con anteprima, persistenza e visualizzazione nella cronologia, riferimenti a file locali con `@` (autocomplete file/cartella), drag&drop cartella con preview albero e limite 12 file, blocchi di codice |
 | 🔀 Provider/Modelli | login guidato API key e OAuth tramite il runtime nativo di pi, provider aggiunti da estensioni, variabili d’ambiente, switch modello a caldo e thinking |
-| 🧩 Package manager | catalogo [pi.dev/packages](https://pi.dev/packages), sorgenti npm/git/local, scope utente/progetto, installazione/rimozione/aggiornamento, refresh cataloghi modelli e controlli grafici equivalenti a `pi config` per estensioni, skill, prompt e temi |
+| 🧩 Package manager | catalogo [pi.dev/packages](https://pi.dev/packages), sorgenti npm/git/local, scope utente/progetto, installazione/rimozione/aggiornamento, refresh cataloghi modelli e controlli grafici equivalenti a `pi config` per estensioni, skill, prompt e temi; marketplace rating |
 | 🔄 Aggiornamenti | badge versioni (npm registry), aggiornamento con `pi update --self`, installazione guidata se pi manca |
 | 🧩 Estensioni | bridge dialoghi (`select`/`confirm`/`input`/`editor`), status bar, widget sopra/sotto il composer e comandi extension nell’IntelliSense |
 | 🔐 Runtime nativo | trust progetto, `settings.json`, transport, tool predefiniti, modelli abilitati, shell, compaction, retry e policy immagini condivisi con la CLI |
-| 📊 Status | token, costo, % contesto, directory di lavoro |
+| 📊 Status | token, costo, % contesto, directory di lavoro; notifiche opzionali con suono |
 
 ## Architettura
 

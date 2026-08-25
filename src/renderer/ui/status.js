@@ -256,5 +256,23 @@ function handleUiRequest(msg) {
   }
 }
 
-window.refreshPiStatus=refreshPiStatus; window.showEmptyHint=showEmptyHint; window.renderPiStatusBox=renderPiStatusBox; window.openPiModal=openPiModal; window.runMaintenance=runMaintenance; window.setupAppUpdates=setupAppUpdates; window.handleAppUpdateState=handleAppUpdateState; window.piStatus={refreshPiStatus,showEmptyHint,renderPiStatusBox,openPiModal,runMaintenance,setupAppUpdates,handleAppUpdateState};
+async function refreshGitStatus(){
+  try{
+    const api = window.piDesktop;
+    if(!api || typeof api.getGitStatus!=="function") return;
+    const cwd = (window.piStore && window.piStore.state && window.piStore.state.settings && window.piStore.state.settings.cwd) || null;
+    const st = await api.getGitStatus(cwd);
+    const elGit = (window.piStore && window.piStore.el && window.piStore.el.gitStatus) || document.getElementById("git-status");
+    if(!elGit) return;
+    if(!st || !st.isGit || !st.branch){
+      elGit.classList.add("hidden");
+      elGit.textContent="";
+      return;
+    }
+    elGit.textContent = st.label || st.branch;
+    elGit.title = st.label || st.branch;
+    elGit.classList.remove("hidden");
+  } catch {}
+}
+window.refreshPiStatus=refreshPiStatus; window.showEmptyHint=showEmptyHint; window.renderPiStatusBox=renderPiStatusBox; window.openPiModal=openPiModal; window.runMaintenance=runMaintenance; window.setupAppUpdates=setupAppUpdates; window.handleAppUpdateState=handleAppUpdateState; window.refreshGitStatus=refreshGitStatus; window.piStatus={refreshPiStatus,showEmptyHint,renderPiStatusBox,openPiModal,runMaintenance,setupAppUpdates,handleAppUpdateState,refreshGitStatus};
 })();

@@ -81,6 +81,9 @@ contextBridge.exposeInMainWorld("piDesktop", {
   authRespond: (id, value, cancelled) => ipcRenderer.invoke("providers:authRespond", { id, value, cancelled }),
   cancelProviderLogin: (providerId) => ipcRenderer.invoke("providers:cancelLogin", providerId),
 
+  getGitStatus: (cwd) => ipcRenderer.invoke("git:getStatus", cwd),
+  popOutTab: (tabId) => ipcRenderer.invoke("window:popOutTab", tabId),
+
   // package store managed by the external pi installation
   searchPackages: (query) => ipcRenderer.invoke("packages:search", query),
   listInstalledPackages: () => ipcRenderer.invoke("packages:listInstalled"),

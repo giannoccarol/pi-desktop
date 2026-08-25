@@ -1,4 +1,5 @@
 "use strict";
+/* eslint-disable no-useless-escape */
 // Chat rendering + streaming – extracted from app.js monolith. Loaded before app.js, globals shared.
 
 // Explicit deps – no bare globals from app.js
@@ -304,6 +305,40 @@ function queueStreamRender(node) {
   });
 }
 
+function smartTitle(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  const firstLine = raw.split("\n").map((s)=>s.trim()).find(Boolean) || raw;
+  const cleaned = firstLine.replace(/^#{1,6}\s*/, "").split("").filter((c) => !["*", "_", "`", ">", "[", "]", "(", ")", "{", "}", '"'].includes(c)).join("").trim();
+  const words = cleaned.split(/\s+/).filter(Boolean).slice(0, 6);
+  let title = words.join(" ");
+  if (title.length > 60) title = title.slice(0, 57).trim() + "…";
+  if (!title) title = cleaned.slice(0, 60);
+  return title.charAt(0).toUpperCase() + title.slice(1);
+}
+
+function maybeAutoTitle(message) {
+  try {
+    const text = (message && Array.isArray(message.content) ? textOfBlocks(message.content) : String(message?.content || "")).trim();
+    if (!text) return;
+    const api = window.piDesktop;
+    if (!api || typeof api.setSessionName !== "function") return;
+    const activeTab = state.tabs?.find((t)=>t.id===state.activeTabId);
+    const title = activeTab ? (activeTab.title || "") : "";
+    const isDefault = !title || /^nuova chat$/i.test(title.trim()) || title.trim().length===0;
+    if (!isDefault) return;
+    const newTitle = smartTitle(text);
+    if (!newTitle || newTitle.length < 3) return;
+    // evita titoli generici
+    if (/^(ciao|hello|ok|grazie|thanks)/i.test(newTitle)) return;
+    api.setSessionName(newTitle).catch(()=>{});
+    if (activeTab) activeTab.title = newTitle;
+    // aggiorna tabs se disponibile
+    if (window.piSidebar?.renderTabs) window.piSidebar.renderTabs();
+    else if (window.renderTabs) window.renderTabs();
+  } catch {}
+}
+
 function endStreamAssistant(message) {
   const sa = state.streamAssistant;
   if (!sa) return;
@@ -356,10 +391,43 @@ function endStreamAssistant(message) {
   state.streamAssistant = null;
   bundleActivityMessages();
   refreshIcons();
+  if (message && !state.lastAssistantErrored) maybeAutoTitle(message);
 }
 
 
 // Extracted from app.js - clearChat + updateActivityBundle
+let virtualObserver = null;
+
+function initVirtualization() {
+  try {
+    if (virtualObserver) virtualObserver.disconnect();
+    const rootEl = el.messages || document.querySelector("#messages");
+    if (!rootEl || typeof IntersectionObserver === "undefined") return;
+    virtualObserver = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        const target = e.target;
+        if (e.isIntersecting) target.classList.remove("virtual-hidden");
+        else if (target.classList.contains("tool-card") || target.classList.contains("msg-assistant") || target.classList.contains("msg-user")) {
+          // keep placeholder height to avoid scroll jump: do not hide completely if near viewport
+          if (Math.abs(e.boundingClientRect.top) > 2000) target.classList.add("virtual-hidden");
+        }
+      }
+    }, { root: el.chat || rootEl.parentElement, rootMargin: "200px 0px 200px 0px", threshold: 0 });
+    const observeAll = () => {
+      for (const node of rootEl.children) {
+        try { virtualObserver.observe(node); } catch {}
+      }
+    };
+    observeAll();
+    // observe future nodes
+    const mo = new MutationObserver(() => observeAll());
+    try { mo.observe(rootEl, { childList: true }); } catch {}
+  } catch {}
+}
+
+function disableVirtualization(){ try{ virtualObserver&&virtualObserver.disconnect(); }catch{} virtualObserver=null; }
+function enableVirtualization(){ initVirtualization(); }
+
 function clearChat() {
   // delegated via piStore globals - same as app.js
   const el = (typeof window !== "undefined" && window.piStore) ? window.piStore.el : {};
@@ -386,7 +454,8 @@ function updateActivityBundle(bundle) {
 // expose for app.js delegation – unified piChat namespace + legacy globals
 if (typeof window !== "undefined") {
   window.piChat = Object.assign(window.piChat || {}, {
-    renderFinalMessage, toolDisplayName, activityBundleLabel, bundleActivityMessages, renderContentBlocks, beginStreamAssistant, mountStreamAssistant, streamEnsureBlock, streamApplyDelta, renderStreamTextNode, queueStreamRender, endStreamAssistant, clearChat, updateActivityBundle, hasVisibleAssistantContent: typeof hasVisibleAssistantContent!=="undefined"?hasVisibleAssistantContent:undefined
+    renderFinalMessage, toolDisplayName, activityBundleLabel, bundleActivityMessages, renderContentBlocks, beginStreamAssistant, mountStreamAssistant, streamEnsureBlock, streamApplyDelta, renderStreamTextNode, queueStreamRender, endStreamAssistant, clearChat, updateActivityBundle, smartTitle, maybeAutoTitle, hasVisibleAssistantContent: typeof hasVisibleAssistantContent!=="undefined"?hasVisibleAssistantContent:undefined,
+    initVirtualization, disableVirtualization, enableVirtualization
   });
   window.renderFinalMessage = renderFinalMessage;
   window.toolDisplayName = toolDisplayName;
@@ -400,9 +469,14 @@ if (typeof window !== "undefined") {
   window.renderStreamTextNode = renderStreamTextNode;
   window.queueStreamRender = queueStreamRender;
   window.endStreamAssistant = endStreamAssistant;
+  window.smartTitle = smartTitle;
+  window.maybeAutoTitle = maybeAutoTitle;
   window.clearChat = clearChat;
   window.updateActivityBundle = updateActivityBundle;
   window.hasVisibleAssistantContent = hasVisibleAssistantContent;
+  window.initVirtualization = initVirtualization;
+  window.disableVirtualization = disableVirtualization;
+  window.enableVirtualization = enableVirtualization;
 }
 if (typeof module !== "undefined" && module.exports) {
   module.exports = window.piChat;

@@ -184,6 +184,7 @@
 
       <footer id="statusbar">
         <span id="status-cwd" class="muted small mono ellipsis" data-i18n-title="status.cwd.title"></span>
+        <span id="git-status" class="muted small mono hidden" title="Git status"></span>
         <span class="flex-spacer"></span>
         <span id="status-activity" class="small"></span>
         <span id="status-tokens" class="muted small mono"></span>
@@ -244,6 +245,14 @@
             <option value="en" data-i18n="settings.language.en">English</option>
           </select>
         </label>
+        <div class="field notification-row">
+          <span data-i18n="settings.notifications.title">Notifiche desktop</span>
+          <div class="toggle-row">
+            <label><input id="setting-notifications-enabled" type="checkbox" /> <span data-i18n="settings.notifications.enabled">Mostra notifica quando Pi finisce in background</span></label>
+            <label><input id="setting-notifications-sound" type="checkbox" /> <span data-i18n="settings.notifications.sound">Riproduci suono</span></label>
+          </div>
+          <small class="muted" data-i18n="settings.notifications.help">Richiede permesso del sistema. Disattiva per silenziare.</small>
+        </div>
         <div class="field app-update-row">
           <span data-i18n="settings.appUpdate.label">Pi Desktop — aggiornamenti app (GitHub OTA)</span>
           <div class="row gap" style="align-items:center">
@@ -505,6 +514,7 @@
   <script src="features/chat/mentions.js"></script>
   <script src="features/chat/diff-view.js"></script>
   <script src="features/chat/dragdrop.js"></script>
+  <script src="features/costs.js"></script>
   <script src="features/session/session.js"></script>
   <script src="features/chat/session-view.js"></script>
   <script src="ui/status.js"></script>

@@ -186,10 +186,10 @@
     st.className = `tool-state ${isError ? "err" : t("tool.ok")}`;
     const pre = card.querySelector(".tool-body pre");
     pre.textContent = text || t("tool.noOutput");
-    // diff view for edit/write
+    // diff view for edit/write/read/grep
     try {
       const tool = String(card.dataset.tool || "").toLowerCase();
-      if ((tool === "edit" || tool === "write") && window.piDiffView) {
+      if (window.piDiffView) {
         let parsedArgs = {};
         const rawArgs = card.dataset.args;
         if (rawArgs) {
@@ -198,12 +198,14 @@
         const html = window.piDiffView.renderDiff(tool, parsedArgs, text);
         if (html) {
           const body = card.querySelector(".tool-body");
-          // remove previous diff if any
           body.querySelector(".diff-view")?.remove();
           const tmp = document.createElement("div");
           tmp.innerHTML = html;
           const diffEl = tmp.firstElementChild;
-          if (diffEl) body.insertBefore(diffEl, pre);
+          if (diffEl) {
+            body.insertBefore(diffEl, pre);
+            try { window.piDiffView.attachDiffActions(diffEl); } catch {}
+          }
           refreshIcons();
         }
       }

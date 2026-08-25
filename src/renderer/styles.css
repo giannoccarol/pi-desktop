@@ -864,7 +864,14 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 .tool-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 var(--mono); }
 /* Diff view */
 .diff-view { margin: 6px 0 8px; overflow: hidden; border: 1px solid var(--hairline); border-radius: 8px; background: var(--surface); }
-.diff-header { padding: 6px 10px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); font: 11px var(--mono); color: var(--muted); }
+.diff-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); font: 11px var(--mono); color: var(--muted); }
+.diff-actions { margin-left: auto; display: flex; gap: 4px; }
+.diff-btn { padding: 2px 7px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--surface); color: var(--text); font: 10px var(--mono); cursor: pointer; }
+.diff-btn:hover { background: var(--hover); }
+.diff-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid var(--hairline); }
+.diff-col { min-width: 0; border-right: 1px solid var(--hairline); }
+.diff-col:last-child { border-right: 0; }
+.diff-col-header { padding: 4px 8px; font: 10px var(--mono); font-weight: 600; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--hairline); text-transform: uppercase; letter-spacing: .05em; }
 .diff-path { color: var(--text); font-weight: 600; }
 .diff-hunk-header { padding: 4px 10px; background: color-mix(in srgb, var(--blue) 7%, var(--surface-2)); color: var(--muted); font: 11px var(--mono); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
 .diff-hunk-header:first-child { border-top: 0; }
@@ -877,6 +884,9 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 .diff-line.added .diff-marker { color: var(--green); }
 .diff-line.removed .diff-marker { color: var(--red); }
 .diff-text { flex: 1; min-width: 0; }
+/* Virtualization */
+.virtual-hidden { opacity: 0.35; max-height: 44px; overflow: hidden; pointer-events: none; }
+.virtual-hidden .tool-body, .virtual-hidden .md { display: none; }
 .tool-args { min-width: 0; max-width: none; flex: 1; overflow: hidden; color: var(--muted); opacity: .82; text-overflow: ellipsis; white-space: nowrap; }
 .activity-only .tool-card, .activity-only details.think { margin: 0; }
 .activity-bundle .tool-card { border: 0; border-radius: 4px; background: transparent; }

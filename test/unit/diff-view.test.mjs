@@ -41,9 +41,12 @@ test("diff-view: renderDiff both added and removed", () => {
   assert.match(html, /bar/);
 });
 
-test("diff-view: renderDiff non-edit returns null", () => {
+test("diff-view: renderDiff read returns preview with copy/open", () => {
   const html = diff.renderDiff("read", { path: "src/a.js" }, "content");
-  assert.equal(html, null);
+  assert.ok(html);
+  assert.match(html, /diff-view/);
+  assert.match(html, /Copia/);
+  assert.match(html, /Apri/);
 });
 
 test("diff-view: parseUnifiedDiff empty returns no hunks", () => {

@@ -497,7 +497,7 @@
     const state = getState();
     const el = getEl();
     if (!currentTree) return;
-    const files = expandSelectionToFiles(currentTree, currentSelection);
+    let files = expandSelectionToFiles(currentTree, currentSelection);
     // Map relative paths to absolute if we have base
     // For dropped absolute folder, files are relative to that folder; need to prepend base
     let toAdd = files;
@@ -517,16 +517,30 @@
       // This path handling is best-effort; main misuse is adding relative path which pi can still resolve via cwd.
     }
 
-    // Add to attachments (state.attachments)
+    // Add to attachments (state.attachments) with 12-limit like pickAttachments
     if (!state.attachments) state.attachments = [];
+    // deduplicate before limit check
+    const deduped = [];
+    const seen = new Set(state.attachments.map((c) => c.path));
+    for (const rel of toAdd) {
+      if (seen.has(rel)) continue;
+      seen.add(rel);
+      deduped.push(rel);
+    }
+    toAdd = deduped;
+    if (state.attachments.length + toAdd.length > 12) {
+      const allowed = Math.max(0, 12 - state.attachments.length);
+      if (allowed < toAdd.length) {
+        const msg = (typeof t === "function" ? t("toast.attachLimit") : null) || "Limite di 12 allegati raggiunto.";
+        // t may return key if missing – fallback to italian
+        const text = msg === "toast.attachLimit" ? "Limite di 12 allegati raggiunto. Solo i primi 12 verranno aggiunti." : msg;
+        toast(text, "warn");
+      }
+      toAdd = toAdd.slice(0, allowed);
+    }
     for (const rel of toAdd) {
       const absOrRel = rel;
       const name = basename(absOrRel);
-      if (state.attachments.some((c) => c.path === absOrRel)) continue;
-      if (state.attachments.length >= 12) {
-        toast("Limite di 12 allegati raggiunto.", "warn");
-        break;
-      }
       state.attachments.push({
         name,
         path: absOrRel,
@@ -534,6 +548,9 @@
         mimeType: null,
         data: null,
       });
+    }
+    if (!toAdd.length && files.length) {
+      // all were duplicates or over limit – already toasted
     }
     // Render tray
     if (root.piComposer && root.piComposer.renderAttachmentTray) root.piComposer.renderAttachmentTray();
