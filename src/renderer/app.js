@@ -387,83 +387,7 @@ function setToolCardResult(card, text, isError, content) {
 }
 
 /** Render a finalized AgentMessage (assistant/user/toolResult/bash/custom). */
-function renderFinalMessage(message, resultMap) {
-  el.emptyState.classList.add("hidden");
-  setConversationMode(true);
 
-  if (message.role === "user") {
-    const blocks = Array.isArray(message.content) ? message.content : [];
-    const images = blocks.filter((block) => block?.type === "image").map((block, index) => ({
-      ...block,
-      name: `Immagine ${index + 1}`,
-    }));
-    addUserMessage(
-      typeof message.content === "string" ? message.content : textOfBlocks(message.content),
-      images,
-      { timestamp: message.timestamp, status: "historical" }
-    );
-    return;
-  }
-  if (message.role === "bashExecution") {
-    const card = makeToolCard("bash", message.command);
-    setToolCardResult(card, `${message.command}\n\n${message.output || ""}`, message.exitCode ? true : false);
-    bundleActivityMessages();
-    return;
-  }
-  if (message.role === "custom") {
-    const div = document.createElement("div");
-    div.className = "msg-assistant";
-    div.innerHTML = `<div class="content md"></div>`;
-    div.querySelector(".content").innerHTML = md(textOfBlocks(message.content));
-    el.messages.appendChild(div);
-    return;
-  }
-  if (message.role === "branchSummary" || message.role === "compactionSummary") {
-    const det = document.createElement("details");
-    det.className = "think";
-    det.innerHTML = `<summary>riepilogo automatico</summary><div class="think-body"></div>`;
-    det.querySelector(".think-body").textContent = message.summary || "";
-    el.messages.appendChild(det);
-    return;
-  }
-  if (message.role === "toolResult") {
-    // Attached to its tool call card when that comes later in the stream.
-    const callId = message.toolCallId;
-    if (resultMap && resultMap.results?.has(callId) && !resultMap.consumed?.has(callId)) {
-      return; // will be rendered inside the assistant's tool card
-    }
-    const card = makeToolCard(message.toolName || "tool", "");
-    setToolCardResult(card, textOfBlocks(message.content), Boolean(message.isError), message.content);
-    bundleActivityMessages();
-    return;
-  }
-  if (message.role === "assistant") {
-    const blocks = message.content || [];
-    const hasVisibleContent = hasVisibleAssistantContent(blocks);
-    if (!hasVisibleContent && message.stopReason !== "error") return;
-    const wrap = document.createElement("div");
-    wrap.className = `msg-assistant${isActivityOnly(blocks) ? " activity-only" : ""}`;
-    const tag = document.createElement("div");
-    tag.className = "role-tag";
-    const meta = [];
-    if (message.model) meta.push(message.model);
-    if (message.usage?.cost?.total != null) meta.push(fmtCost(message.usage.cost.total));
-    tag.textContent = `pi${meta.length ? " · " + meta.join(" · ") : ""}`;
-    wrap.appendChild(tag);
-    const content = document.createElement("div");
-    content.className = "content";
-    renderContentBlocks(content, blocks, resultMap);
-    wrap.appendChild(content);
-    if (message.stopReason === "error") {
-      const err = document.createElement("div");
-      err.className = "error-box";
-      err.textContent = message.errorMessage || t("error.unknown");
-      wrap.appendChild(err);
-    }
-    el.messages.appendChild(wrap);
-    bundleActivityMessages();
-  }
-}
 
 function isActivityOnly(blocks) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.isActivityOnly) return window.piUtils.isActivityOnly.apply(null, Array.from(arguments)); 
   const items = Array.isArray(blocks) ? blocks : [];
@@ -484,31 +408,9 @@ function toolIconName(toolName) { if(typeof window!=="undefined" && window.piUti
   return "wrench";
  }
 
-function toolDisplayName(toolName) {
-  const name = String(toolName || "tool").toLowerCase();
-  if (name === "read") return t("tool.display.read");
-  if (["edit", "write"].includes(name)) return t("tool.display.edit");
-  if (["grep", "find", "search"].includes(name)) return t("tool.display.search");
-  if (name === "ls") return t("tool.display.ls");
-  if (["bash", "shell", "powershell"].some((value) => name.startsWith(value))) return t("tool.display.bash");
-  return toolName || t("tool.display.tool");
-}
 
-function activityBundleLabel(bundle) {
-  const tools = [...bundle.querySelectorAll(".tool-card")].map((card) => card.dataset.tool);
-  const counts = (names) => tools.filter((tool) => names.includes(tool)).length;
-  const edits = counts(["edit", "write"]);
-  const reads = counts(["read"]);
-  const searches = counts(["grep", "find", "search"]);
-  const shells = tools.filter((tool) => tool?.startsWith("bash") || tool === "shell" || tool === "powershell").length;
-  const parts = [];
-  if (edits) parts.push(edits === 1 ? "ha modificato un file" : `ha modificato ${edits} file`);
-  if (reads) parts.push(reads === 1 ? "ha letto un file" : `ha letto ${reads} file`);
-  if (searches) parts.push(searches === 1 ? "ha effettuato una ricerca" : `ha effettuato ${searches} ricerche`);
-  if (shells) parts.push(shells === 1 ? "ha eseguito un comando" : `ha eseguito ${shells} comandi`);
-  const label = parts.length ? parts.join(" e ") : "ha elaborato il contesto";
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
+
+
 
 function updateActivityBundle(bundle) {
   const count = bundle.querySelectorAll(".tool-card, details.think").length;
@@ -516,40 +418,7 @@ function updateActivityBundle(bundle) {
   bundle.querySelector(".activity-count").textContent = count ? `${count} attività` : "";
 }
 
-function bundleActivityMessages() {
-  // Normalize every activity-only assistant shell and every existing bundle
-  // to the same flat list before regrouping. This prevents one tool result
-  // (especially bash) from alternating between a bundle and a standalone card.
-  for (const bundle of [...el.messages.querySelectorAll(":scope > .activity-bundle")]) {
-    const list = bundle.querySelector(".activity-list");
-    for (const child of [...(list?.children || [])]) bundle.before(child);
-    bundle.remove();
-  }
-  for (const wrap of [...el.messages.querySelectorAll(":scope > .msg-assistant.activity-only")]) {
-    const content = wrap.querySelector(":scope > .content");
-    for (const child of [...(content?.children || [])]) wrap.before(child);
-    wrap.remove();
-  }
 
-  let bundle = null;
-  for (const node of [...el.messages.children]) {
-    const activity = node.classList.contains("tool-card") || node.matches("details.think");
-    if (!activity) {
-      bundle = null;
-      continue;
-    }
-    if (!bundle) {
-      bundle = document.createElement("details");
-      bundle.className = "activity-bundle";
-      bundle.open = true;
-      bundle.innerHTML = `<summary>${icon("paperclip")}<span class="activity-label">Attività</span><span class="activity-count"></span></summary><div class="activity-list"></div>`;
-      el.messages.insertBefore(bundle, node);
-    }
-    bundle.querySelector(".activity-list").appendChild(node);
-    updateActivityBundle(bundle);
-  }
-  refreshIcons();
-}
 
 function textOfBlocks(content) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.textOfBlocks) return window.piUtils.textOfBlocks.apply(null, Array.from(arguments)); 
   if (typeof content === "string") return content;
@@ -561,200 +430,25 @@ function textOfBlocks(content) { if(typeof window!=="undefined" && window.piUtil
  }
 
 /** Render assistant content blocks (text/thinking/toolCall) into a container. */
-function renderContentBlocks(container, blocks, resultMap) {
-  for (const block of blocks) {
-    if (block.type === "text") {
-      const div = document.createElement("div");
-      div.className = "md";
-      div.innerHTML = md(block.text || "");
-      container.appendChild(div);
-    } else if (block.type === "thinking") {
-      if (!String(block.thinking || "").trim()) continue;
-      const det = document.createElement("details");
-      det.className = "think";
-      det.innerHTML = `<summary>Ragionamento</summary><div class="think-body"></div>`;
-      det.querySelector(".think-body").textContent = block.thinking || "";
-      container.appendChild(det);
-    } else if (block.type === "toolCall") {
-      const toolName = block.name || block.toolName || "tool";
-      const card = makeToolCard(toolName, compactToolArgs(toolName, block.arguments), container);
-      const callId = block.id || block.toolCallId;
-      const res = resultMap?.results?.get(callId);
-      if (res && !resultMap.consumed.has(callId)) {
-        resultMap.consumed.add(callId);
-        setToolCardResult(card, textOfBlocks(res.content), Boolean(res.isError), res.content);
-      }
-    } else if (block.type === "image") {
-      renderMediaBlock(container, block, "Immagine generata");
-    }
-  }
-}
+
 
 // ---------------------------------------------------------------------------
 // Streaming assembly
 // ---------------------------------------------------------------------------
 
-function beginStreamAssistant() {
-  el.emptyState.classList.add("hidden");
-  const wrap = document.createElement("div");
-  wrap.className = "msg-assistant activity-only";
-  wrap.innerHTML = `<div class="role-tag">pi</div><div class="content"></div>`;
-  // Keep the shell detached until the first real block arrives. Pi can emit
-  // empty assistant segments between internal steps; mounting those shells was
-  // the source of repeated, content-less “PI” labels.
-  state.streamAssistant = { wrap, content: wrap.querySelector(".content"), blocks: new Map(), rafPending: false, mounted: false };
-  state.lastAssistantErrored = false;
-}
 
-function mountStreamAssistant() {
-  const sa = state.streamAssistant;
-  if (!sa || sa.mounted) return;
-  el.messages.appendChild(sa.wrap);
-  sa.mounted = true;
-  scheduleScroll();
-}
 
-function streamEnsureBlock(idx, type) {
-  const sa = state.streamAssistant;
-  if (!sa) return null;
-  if (!sa.blocks.has(idx)) {
-    mountStreamAssistant();
-    let node;
-    if (type === "text") {
-      node = document.createElement("div");
-      node.className = "md typing";
-      node.dataset.raw = "";
-      sa.content.appendChild(node);
-    } else if (type === "thinking") {
-      node = document.createElement("details");
-      node.className = "think";
-      node.innerHTML = `<summary>Ragionamento</summary><div class="think-body"></div>`;
-      sa.content.appendChild(node);
-    } else if (type === "toolcall") {
-      node = makeToolCard("…", "", sa.content);
-      node.dataset.args = "";
-    }
-    sa.blocks.set(idx, { type, node });
-  }
-  return sa.blocks.get(idx);
-}
 
-function streamApplyDelta(evt) {
-  const sa = state.streamAssistant;
-  if (!sa) return;
-  const e = evt.assistantMessageEvent;
-  if (!e) return;
-  const idx = e.contentIndex;
 
-  if (e.type === "text_delta") {
-    if (!e.delta && !sa.blocks.has(idx)) return;
-    const b = streamEnsureBlock(idx, "text");
-    if (e.delta?.trim()) sa.wrap.classList.remove("activity-only");
-    b.node.dataset.raw += e.delta || "";
-    queueStreamRender(b.node);
-  } else if (e.type === "thinking_delta") {
-    if (!e.delta && !sa.blocks.has(idx)) return;
-    const b = streamEnsureBlock(idx, "thinking");
-    b.node.querySelector(".think-body").textContent += e.delta || "";
-    scheduleScroll();
-  } else if (e.type === "toolcall_start") {
-    const b = streamEnsureBlock(idx, "toolcall");
-    const toolName = e.toolName || "…";
-    b.node.dataset.tool = toolName.toLowerCase();
-    b.node.querySelector(".tool-name").innerHTML = `${icon(toolIconName(toolName))} ${escapeHtml(toolDisplayName(toolName))}`;
-    if (e.id) state.tools.set(e.id, b.node);
-    refreshIcons();
-  } else if (e.type === "toolcall_delta") {
-    const b = streamEnsureBlock(idx, "toolcall");
-    b.node.dataset.args = (b.node.dataset.args || "") + (e.delta || "");
-  } else if (e.type === "toolcall_end") {
-    const tc = e.toolCall || {};
-    const b = streamEnsureBlock(idx, "toolcall");
-    const toolName = tc.name || "…";
-    b.node.dataset.tool = toolName.toLowerCase();
-    b.node.querySelector(".tool-name").innerHTML = `${icon(toolIconName(toolName))} ${escapeHtml(toolDisplayName(toolName))}`;
-    if (tc.id || tc.toolCallId) state.tools.set(tc.id || tc.toolCallId, b.node);
-    const argsEl = b.node.querySelector(".tool-args");
-    argsEl.textContent = compactToolArgs(toolName, tc.arguments);
-    argsEl.title = fullToolArgs(tc.arguments);
-    refreshIcons();
-  } else if (e.type === "text_end") {
-    const b = sa.blocks.get(idx);
-    if (b && b.type === "text") {
-      b.node.dataset.raw = e.content ?? b.node.dataset.raw;
-      renderStreamTextNode(b.node);
-    }
-  }
-}
 
-function renderStreamTextNode(node) {
-  node.innerHTML = md(node.dataset.raw || "");
-  node.classList.remove("typing");
-  scheduleScroll();
-}
 
-function queueStreamRender(node) {
-  const sa = state.streamAssistant;
-  if (!sa || sa.rafPending) return;
-  sa.rafPending = true;
-  requestAnimationFrame(() => {
-    sa.rafPending = false;
-    if (node.isConnected) renderStreamTextNode(node);
-  });
-}
 
-function endStreamAssistant(message) {
-  const sa = state.streamAssistant;
-  if (!sa) return;
-  const blocks = message?.content || [];
-  sa.wrap.classList.toggle("activity-only", isActivityOnly(blocks));
-  const hasVisibleContent = hasVisibleAssistantContent(blocks);
-  if (hasVisibleContent || message?.stopReason === "error") mountStreamAssistant();
-  // Reconcile streamed nodes with the authoritative final message without
-  // recreating tool cards that are already receiving execution events.
-  for (const [idx, block] of blocks.entries()) {
-    if (block.type === "text") {
-      const streamed = streamEnsureBlock(idx, "text");
-      streamed.node.dataset.raw = block.text || "";
-      renderStreamTextNode(streamed.node);
-    } else if (block.type === "thinking") {
-      const thinking = String(block.thinking || "");
-      const existing = sa.blocks.get(idx);
-      if (!thinking.trim()) {
-        existing?.node?.remove();
-        sa.blocks.delete(idx);
-        continue;
-      }
-      const streamed = streamEnsureBlock(idx, "thinking");
-      streamed.node.open = false;
-      streamed.node.querySelector(".think-body").textContent = thinking;
-    } else if (block.type === "toolCall") {
-      const streamed = streamEnsureBlock(idx, "toolcall");
-      const callId = block.id || block.toolCallId;
-      const toolName = block.name || block.toolName || "tool";
-      streamed.node.dataset.tool = toolName.toLowerCase();
-      streamed.node.querySelector(".tool-name").innerHTML = `${icon(toolIconName(toolName))} ${escapeHtml(toolDisplayName(toolName))}`;
-      const argsEl = streamed.node.querySelector(".tool-args");
-      argsEl.textContent = compactToolArgs(toolName, block.arguments);
-      argsEl.title = fullToolArgs(block.arguments);
-      if (callId) state.tools.set(callId, streamed.node);
-    } else if (block.type === "image" && !sa.blocks.has(idx)) {
-      const node = renderMediaBlock(sa.content, block, "Immagine generata");
-      if (node) sa.blocks.set(idx, { type: "image", node });
-    }
-  }
-  if (message?.stopReason === "error" && !sa.wrap.querySelector(".error-box")) {
-    const err = document.createElement("div");
-    err.className = "error-box";
-    err.textContent = message.errorMessage || t("error.unknown");
-    sa.wrap.appendChild(err);
-  }
-  state.lastAssistantErrored = message?.stopReason === "error";
-  state.lastAssistantErrorWrap = state.lastAssistantErrored ? sa.wrap : null;
-  state.streamAssistant = null;
-  bundleActivityMessages();
-  refreshIcons();
-}
+
+
+
+
+
+
 
 // ---------------------------------------------------------------------------
 // Session history sidebar
@@ -766,172 +460,19 @@ function tabDisplayTitle(tab) { if(typeof window!=="undefined" && window.piNavig
   return tab.title || t("session.newChat");
 }
 
-function stashActiveTabContext() {
-  if (!state.activeTabId) return;
-  state.tabContexts.set(state.activeTabId, {
-    input: el.input.value,
-    attachments: state.attachments.slice(),
-    queueBehavior: state.queueBehavior,
-    localQueue: state.localQueue.map((item) => ({
-      id: item.id,
-      message: item.message,
-      displayText: item.displayText,
-      messageSuffix: item.messageSuffix,
-      images: item.images || [],
-      userMessage: null,
-    })),
-  });
-}
 
-function restoreActiveTabContext() {
-  const saved = state.tabContexts.get(state.activeTabId);
-  state.attachments = saved?.attachments?.slice() || [];
-  state.queueBehavior = saved?.queueBehavior || "followUp";
-  el.input.value = saved?.input || "";
-  state.localQueue = (saved?.localQueue || []).map((item) => ({ ...item, userMessage: null }));
-  for (const item of state.localQueue) {
-    item.userMessage = addUserMessage(item.displayText, [], { timestamp: Date.now(), status: "localQueued" });
-  }
-  for (const button of el.queueBehaviorButtons) {
-    button.classList.toggle("active", button.dataset.queueBehavior === state.queueBehavior);
-  }
-  renderAttachmentTray();
-  renderQueuePanel();
-  autosize();
-}
 
-async function refreshTabs() {
-  try {
-    state.tabs = await api.listTabs();
-    const active = state.tabs.find((tab) => tab.active);
-    if (active) state.activeTabId = active.id;
-    renderTabs();
-    renderProjects();
-    return state.tabs;
-  } catch (err) {
-    console.error(err);
-    return state.tabs;
-  }
-}
 
-function renderTabs() {
-  el.chatTabs.innerHTML = "";
-  for (const tab of state.tabs) {
-    const isLoading = tab.id === state.pendingTabId;
-    const button = document.createElement("div");
-    button.className = `chat-tab${tab.id === state.activeTabId ? " active" : ""}${tab.busy ? " busy" : ""}${isLoading ? " loading" : ""}`;
-    button.dataset.tabId = tab.id;
-    button.setAttribute("role", "tab");
-    button.setAttribute("aria-selected", tab.id === state.activeTabId ? "true" : "false");
-    button.setAttribute("aria-busy", isLoading ? "true" : "false");
-    button.tabIndex = tab.id === state.activeTabId ? 0 : -1;
-    button.innerHTML = `<span class="chat-tab-status"></span><span class="chat-tab-title"></span>` +
-      `<button type="button" class="chat-tab-close" title="Chiudi tab" aria-label="Chiudi tab">${icon("x")}</button>`;
-    const title = tabDisplayTitle(tab);
-    button.querySelector(".chat-tab-title").textContent = isLoading ? "caricamento…" : title;
-    button.title = `${title}${tab.busy ? " · in esecuzione" : ""}${isLoading ? " · caricamento…" : ""}`;
-    button.addEventListener("click", (event) => {
-      if (event.target.closest(".chat-tab-close")) return;
-      switchToTab(tab.id);
-    });
-    button.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        switchToTab(tab.id);
-      }
-    });
-    button.querySelector(".chat-tab-close").addEventListener("click", (event) => {
-      event.stopPropagation();
-      closeChatTab(tab.id);
-    });
-    el.chatTabs.appendChild(button);
-  }
-  refreshIcons();
-}
 
-async function switchToTab(tabId) {
-  if (!tabId || tabId === state.activeTabId || state.creatingChat) return;
-  const target = state.tabs.find((tab) => tab.id === tabId);
-  if (!target) return;
-  const generation = ++state.switchGeneration;
-  stashActiveTabContext();
-  state.pendingTabId = tabId;
-  renderTabs();
-  try {
-    const cached = target.sessionFile ? getCachedSessionMessages(target.sessionFile) : null;
-    setSessionLoading(target.sessionFile || `tab:${tabId}`, { showSkeleton: !cached });
-    resetQueueState();
-    state.attachments = [];
-    await api.activateTab(tabId);
-    if (generation !== state.switchGeneration) return;
-    if (target.cwd) state.settings = await api.activateProject(target.cwd);
-    if (generation !== state.switchGeneration) return;
-    state.activeTabId = tabId;
-    state.activeSessionFile = target.sessionFile || null;
-    state.commands = [];
-    el.statusCwd.textContent = target.cwd || state.settings?.cwd || "";
-    let painted = null;
-    if (cached) {
-      el.messages.innerHTML = "";
-      state.streamAssistant = null;
-      state.tools.clear();
-      el.emptyState.classList.add("hidden");
-      setConversationMode(true, false);
-      await renderConversation(cached, () => generation === state.switchGeneration);
-      jumpToBottom();
-      painted = cached;
-    }
-    await reloadConversationFromRuntime({ restoreTab: true, paintedCache: painted, switchGeneration: generation });
-  } catch (err) {
-    toast(`Cambio tab fallito: ${err.message}`, "error");
-  } finally {
-    if (generation === state.switchGeneration) {
-      if (state.pendingTabId === tabId) state.pendingTabId = null;
-      clearSessionLoading();
-      await refreshTabs();
-    }
-  }
-}
 
-async function closeChatTab(tabId) {
-  const tab = state.tabs.find((candidate) => candidate.id === tabId);
-  if (!tab) return;
-  if (tab.busy && !confirm("Questa chat sta ancora lavorando. Interromperla e chiudere il tab?")) return;
-  const wasActive = tabId === state.activeTabId;
-  if (wasActive) stashActiveTabContext();
-  state.pendingTabId = tabId;
-  renderTabs();
-  try {
-    const result = await api.closeTab(tabId);
-    state.tabContexts.delete(tabId);
-    if (!result.activeId) {
-      state.activeTabId = null;
-      await newChat(tab.cwd || state.settings?.cwd);
-      return;
-    }
-    await refreshTabs();
-    if (wasActive) {
-      state.activeTabId = null;
-      await switchToTab(result.activeId);
-    }
-  } catch (err) {
-    toast(`Chiusura tab fallita: ${err.message}`, "error");
-  } finally {
-    if (state.pendingTabId === tabId) {
-      state.pendingTabId = null;
-      renderTabs();
-    }
-  }
-}
 
-async function refreshSessions() {
-  try {
-    state.sessions = await api.listSessions();
-    renderProjects();
-  } catch (err) {
-    console.error(err);
-  }
-}
+
+
+
+
+
+
+
 
 function configuredProjects() { if(typeof window!=="undefined" && window.piNavigation && window.piNavigation.configuredProjects) return window.piNavigation.configuredProjects(state.settings);
   const values = Array.isArray(state.settings?.projects) ? state.settings.projects : [state.settings?.cwd];
@@ -957,348 +498,17 @@ function sessionsForProject(projectPath) { if(typeof window!=="undefined" && win
   return [...drafts, ...saved];
 }
 
-function renderProjects() {
-  const q = (el.sessionSearch.value || "").toLowerCase().trim();
-  el.projectsList.innerHTML = "";
-  const projects = configuredProjects().map((projectPath) => {
-    const sessions = sessionsForProject(projectPath);
-    const matchesProject = `${basename(projectPath)} ${projectPath}`.toLowerCase().includes(q);
-    const matchingSessions = sessions.filter((session) =>
-      `${session.name || ""} ${session.preview || ""}`.toLowerCase().includes(q)
-    );
-    return { path: projectPath, sessions, matchesProject, matchingSessions };
-  }).filter((project) => !q || project.matchesProject || project.matchingSessions.length);
 
-  for (const project of projects) {
-    const active = project.path === state.settings?.cwd;
-    const expanded = Boolean(q) || state.expandedProjects.has(project.path) || active;
-    const block = document.createElement("section");
-    block.className = `project-block${active ? " active" : ""}${expanded ? " expanded" : ""}`;
-    block.dataset.path = project.path;
-
-    const row = document.createElement("div");
-    row.className = "project-row";
-    row.title = project.path;
-    row.innerHTML =
-      `${icon("chevron-right")} ${icon("folder")}<span class="project-title"></span>` +
-      `<span class="project-actions">` +
-      `<button class="project-action project-new" title="Nuova chat in ${escapeHtml(basename(project.path))}" aria-label="${escapeHtml(t("session.newChat"))}">${icon("plus")}</button>` +
-      `<button class="project-action project-remove" title="Rimuovi dalla sidebar" aria-label="Rimuovi progetto">${icon("ellipsis")}</button>` +
-      `</span>`;
-    row.querySelector("svg, i")?.classList.add("project-chevron");
-    row.querySelector(".project-title").textContent = basename(project.path) || project.path;
-    if (state.creatingChat) row.style.pointerEvents = "none";
-    row.addEventListener("click", (event) => {
-      if (state.creatingChat) return;
-      if (event.target.closest(".project-action")) return;
-      if (event.target.closest(".project-menu")) return;
-      if (state.expandedProjects.has(project.path)) state.expandedProjects.delete(project.path);
-      else state.expandedProjects.add(project.path);
-      renderProjects();
-    });
-    row.querySelector(".project-new").addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (state.creatingChat) return;
-      newChat(project.path);
-    });
-    const menuBtn = row.querySelector(".project-remove");
-    menuBtn.setAttribute("aria-expanded", state.openProjectMenu === project.path ? "true" : "false");
-    menuBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (state.creatingChat) return;
-      state.openProjectMenu = state.openProjectMenu === project.path ? null : project.path;
-      renderProjects();
-    });
-    // submenu
-    const projectMenu = document.createElement("div");
-    projectMenu.className = "project-menu" + (state.openProjectMenu === project.path ? "" : " hidden");
-    projectMenu.setAttribute("role", "menu");
-    projectMenu.innerHTML =
-      `<button class="project-menu-item danger" role="menuitem" data-action="remove">${icon("trash-2")}<span>Rimuovi dalla sidebar</span></button>` +
-      `<button class="project-menu-item" role="menuitem" data-action="copy">${icon("copy")}<span>Copia percorso</span></button>`;
-    projectMenu.querySelector('[data-action="remove"]').addEventListener("click", async (e) => {
-      e.stopPropagation();
-      state.openProjectMenu = null;
-      if (!confirm(`Rimuovere “${basename(project.path)}” dalla sidebar? Le chat salvate non verranno eliminate.`)) {
-        renderProjects();
-        return;
-      }
-      try {
-        const wasActive = project.path === state.settings?.cwd;
-        state.settings = await api.removeProject(project.path);
-        state.expandedProjects.delete(project.path);
-        if (wasActive) await newChat(state.settings.cwd);
-        else await refreshSessions();
-      } catch (err) {
-        toast(`Impossibile rimuovere il progetto: ${err.message}`, "error");
-      }
-    });
-    projectMenu.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
-      e.stopPropagation();
-      state.openProjectMenu = null;
-      try {
-        await navigator.clipboard.writeText(project.path);
-        toast("Percorso copiato.");
-      } catch {
-        toast(project.path, "info");
-      }
-      renderProjects();
-    });
-    row.appendChild(projectMenu);
-    block.appendChild(row);
-
-    if (expanded) {
-      const chats = document.createElement("div");
-      chats.className = "project-chats";
-      const candidates = q && !project.matchesProject ? project.matchingSessions : project.sessions;
-      const limit = q ? candidates.length : (state.projectLimits.get(project.path) || 6);
-      for (const session of candidates.slice(0, limit)) {
-        const openTab = session.tabId
-          ? state.tabs.find((tab) => tab.id === session.tabId)
-          : state.tabs.find((tab) => tab.sessionFile === session.file);
-        const isActive = session.tabId ? session.tabId === state.activeTabId : session.file === state.activeSessionFile;
-        const isLoading = session.file === state.openingSessionFile;
-        const item = document.createElement("div");
-        item.className = "session-item" + (isActive ? " active" : "") + (isLoading ? " loading" : "") + (openTab?.busy || session.busy ? " running" : "");
-        const displayName = session.hasName ? session.name : truncate(session.preview || t("session.newChat"), 120);
-        const prefLabel = preferenceLabel(session.preference);
-        const timeLabel = isLoading ? "caricamento…" : relTime(session.modified);
-        // custom tooltip data — no native title to avoid browser tooltip clash
-        item.removeAttribute("title");
-        item.dataset.tooltipTitle = displayName;
-        item.dataset.tooltipPref = prefLabel || "";
-        item.dataset.tooltipTime = timeLabel;
-        item.dataset.tooltipPath = session.file || "";
-        item.setAttribute("aria-busy", isLoading ? "true" : "false");
-        item.innerHTML =
-          `<div class="session-title"></div>` +
-          `<div class="session-meta"><span>${isLoading ? "caricamento…" : relTime(session.modified)}</span>` +
-          `<button class="sess-del" title="Elimina sessione" aria-label="Elimina sessione">${icon("trash-2")}</button></div>`;
-        item.querySelector(".session-title").textContent = displayName;
-        item.addEventListener("click", async (ev) => {
-          if (ev.target.closest(".sess-del")) return;
-          if (state.creatingChat) return;
-          if (session.tabId) await switchToTab(session.tabId);
-          else if (openTab) await switchToTab(openTab.id);
-          else await openHistorySession(session);
-        });
-        const deleteButton = item.querySelector(".sess-del");
-        if (session.draft) {
-          deleteButton.title = "Chiudi bozza";
-          deleteButton.setAttribute("aria-label", "Chiudi bozza");
-        }
-        deleteButton.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          if (state.creatingChat) return;
-          if (session.draft) return closeChatTab(session.tabId);
-          if (!confirm("Eliminare definitivamente questa sessione?")) return;
-          try {
-            await api.deleteSession(session.file);
-            if (state.activeSessionFile === session.file) newChat(project.path);
-            await refreshSessions();
-          } catch (err) {
-            toast(`Eliminazione fallita: ${err.message}`, "error");
-          }
-        });
-        chats.appendChild(item);
-      }
-      if (!candidates.length) {
-        const empty = document.createElement("div");
-        empty.className = "project-empty";
-        empty.textContent = q ? "Nessuna chat corrispondente" : "Nessuna chat";
-        chats.appendChild(empty);
-      } else if (!q && candidates.length > limit) {
-        const more = document.createElement("button");
-        more.className = "project-more";
-        more.textContent = `Mostra altre ${Math.min(6, candidates.length - limit)}`;
-        more.addEventListener("click", () => {
-          state.projectLimits.set(project.path, limit + 6);
-          renderProjects();
-        });
-        chats.appendChild(more);
-      }
-      block.appendChild(chats);
-    }
-    el.projectsList.appendChild(block);
-  }
-
-  if (!projects.length) {
-    const empty = document.createElement("div");
-    empty.className = "menu-empty";
-    empty.textContent = q ? "Nessun progetto o chat trovato." : "Aggiungi il tuo primo progetto.";
-    el.projectsList.appendChild(empty);
-  }
-  const draftCount = state.tabs.filter((tab) => !tab.sessionFile).length;
-  const visibleCount = state.sessions.length + draftCount;
-  el.sessionsCount.textContent = visibleCount ? `${visibleCount} chat` : "";
-  refreshIcons();
-}
 
 // ---------------------------------------------------------------------------
 // Sidebar resize + custom tooltip + search enhancement
 // ---------------------------------------------------------------------------
 
-function initSidebarResize() {
-  const key = "pi-desktop-sidebar-width";
-  const minW = 210;
-  const maxW = 520;
-  const defaultW = 268;
-  const sidebar = el.sidebar;
-  const resizer = el.sidebarResizer;
-  if (!sidebar || !resizer) return;
-  let saved = null;
-  try { saved = parseInt(localStorage.getItem(key), 10); } catch {}
-  if (Number.isFinite(saved) && saved >= minW && saved <= maxW) {
-    sidebar.style.setProperty("--sidebar-w", `${saved}px`);
-  }
-  let dragging = false;
-  let startX = 0;
-  let startW = 0;
-  const onMove = (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - startX;
-    let w = Math.round(startW + dx);
-    w = Math.max(minW, Math.min(maxW, w));
-    sidebar.style.setProperty("--sidebar-w", `${w}px`);
-  };
-  const onUp = () => {
-    if (!dragging) return;
-    dragging = false;
-    resizer.classList.remove("dragging");
-    sidebar.classList.remove("resizing");
-    document.body.classList.remove("is-resizing");
-    const cur = parseInt(getComputedStyle(sidebar).getPropertyValue("--sidebar-w"), 10) || sidebar.getBoundingClientRect().width;
-    try { localStorage.setItem(key, String(cur)); } catch {}
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
-  };
-  resizer.addEventListener("mousedown", (e) => {
-    if (sidebar.classList.contains("collapsed")) return;
-    e.preventDefault();
-    dragging = true;
-    startX = e.clientX;
-    startW = sidebar.getBoundingClientRect().width;
-    resizer.classList.add("dragging");
-    sidebar.classList.add("resizing");
-    document.body.classList.add("is-resizing");
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  });
-  resizer.addEventListener("dblclick", (e) => {
-    e.preventDefault();
-    sidebar.style.setProperty("--sidebar-w", `${defaultW}px`);
-    try { localStorage.setItem(key, String(defaultW)); } catch {}
-  });
-}
 
-function initChatTooltip() {
-  const tooltip = el.chatTooltip;
-  if (!tooltip) return;
-  const titleEl = tooltip.querySelector(".chat-tooltip-title");
-  const prefWrap = tooltip.querySelector(".chat-tooltip-pref");
-  const prefText = tooltip.querySelector(".ct-pref-text");
-  const dotEl = tooltip.querySelector(".chat-tooltip-dot");
-  const timeEl = tooltip.querySelector(".chat-tooltip-time");
-  const pathEl = tooltip.querySelector(".chat-tooltip-path");
-  let hideTimer = null;
-  let currentTarget = null;
-  const show = (target, e) => {
-    const t = target.dataset.tooltipTitle;
-    if (!t) return;
-    currentTarget = target;
-    clearTimeout(hideTimer);
-    titleEl.textContent = t;
-    const pref = target.dataset.tooltipPref || "";
-    if (pref) { prefText.textContent = pref; prefWrap.style.display = "inline-flex"; dotEl.style.display = pref ? "" : "none"; }
-    else { prefText.textContent = ""; prefWrap.style.display = "none"; }
-    timeEl.textContent = target.dataset.tooltipTime || "";
-    pathEl.textContent = target.dataset.tooltipPath || "";
-    dotEl.style.display = pref ? "" : "none";
-    if (!pref && !timeEl.textContent) dotEl.style.display = "none";
-    tooltip.classList.remove("hidden");
-    tooltip.setAttribute("aria-hidden", "false");
-    refreshIcons();
-    position(e);
-  };
-  const position = (e) => {
-    if (tooltip.classList.contains("hidden")) return;
-    const pad = 12;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // default near cursor or target rect
-    let x, y;
-    if (e && typeof e.clientX === "number") { x = e.clientX + 18; y = e.clientY - 10; }
-    else if (currentTarget) {
-      const r = currentTarget.getBoundingClientRect();
-      x = r.right + 12; y = r.top + 6;
-    } else { x = pad; y = pad; }
-    // measure
-    tooltip.style.left = "0";
-    tooltip.style.top = "0";
-    const rect = tooltip.getBoundingClientRect();
-    if (x + rect.width + pad > vw) x = vw - rect.width - pad;
-    if (y + rect.height + pad > vh) y = vh - rect.height - pad;
-    if (x < pad) x = pad;
-    if (y < pad) y = pad;
-    tooltip.style.left = `${Math.round(x)}px`;
-    tooltip.style.top = `${Math.round(y)}px`;
-  };
-  const hide = () => {
-    hideTimer = setTimeout(() => {
-      tooltip.classList.add("hidden");
-      tooltip.setAttribute("aria-hidden", "true");
-      currentTarget = null;
-    }, 80);
-  };
-  const cancelHide = () => clearTimeout(hideTimer);
-  // delegated listeners
-  el.projectsList.addEventListener("mouseover", (e) => {
-    const item = e.target.closest(".session-item");
-    if (!item) return;
-    show(item, e);
-  });
-  el.projectsList.addEventListener("mousemove", (e) => {
-    if (currentTarget) position(e);
-  });
-  el.projectsList.addEventListener("mouseout", (e) => {
-    const item = e.target.closest(".session-item");
-    if (!item) return;
-    const related = e.relatedTarget;
-    if (related && item.contains(related)) return;
-    hide();
-  });
-  el.projectsList.addEventListener("focusin", (e) => {
-    const item = e.target.closest(".session-item");
-    if (item) show(item, null);
-  });
-  el.projectsList.addEventListener("focusout", hide);
-  tooltip.addEventListener("mouseenter", cancelHide);
-  tooltip.addEventListener("mouseleave", hide);
-  window.addEventListener("scroll", hide, true);
-  window.addEventListener("resize", () => { if (currentTarget) hide(); });
-}
 
-function initSearchEnhancement() {
-  const input = el.sessionSearch;
-  const wrap = el.globalSearch;
-  const clearBtn = el.searchClear;
-  if (!input || !wrap) return;
-  const sync = () => {
-    const has = Boolean(input.value.trim());
-    wrap.classList.toggle("has-value", has);
-    if (clearBtn) clearBtn.classList.toggle("hidden", !has);
-  };
-  input.addEventListener("input", sync);
-  input.addEventListener("search", sync);
-  if (clearBtn) clearBtn.addEventListener("click", () => {
-    input.value = "";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    sync();
-    input.focus();
-    renderProjects();
-  });
-  sync();
-}
+
+
+
 
 function truncate(s, n) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.truncate) return window.piUtils.truncate.apply(null, Array.from(arguments)); 
   return s && s.length > n ? s.slice(0, n - 1) + "…" : s;
@@ -2995,15 +2205,9 @@ function compactToolArgs(toolName, rawArgs) {
 
 let sessionsTimer = null;
 let tabsTimer = null;
-function refreshSessionsSoon() {
-  clearTimeout(sessionsTimer);
-  sessionsTimer = setTimeout(refreshSessions, 400);
-}
 
-function refreshTabsSoon() {
-  clearTimeout(tabsTimer);
-  tabsTimer = setTimeout(refreshTabs, 250);
-}
+
+
 
 api.on("pi:maintenance-output", (line) => {
   if (state.maintenanceAppend) state.maintenanceAppend(line);
