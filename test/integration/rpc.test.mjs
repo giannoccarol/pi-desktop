@@ -394,6 +394,10 @@ test("sessions: parse fixture files and list newest-first", () => {
   assert.equal(list[0].hasName, true);
   assert.deepEqual(list[0].preference, { provider: "openai", modelId: "gpt-test", thinkingLevel: "high" });
 
+  const preview = sessionsStore.readSessionMessages(newer);
+  assert.deepEqual(preview.messages.map((message) => message.role), ["user", "assistant"]);
+  assert.equal(preview.messages[0].content, "primo messaggio di prova");
+
   sessionsStore.deleteSession(older);
   assert.equal(sessionsStore.listSessions(dir).length, 1);
 

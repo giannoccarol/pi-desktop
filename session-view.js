@@ -47,21 +47,6 @@
       else break;
     }
   }
-  function cacheSessionDom(file, tabId=null){
-    const entry=getCachedSessionSnapshot(file,tabId,{allowDirty:true});
-    if(!entry || !el.messages) return false;
-    entry.nodes=[...el.messages.childNodes];
-    return true;
-  }
-  function restoreCachedSessionDom(file, tabId=null){
-    const entry=getCachedSessionSnapshot(file,tabId);
-    if(!entry || !Array.isArray(entry.nodes) || !el.messages) return null;
-    if(window.piChat?.clearChat) window.piChat.clearChat();
-    else { el.messages.innerHTML=""; state.streamAssistant=null; state.tools.clear(); }
-    el.messages.replaceChildren(...entry.nodes);
-    window.piUi?.jumpToBottom?.();
-    return entry.messages;
-  }
   function markSessionCacheDirty(file,tabId=null){
     for(const key of cacheKeysFor(file,tabId)){
       const entry=sessionMessageCache.get(key);
@@ -96,10 +81,7 @@
   function setSessionLoading(file, {showSkeleton=true}={}){
     state.openingSessionFile=file;
     document.body.classList.add("session-loading");
-    if(el.chat) {
-      el.chat.classList.add("session-loading");
-      el.chat.classList.toggle("session-preview-ready", !showSkeleton);
-    }
+    if(el.chat) el.chat.classList.add("session-loading");
     if(el.statusActivity) el.statusActivity.textContent=t("session.loadingChat");
     if(!showSkeleton) return;
     el.messages.innerHTML="";
@@ -115,7 +97,7 @@
   function clearSessionLoading(){
     state.openingSessionFile=null;
     document.body.classList.remove("session-loading");
-    if(el.chat) el.chat.classList.remove("session-loading", "session-preview-ready");
+    if(el.chat) el.chat.classList.remove("session-loading");
     if(!state.busy && el.statusActivity) el.statusActivity.textContent="";
     if(window.piSidebar?.renderProjects) window.piSidebar.renderProjects();
   }
@@ -129,10 +111,6 @@
       console.error("renderFinalMessage mancante", window.piChat);
       throw new Error("renderFinalMessage non disponibile");
     }
-    const liveMessages=el.messages;
-    const staging=document.createElement("div");
-    el.messages=staging;
-    let completed=false;
     window.piChat?.beginBulkRender?.();
     try{
       let lastYield=performance.now();
@@ -146,19 +124,12 @@
           if(!isCurrent()) return false;
         }
       }
-      completed=true;
     }finally{
       window.piChat?.endBulkRender?.();
-      el.messages=liveMessages;
     }
-    if(!completed||!isCurrent()) return false;
-    if(window.piChat?.clearChat) window.piChat.clearChat();
-    else { liveMessages.innerHTML=""; state.streamAssistant=null; state.tools.clear(); }
-    liveMessages.replaceChildren(...staging.childNodes);
-    window.piUi?.refreshIcons?.();
     return true;
   }
-  async function reloadConversationFromRuntime({restoreTab=false, contextRestored=false, paintedCache=null, switchGeneration=null, pinToBottom=false}={}){
+  async function reloadConversationFromRuntime({restoreTab=false, paintedCache=null, switchGeneration=null, pinToBottom=false}={}){
     const requestedTabId=state.activeTabId;
     const isCurrent=()=>
       (switchGeneration==null || switchGeneration===state.switchGeneration) &&
@@ -166,19 +137,16 @@
     const [msgs, current]=await Promise.all([api.getMessages(requestedTabId), api.getState(requestedTabId)]);
     if(!isCurrent()) return false;
     const displayMessages=window.piChatUtils.collapseRetryAttempts(msgs.messages||[]);
-    if(msgs.truncated && msgs.hiddenCount){
-      window.piUi?.toast?.(t("toast.sessionTruncated", { shown: displayMessages.length, hidden: msgs.hiddenCount }), "info", 5200);
-    }
     state.activeSessionFile=current.sessionFile||null;
     state.activeTabId=current.tabId||state.activeTabId;
     const identical = Array.isArray(paintedCache) && messagesEqual(paintedCache, displayMessages);
     if(!identical){
+      if(window.piChat?.clearChat) window.piChat.clearChat(); else { el.messages.innerHTML=""; state.streamAssistant=null; state.tools.clear(); }
       const painted=await renderConversation(displayMessages,isCurrent);
       if(painted===false||!isCurrent()) return false;
     }
     cacheSessionMessages(state.activeSessionFile, displayMessages, state.activeTabId);
-    cacheSessionDom(state.activeSessionFile, state.activeTabId);
-    if(restoreTab && !contextRestored && window.piSidebar?.restoreActiveTabContext) window.piSidebar.restoreActiveTabContext();
+    if(restoreTab && window.piSidebar?.restoreActiveTabContext) window.piSidebar.restoreActiveTabContext();
     const hasContent=Boolean(displayMessages.length||state.localQueue.length);
     window.piUi?.setConversationMode(hasContent,false);
     el.emptyState.classList.toggle("hidden",hasContent);
@@ -195,67 +163,33 @@
     if(state.creatingChat) return;
     const generation=++state.switchGeneration;
     window.piSidebar?.stashActiveTabContext?.();
-    let painted=null;
-    let stage="open";
     try{
-      const cachedSnapshot=getCachedSessionSnapshot(session.file);
-      const cached=cachedSnapshot?.messages||null;
+      const cached=getCachedSessionMessages(session.file);
       setSessionLoading(session.file,{showSkeleton:!cached});
       window.piComposer?.resetQueueState?.(); window.piComposer?.setBusy(false);
       const openedPromise=api.openSession(session.file, session.cwd, session.preference, session.name||session.preview);
-      const settingsPromise=session.cwd && session.cwd!==state.settings?.cwd
-        ? api.activateProject(session.cwd)
-        : Promise.resolve(null);
+      const settingsPromise=api.activateProject(session.cwd);
       state.expandedProjects.add(session.cwd);
+      let painted=null;
       if(cached){
-        stage="cache";
+        el.messages.innerHTML=""; state.streamAssistant=null; state.tools.clear();
         el.emptyState.classList.add("hidden"); window.piUi?.setConversationMode(true,false);
-        const restored=restoreCachedSessionDom(session.file);
-        if(!restored) {
-          await renderConversation(cached,()=>generation===state.switchGeneration);
-          cacheSessionDom(session.file);
-          window.piUi?.jumpToBottom?.();
-        }
+        await renderConversation(cached,()=>generation===state.switchGeneration);
         if(generation!==state.switchGeneration) return;
         painted=cached;
-      } else if(typeof api.previewSession==="function") {
-        stage="preview";
-        const preview=await api.previewSession(session.file).catch(()=>null);
-        if(generation!==state.switchGeneration) return;
-        const previewMessages=window.piChatUtils.collapseRetryAttempts(preview?.messages||[]);
-        if(previewMessages.length){
-          await renderConversation(previewMessages,()=>generation===state.switchGeneration);
-          if(generation!==state.switchGeneration) return;
-          cacheSessionMessages(session.file,previewMessages);
-          cacheSessionDom(session.file);
-          painted=previewMessages;
-          window.piUi?.setConversationMode(true,false);
-          el.emptyState.classList.add("hidden");
-          el.chat?.classList.add("session-preview-ready");
-          window.piUi?.jumpToBottom?.();
-        }
       }
-      stage="runtime";
       const [opened, settings]=await Promise.all([openedPromise, settingsPromise]);
       if(generation!==state.switchGeneration) return;
       if(settings) state.settings=settings;
       state.commands=[]; state.activeTabId=opened.tabId||state.activeTabId; state.activeSessionFile=session.file;
       el.statusCwd.textContent=session.cwd||"";
-      stage="render";
-      const loaded=await reloadConversationFromRuntime({restoreTab:true, paintedCache:painted, switchGeneration:generation, pinToBottom:true});
-      if(loaded) painted=painted||true;
-      if(generation===state.switchGeneration) {
-        try { await window.piUi?.waitUntilPinnedToBottom?.(); }
-        catch (err) { console.warn("[openHistorySession] pin", err); }
-      }
+      await reloadConversationFromRuntime({restoreTab:true, paintedCache:painted, switchGeneration:generation, pinToBottom:true});
+      if(generation===state.switchGeneration) await window.piUi?.waitUntilPinnedToBottom?.();
     }catch(err){
-      console.error("[openHistorySession]", stage, err);
       if(generation!==state.switchGeneration) return;
-      if(!painted){
-        if(window.piChat?.clearChat) window.piChat.clearChat(); else el.messages.innerHTML="";
-        el.emptyState.classList.remove("hidden"); window.piUi?.setConversationMode(false,false);
-      }
-      window.piUi?.toast(t("toast.openSessionFail", { msg: `${stage}: ${err.message}` }),"error");
+      if(window.piChat?.clearChat) window.piChat.clearChat(); else el.messages.innerHTML="";
+      el.emptyState.classList.remove("hidden"); window.piUi?.setConversationMode(false,false);
+      window.piUi?.toast(`Impossibile aprire la sessione: ${err.message}`,"error");
     }finally{
       if(generation===state.switchGeneration) clearSessionLoading();
     }
@@ -263,7 +197,6 @@
   // expose for app.js compat
   window.piSessionView={
     getCachedSessionSnapshot, getCachedSessionMessages, cacheSessionMessages,
-    cacheSessionDom, restoreCachedSessionDom,
     markSessionCacheDirty, markActiveCacheDirty, refreshSessionCache,
     setSessionLoading, clearSessionLoading, renderConversation,
     reloadConversationFromRuntime, openHistorySession,

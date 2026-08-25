@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
 
   // history
   listSessions: () => ipcRenderer.invoke("sessions:list"),
+  previewSession: (file) => ipcRenderer.invoke("sessions:preview", file),
   deleteSession: (file) => ipcRenderer.invoke("sessions:delete", file),
 
   // agent lifecycle & commands

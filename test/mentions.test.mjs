@@ -88,3 +88,15 @@ test("mentions: selection not collapsed returns null", () => {
   const ctx = m.currentAtQuery();
   assert.equal(ctx, null);
 });
+
+test("mentions: applying a suggestion delegates autosize without recursing through the legacy global", () => {
+  const { m, fakeEl } = makeEnv({ value: "ciao @sr", pos: 8 });
+  let autosizeCalls = 0;
+  window.piComposer = { autosize: () => { autosizeCalls += 1; } };
+  window.autosize = () => assert.fail("the colliding legacy autosize global must not be called");
+
+  m.applyAtSuggestion({ path: "src/renderer", dir: true });
+
+  assert.equal(fakeEl.input.value, "ciao @src/renderer ");
+  assert.equal(autosizeCalls, 1);
+});

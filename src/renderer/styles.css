@@ -544,6 +544,7 @@ body.session-loading .session-item:not(.loading) { opacity: .45; }
   backdrop-filter: blur(6px);
   pointer-events: none;
 }
+#chat.session-loading.session-preview-ready::after { display: none; }
 
 /* Buttons */
 .icon-btn {

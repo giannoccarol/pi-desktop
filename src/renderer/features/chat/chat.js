@@ -1,4 +1,5 @@
 "use strict";
+(function exposeChatModule() {
 /* eslint-disable no-useless-escape */
 // Chat rendering + streaming – extracted from app.js monolith. Loaded before app.js, globals shared.
 
@@ -139,8 +140,10 @@ function beginBulkRender() {
 function endBulkRender() {
   if (!bulkRender) return;
   bulkRender = false;
-  bundleActivityMessages({ skipIcons: true, skipScroll: true });
-  window.piUi?.resumeIconRefresh?.();
+  try { bundleActivityMessages({ skipIcons: true, skipScroll: true }); }
+  catch (err) { console.warn("[endBulkRender] bundle", err); }
+  try { window.piUi?.resumeIconRefresh?.(); }
+  catch (err) { console.warn("[endBulkRender] icons", err); }
 }
 
 function bundleActivityMessages(opts = {}) {
@@ -496,3 +499,4 @@ if (typeof window !== "undefined") {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = window.piChat;
 }
+})();

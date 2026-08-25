@@ -1,4 +1,5 @@
 "use strict";
+(function exposeMentionsModule() {
 // Mentions @ – file/folder autocomplete. Extracted/initial implementation for @ flow.
 // Loaded before bootstrap.js, globals shared via piMentions.
 
@@ -10,7 +11,7 @@ function t(k, v) { return window.i18n ? window.i18n.t(k, v) : String(k); }
 function escapeHtml(s) { return window.piUtils ? window.piUtils.escapeHtml(s) : String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 function icon(n) { return window.piUi ? window.piUi.icon(n) : `<i data-lucide="${n}"></i>`; }
 function refreshIcons() { return window.piUi ? window.piUi.refreshIcons() : void 0; }
-function autosize() { return (window.autosize || window.piComposer?.autosize)?.(); }
+function resizeComposerInput() { return window.piComposer?.autosize?.(); }
 
 let mentionFetchId = 0;
 let mentionDebounceTimer = null;
@@ -51,7 +52,7 @@ function applyAtSuggestion(candidate) {
   const newPos = prefix.length + insertion.length;
   el.input.setSelectionRange(newPos, newPos);
   hideAtSuggestions();
-  autosize();
+  resizeComposerInput();
   el.input.focus();
 }
 
@@ -133,3 +134,4 @@ if (typeof window !== "undefined") {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { currentAtQuery, renderAtSuggestions, hideAtSuggestions, applyAtSuggestion };
 }
+})();

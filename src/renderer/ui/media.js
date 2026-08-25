@@ -100,7 +100,13 @@
     time.textContent = t("time.sentAt", {label: sentAt.label});
     const attachmentWrap = wrap.querySelector(".message-attachments");
     for (const attachment of attachments) {
-      if (attachment.data && attachment.mimeType?.startsWith("image/")) {
+      if (attachment.omitted || (attachment.byteLength && !attachment.data)) {
+        const chip = document.createElement("span");
+        chip.className = "message-attachment";
+        chip.innerHTML = `${icon("image")}<span></span>`;
+        chip.querySelector("span").textContent = t("attachment.omitted", { size: formatBytes(attachment.byteLength) });
+        attachmentWrap.appendChild(chip);
+      } else if (attachment.data && attachment.mimeType?.startsWith("image/")) {
         renderMediaBlock(attachmentWrap, attachment, attachment.name || "Immagine allegata");
       } else {
         const chip = document.createElement("span");
@@ -140,7 +146,29 @@
     return card;
   }
 
+  function isBase64Payload(data) {
+    const value = String(data || "");
+    const n = value.length;
+    if (!n || n > 28_000_000) return false;
+    const step = 4096;
+    for (let i = 0; i < n; i += step) {
+      const slice = value.slice(i, i + step).replace(/\s/g, "");
+      if (slice && !/^[A-Za-z0-9+/=]*$/.test(slice)) return false;
+    }
+    return true;
+  }
+
+  function formatBytes(n) {
+    if (window.piUtils?.formatBytes) return window.piUtils.formatBytes(n);
+    const v = Number(n);
+    if (!Number.isFinite(v) || v < 0) return "0 B";
+    if (v < 1024) return `${v} B`;
+    if (v < 1024 * 1024) return `${Math.round(v / 1024)} KB`;
+    return `${(v / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   function safeImageSource(block) {
+    if (block?.omitted) return null;
     const mimeType = String(block?.mimeType || block?.media_type || "").toLowerCase();
     if (!/^image\/(png|jpe?g|gif|webp)$/.test(mimeType)) return null;
     const data = String(block?.data || block?.content || "");
@@ -148,11 +176,18 @@
     if (data.startsWith("data:")) {
       return data.startsWith(`data:${mimeType};base64,`) ? data : null;
     }
-    if (!/^[a-z0-9+/=\s]+$/i.test(data)) return null;
+    if (!isBase64Payload(data)) return null;
     return `data:${mimeType};base64,${data.replace(/\s/g, "")}`;
   }
 
   function renderMediaBlock(parent, block, caption = "Immagine") {
+    if (block?.omitted) {
+      const chip = document.createElement("span");
+      chip.className = "message-attachment";
+      chip.textContent = t("attachment.omitted", { size: formatBytes(block.byteLength) });
+      parent.appendChild(chip);
+      return chip;
+    }
     const source = safeImageSource(block);
     if (!source) return null;
     const figure = document.createElement("figure");

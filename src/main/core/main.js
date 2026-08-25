@@ -15,6 +15,7 @@ const piSettingsStore = require("../services/pi-settings-store");
 const authService = require("../services/auth-service");
 const { createMentionService } = require("../services/mention-service");
 const gitService = require("../services/git-service");
+const ipcSanitize = require("../services/ipc-sanitize");
 const { UpdateService } = require("../updates/update-service");
 
 let win = null;
@@ -397,7 +398,13 @@ if (process.env.NODE_ENV === "test" || typeof globalThis.__PI_TEST__ !== "undefi
 }
 
 const runtime = new RuntimeTabs((channel, payload) => {
-  if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+  if (!win || win.isDestroyed()) return;
+  try {
+    const safe = channel === "pi:event" ? ipcSanitize.sanitizeForIpc(payload) : payload;
+    win.webContents.send(channel, safe);
+  } catch (err) {
+    console.error("[ipc send]", channel, err);
+  }
 });
 
 async function ensureRuntime() {
@@ -623,6 +630,15 @@ ipcMain.handle("sessions:list", () => {
   return listed;
 });
 
+ipcMain.handle("sessions:preview", (_e, file) => {
+  const resolvedRoot = path.resolve(sessionsDir());
+  const resolvedFile = path.resolve(file);
+  if (!resolvedFile.startsWith(resolvedRoot + path.sep) || !resolvedFile.endsWith(".jsonl")) {
+    throw new Error("Percorso sessione non valido");
+  }
+  return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile));
+});
+
 ipcMain.handle("sessions:delete", async (_e, file) => {
   // Safety: only delete inside our sessions dir.
   const resolvedRoot = path.resolve(sessionsDir());
@@ -708,15 +724,27 @@ ipcMain.handle("pi:openSession", async (_e, { sessionPath, cwd, preference, titl
   });
   // Preference persistence is secondary to click-to-chat latency.
   rememberCurrentPreference().catch(() => {});
-  return result;
+  return { ok: true, tabId: result?.tabId, reused: Boolean(result?.reused) };
 });
 ipcMain.handle("pi:getState", async (_e, tabId) => {
   await ensureRuntime();
-  return runtime.getState(tabId);
+  const state = await runtime.getState(tabId);
+  try {
+    return ipcSanitize.sanitizeForIpc(state);
+  } catch (err) {
+    console.error("[getState] sanitize fallita:", err);
+    return { tabId };
+  }
 });
 ipcMain.handle("pi:getMessages", async (_e, tabId) => {
   await ensureRuntime();
-  return runtime.getMessages(tabId);
+  const payload = await runtime.getMessages(tabId);
+  try {
+    return ipcSanitize.sanitizeMessagesPayload(payload);
+  } catch (err) {
+    console.error("[getMessages] sanitize fallita:", err);
+    return { messages: [] };
+  }
 });
 ipcMain.handle("pi:getAvailableModels", async () => {
   await ensureRuntime();

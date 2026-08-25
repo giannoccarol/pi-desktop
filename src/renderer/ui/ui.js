@@ -93,28 +93,43 @@
   }
 
   function waitForChatMedia(root, timeoutMs = 400) {
-    const images = [...(root?.querySelectorAll?.("img") || [])].filter((img) => !img.complete);
-    if (!images.length) return Promise.resolve();
-    return Promise.race([
-      Promise.all(images.map((img) => (typeof img.decode === "function" ? img.decode() : Promise.resolve()).catch(() => {}))),
-      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
-    ]);
+    try {
+      const images = [...(root?.querySelectorAll?.("img") || [])].filter((img) => !img.complete);
+      if (!images.length) return Promise.resolve();
+      return Promise.race([
+        Promise.all(images.map((img) => {
+          try {
+            if (typeof img.decode !== "function") return Promise.resolve();
+            return img.decode().catch(() => {});
+          } catch {
+            return Promise.resolve();
+          }
+        })),
+        new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+      ]);
+    } catch {
+      return Promise.resolve();
+    }
   }
 
   async function waitUntilPinnedToBottom() {
     const el = getEl();
     if (!el.chat) return;
-    el.chat.style.scrollBehavior = "auto";
-    el.chat.scrollTop = el.chat.scrollHeight;
-    getState().chatStickToBottom = true;
-    const media = waitForChatMedia(el.messages, 400);
-    await Promise.all([
-      media,
-      pinBottomUntilSettled({ maxFrames: 48, stableFrames: 4, maxDistance: 4 }),
-    ]);
-    el.chat.scrollTop = el.chat.scrollHeight;
-    if (chatBottomDistance() > 4) {
-      await pinBottomUntilSettled({ maxFrames: 24, stableFrames: 3, maxDistance: 4 });
+    try {
+      el.chat.style.scrollBehavior = "auto";
+      el.chat.scrollTop = el.chat.scrollHeight;
+      getState().chatStickToBottom = true;
+      const media = waitForChatMedia(el.messages, 400);
+      await Promise.all([
+        media,
+        pinBottomUntilSettled({ maxFrames: 48, stableFrames: 4, maxDistance: 4 }),
+      ]);
+      el.chat.scrollTop = el.chat.scrollHeight;
+      if (chatBottomDistance() > 4) {
+        await pinBottomUntilSettled({ maxFrames: 24, stableFrames: 3, maxDistance: 4 });
+      }
+    } catch (err) {
+      console.warn("[waitUntilPinnedToBottom]", err);
     }
   }
 
@@ -207,7 +222,19 @@
     });
   }
 
-  function md(text) { return root.renderMarkdown ? root.renderMarkdown(text) : String(text ?? ""); }
+  function md(text) {
+    const src = String(text ?? "");
+    try {
+      if (src.length > 250000) {
+        const cut = src.slice(0, 250000);
+        return root.renderMarkdown ? root.renderMarkdown(cut) : cut;
+      }
+      return root.renderMarkdown ? root.renderMarkdown(src) : src;
+    } catch (err) {
+      console.warn("[md]", err);
+      return src.slice(0, 4000).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    }
+  }
 
   function setConversationMode(active, animate = true) {
     const el = getEl();

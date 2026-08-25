@@ -1,4 +1,5 @@
 "use strict";
+(function exposeComposerModule() {
 // Composer + queue – extracted from app.js monolith (head). Loaded before app.js, globals shared.
 
 // Explicit deps – no bare globals from app.js
@@ -377,6 +378,10 @@ function resetQueueState() {
 }
 
 async function sendMessage(rawBehavior) {
+  if (state.openingSessionFile) {
+    toast(t("toast.sessionStillOpening"), "info", 2200);
+    return;
+  }
   const text = el.input.value.trim();
   const attachments = state.attachments.slice();
   if (!text && !attachments.length) return;
@@ -502,3 +507,4 @@ if (typeof window !== "undefined") {
   window.dispatchNextLocalMessage = dispatchNextLocalMessage;
 }
 if (typeof module !== "undefined" && module.exports) module.exports = window.piComposer;
+})();

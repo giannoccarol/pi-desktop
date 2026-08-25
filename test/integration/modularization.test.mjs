@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+const espree = require("espree");
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..", "..");
 
@@ -57,6 +58,20 @@ test("regression: all extracted modules are loadable and expose expected API", (
   assert.match(sidebar, /function renderProjects/);
   assert.match(sidebar, /function renderTabs/);
   assert.match(sidebar, /function switchToTab/);
+});
+
+test("regression: stateful renderer modules keep helpers out of the shared global scope", () => {
+  for (const relative of [
+    "features/chat/composer.js",
+    "features/chat/chat.js",
+    "ui/sidebar.js",
+    "features/chat/mentions.js",
+  ]) {
+    const source = fs.readFileSync(path.join(root, "src/renderer", relative), "utf8");
+    const ast = espree.parse(source, { ecmaVersion: "latest", sourceType: "script" });
+    const globals = ast.body.filter((node) => node.type === "FunctionDeclaration").map((node) => node.id.name);
+    assert.deepEqual(globals, [], `${relative} must not leak helper declarations globally: ${globals.join(", ")}`);
+  }
 });
 
 test("regression: index.html loads modules in correct order (store → composer → chat → sidebar → app)", () => {

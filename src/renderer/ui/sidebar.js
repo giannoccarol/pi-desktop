@@ -1,4 +1,5 @@
 "use strict";
+(function exposeSidebarModule() {
 // Sidebar + tabs – extracted from app.js monolith. Loaded before app.js, globals shared.
 
 // Explicit deps – no reliance on app.js bare globals (fragile across script order)
@@ -22,7 +23,7 @@ function sessionsForProject(path){ return window.piNavigation ? window.piNavigat
 function addUserMessage(){ return window.piMedia ? window.piMedia.addUserMessage.apply(null, arguments) : null; }
 function renderAttachmentTray(){ return window.piComposer ? window.piComposer.renderAttachmentTray.apply(null, arguments) : void 0; }
 function renderQueuePanel(){ return window.piComposer ? window.piComposer.renderQueuePanel.apply(null, arguments) : void 0; }
-function autosize(){ return window.piComposer ? window.piComposer.autosize.apply(null, arguments) : void 0; }
+function resizeComposerInput(){ return window.piComposer ? window.piComposer.autosize.apply(null, arguments) : void 0; }
 function getCachedSessionMessages(f, tabId=null){ return window.piSessionView ? window.piSessionView.getCachedSessionMessages(f, tabId) : null; }
 function setSessionLoading(f,o){ return window.piSessionView ? window.piSessionView.setSessionLoading(f,o) : void 0; }
 function clearSessionLoading(){ return window.piSessionView ? window.piSessionView.clearSessionLoading() : void 0; }
@@ -68,7 +69,7 @@ function restoreActiveTabContext() {
   }
   renderAttachmentTray();
   renderQueuePanel();
-  autosize();
+  resizeComposerInput();
   return saved;
 }
 
@@ -163,26 +164,33 @@ async function switchToTab(tabId) {
   stashActiveTabContext();
   state.pendingTabId = tabId;
   renderTabs();
+  let stage = "prepare";
+  let backgroundReconcile = false;
   try {
-    const cached = getCachedSessionMessages(target.sessionFile, target.id);
+    const cachedSnapshot = window.piSessionView?.getCachedSessionSnapshot?.(target.sessionFile, target.id);
+    const cached = cachedSnapshot?.messages || null;
     setSessionLoading(target.sessionFile || `tab:${tabId}`, { showSkeleton: !cached });
     resetQueueState();
     state.attachments = [];
     const activate = Promise.all([
       api.activateTab(tabId),
-      target.cwd ? api.activateProject(target.cwd) : Promise.resolve(null),
+      target.cwd && target.cwd !== state.settings?.cwd ? api.activateProject(target.cwd) : Promise.resolve(null),
     ]);
     let painted = null;
     if (cached) {
-      el.messages.innerHTML = "";
-      state.streamAssistant = null;
-      state.tools.clear();
+      stage = "cache";
       el.emptyState.classList.add("hidden");
       setConversationMode(true, false);
-      await renderConversation(cached, () => generation === state.switchGeneration);
+      const restored = window.piSessionView?.restoreCachedSessionDom?.(target.sessionFile, target.id);
+      if (!restored) {
+        await renderConversation(cached, () => generation === state.switchGeneration);
+        window.piSessionView?.cacheSessionDom?.(target.sessionFile, target.id);
+        window.piUi?.jumpToBottom?.();
+      }
       if (generation !== state.switchGeneration) return;
       painted = cached;
     }
+    stage = "activate";
     const [, settings] = await activate;
     if (generation !== state.switchGeneration) return;
     if (settings) state.settings = settings;
@@ -190,20 +198,53 @@ async function switchToTab(tabId) {
     state.activeSessionFile = target.sessionFile || null;
     state.commands = [];
     el.statusCwd.textContent = target.cwd || state.settings?.cwd || "";
-    await reloadConversationFromRuntime({ restoreTab: true, paintedCache: painted, switchGeneration: generation });
-    if (generation === state.switchGeneration) {
-      const saved = state.tabContexts.get(tabId);
-      if (!saved?.scrollState || saved.scrollState.stickToBottom !== false) {
-        await window.piUi?.waitUntilPinnedToBottom?.();
-      }
+    if (cached) {
+      restoreActiveTabContext();
+      const hasContent = Boolean(cached.length || state.localQueue.length);
+      setConversationMode(hasContent, false);
+      el.emptyState.classList.toggle("hidden", hasContent);
+      window.piComposer?.setBusy?.(Boolean(target.busy), { dispatchQueue: false });
+      window.piUi?.jumpToBottom?.();
+      backgroundReconcile = true;
+      void window.piUi?.waitUntilPinnedToBottom?.();
+      setTimeout(() => {
+        if (generation !== state.switchGeneration) return;
+        void window.piSessionView.reloadConversationFromRuntime({
+          restoreTab: true,
+          contextRestored: true,
+          paintedCache: painted,
+          switchGeneration: generation,
+          pinToBottom: true,
+        }).then(async (loaded) => {
+          if (!loaded || generation !== state.switchGeneration) return;
+          await window.piUi?.waitUntilPinnedToBottom?.();
+          await refreshTabs();
+        }).catch((err) => {
+          if (generation === state.switchGeneration) {
+            console.error("[switchToTab] reconcile", err);
+            toast(`Aggiornamento chat fallito: ${err.message}`, "error");
+          }
+        });
+      }, 120);
+      return;
     }
+    stage = "runtime";
+    await window.piSessionView.reloadConversationFromRuntime({
+      restoreTab: true,
+      paintedCache: painted,
+      switchGeneration: generation,
+      pinToBottom: true,
+    });
+    if (generation === state.switchGeneration) await window.piUi?.waitUntilPinnedToBottom?.();
   } catch (err) {
+    console.error("[switchToTab]", stage, err);
     toast(`Cambio tab fallito: ${err.message}`, "error");
   } finally {
     if (generation === state.switchGeneration) {
       if (state.pendingTabId === tabId) state.pendingTabId = null;
       clearSessionLoading();
-      await refreshTabs();
+      if (!backgroundReconcile) await refreshTabs();
+      else renderTabs();
     }
   }
 }
@@ -664,3 +705,4 @@ if (typeof window !== "undefined") {
   window.refreshTabsSoon = refreshTabsSoon;
 }
 if (typeof module !== "undefined" && module.exports) module.exports = window.piSidebar;
+})();

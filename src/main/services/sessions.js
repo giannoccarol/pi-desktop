@@ -160,4 +160,39 @@ function deleteSession(file) {
   sessionMetaCache.delete(file);
 }
 
-module.exports = { defaultSessionsDir, listSessions, parseSessionFile, deleteSession };
+/** Read the currently selected branch directly from a Pi JSONL session. */
+function readSessionMessages(file) {
+  const entries = [];
+  const byId = new Map();
+  const text = fs.readFileSync(file, "utf8");
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    let entry;
+    try { entry = JSON.parse(line); } catch { continue; }
+    if (!entry || entry.type === "session") continue;
+    entries.push(entry);
+    if (entry.id) byId.set(entry.id, entry);
+  }
+
+  const branch = [];
+  const visited = new Set();
+  let cursor = entries.length ? entries[entries.length - 1] : null;
+  while (cursor && !visited.has(cursor.id)) {
+    if (cursor.id) visited.add(cursor.id);
+    branch.push(cursor);
+    cursor = cursor.parentId ? byId.get(cursor.parentId) : null;
+  }
+  branch.reverse();
+  const selected = branch.length ? branch : entries;
+  const messages = [];
+  for (const entry of selected) {
+    if (entry.type === "message" && entry.message) {
+      messages.push({ ...entry.message, timestamp: entry.message.timestamp || entry.timestamp });
+    } else if (entry.type === "custom_message" && entry.display !== false) {
+      messages.push({ role: "custom", content: entry.content || "", timestamp: entry.timestamp });
+    }
+  }
+  return { messages };
+}
+
+module.exports = { defaultSessionsDir, listSessions, parseSessionFile, readSessionMessages, deleteSession };

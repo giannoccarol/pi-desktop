@@ -142,9 +142,9 @@ function preferenceLabel(preference) { if(typeof window!=="undefined" && window.
  }
 
 function clearChat(){ return window.piChat.clearChat.apply(null, arguments); }
-async function reloadConversationFromRuntime({ restoreTab = false, paintedCache = null, switchGeneration = null } = {}) {
+async function reloadConversationFromRuntime({ restoreTab = false, contextRestored = false, paintedCache = null, switchGeneration = null, pinToBottom = false } = {}) {
   // delegated to session-view.js
-  return window.piSessionView.reloadConversationFromRuntime({ restoreTab, paintedCache, switchGeneration });
+  return window.piSessionView.reloadConversationFromRuntime({ restoreTab, contextRestored, paintedCache, switchGeneration, pinToBottom });
 }
 function getCachedSessionMessages(f){ return window.piSessionView.getCachedSessionMessages(f); }
 function cacheSessionMessages(f,m){ return window.piSessionView.cacheSessionMessages(f,m); }
