@@ -148,13 +148,20 @@ function resolveWindowIcon() {
 }
 
 function showWindow() {
-  if (!win) {
+  if (!win || win.isDestroyed()) {
+    if (win && win.isDestroyed()) win = null;
     createWindow();
     return;
   }
-  if (win.isMinimized()) win.restore();
-  if (!win.isVisible()) win.show();
-  win.focus();
+  try {
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+    win.focus();
+  } catch {
+    // Window was destroyed between checks (race during quit / second-instance)
+    win = null;
+    try { createWindow(); } catch {}
+  }
 }
 
 function tTray(key, vars = {}) {
@@ -274,6 +281,12 @@ function unregisterGlobalShortcut() {
 }
 
 function createWindow() {
+  // Avoid creating duplicate if a valid window already exists
+  if (win && !win.isDestroyed()) {
+    try { showWindow(); } catch {}
+    return win;
+  }
+  if (win && win.isDestroyed()) win = null;
   const windowIcon = resolveWindowIcon();
   if (!windowIcon) console.warn("[window] icon not found, checked build/icon.png and icon.png");
   win = new BrowserWindow({
@@ -292,6 +305,9 @@ function createWindow() {
       spellcheck: false,
     },
   });
+  win.on("closed", () => {
+    win = null;
+  });
   win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
@@ -303,6 +319,7 @@ function createWindow() {
     appUpdateService.setWindow(win);
   }
   appUpdateService.initialize();
+  return win;
 }
 
 // Single instance lock.
@@ -310,7 +327,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    showWindow();
+    try { showWindow(); } catch (err) { console.warn("[second-instance] showWindow fallita:", err.message); }
   });
 
   app.whenReady().then(() => {
