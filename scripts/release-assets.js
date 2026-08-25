@@ -2,41 +2,46 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
+const GITHUB_SAFE_PI_RE = /^Pi[ ._-]Desktop-.+/i;
+const LINUX_PACKAGE_RE = /^Pi[ ._-]Desktop-.+-linux-.+\.(?:AppImage|deb|pacman)$/i;
+const WINDOWS_PACKAGE_RE = /^Pi[ ._-]Desktop-.+-win-.+\.exe$/i;
+const MAC_PACKAGE_RE = /^Pi[ ._-]Desktop-.+-mac-.+\.(?:dmg|zip)$/i;
+
 const PLATFORM_RULES = {
   win: {
-    package: name => /^Pi Desktop-.+-win-.+\.exe$/i.test(name),
+    package: name => WINDOWS_PACKAGE_RE.test(name),
     metadata: name => /^(?:latest|beta|alpha)\.yml$/i.test(name),
-    optional: name => /^Pi Desktop-.+-win-.+\.exe\.blockmap$/i.test(name),
+    optional: name => /^Pi[ ._-]Desktop-.+-win-.+\.exe\.blockmap$/i.test(name),
     required: [
-      { label: 'NSIS installer', matches: name => /^Pi Desktop-.+-win-.+\.exe$/i.test(name) }
+      { label: 'NSIS installer', matches: name => WINDOWS_PACKAGE_RE.test(name) }
     ]
   },
   mac: {
-    package: name => /^Pi Desktop-.+-mac-.+\.(?:dmg|zip)$/i.test(name),
+    package: name => MAC_PACKAGE_RE.test(name),
     metadata: name => /^(?:latest|beta|alpha)-mac\.yml$/i.test(name),
-    optional: name => /^Pi Desktop-.+-mac-.+\.zip\.blockmap$/i.test(name),
+    optional: name => /^Pi[ ._-]Desktop-.+-mac-.+\.zip\.blockmap$/i.test(name),
     required: [
-      { label: 'DMG installer', matches: name => /^Pi Desktop-.+-mac-.+\.dmg$/i.test(name) },
-      { label: 'ZIP update payload', matches: name => /^Pi Desktop-.+-mac-.+\.zip$/i.test(name) }
+      { label: 'DMG installer', matches: name => /^Pi[ ._-]Desktop-.+-mac-.+\.dmg$/i.test(name) },
+      { label: 'ZIP update payload', matches: name => /^Pi[ ._-]Desktop-.+-mac-.+\.zip$/i.test(name) }
     ]
   },
   'mac-manual': {
-    package: name => /^Pi Desktop-.+-mac-.+\.dmg$/i.test(name),
+    package: name => /^Pi[ ._-]Desktop-.+-mac-.+\.dmg$/i.test(name),
     metadata: null,
     optional: () => false,
     requiresMetadata: false,
     required: [
-      { label: 'DMG installer', matches: name => /^Pi Desktop-.+-mac-.+\.dmg$/i.test(name) }
+      { label: 'DMG installer', matches: name => /^Pi[ ._-]Desktop-.+-mac-.+\.dmg$/i.test(name) }
     ]
   },
   linux: {
-    package: name => /^Pi Desktop-.+-linux-.+\.(?:AppImage|deb|pacman)$/i.test(name),
+    package: name => LINUX_PACKAGE_RE.test(name),
     metadata: name => /^(?:latest|beta|alpha)-linux\.yml$/i.test(name),
-    optional: name => /^Pi Desktop-.+-linux-.+\.AppImage\.blockmap$/i.test(name),
+    optional: name => /^Pi[ ._-]Desktop-.+-linux-.+\.AppImage\.blockmap$/i.test(name),
     required: [
-      { label: 'AppImage update payload', matches: name => /^Pi Desktop-.+-linux-.+\.AppImage$/i.test(name) },
-      { label: 'DEB installer', matches: name => /^Pi Desktop-.+-linux-.+\.deb$/i.test(name) },
-      { label: 'Pacman installer', matches: name => /^Pi Desktop-.+-linux-.+\.pacman$/i.test(name) }
+      { label: 'AppImage update payload', matches: name => /^Pi[ ._-]Desktop-.+-linux-.+\.AppImage$/i.test(name) },
+      { label: 'DEB installer', matches: name => /^Pi[ ._-]Desktop-.+-linux-.+\.deb$/i.test(name) },
+      { label: 'Pacman installer', matches: name => /^Pi[ ._-]Desktop-.+-linux-.+\.pacman$/i.test(name) }
     ]
   }
 };

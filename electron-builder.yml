@@ -19,7 +19,7 @@ files:
 
 extraResources: []
 
-artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+artifactName: Pi-Desktop-${version}-${os}-${arch}.${ext}
 
 publish:
   provider: github
@@ -95,4 +95,4 @@ pacman:
     - alsa-lib
 
 appImage:
-  artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+  artifactName: Pi-Desktop-${version}-${os}-${arch}.${ext}
