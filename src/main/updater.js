@@ -42,8 +42,16 @@ function run(bin, args, opts = {}) {
   });
 }
 
+// Cache of the resolved pi binary: resolving via `which` / login shell can be
+// slow, and it never changes within one app run unless the user edits settings.
+let cachedPiPath = null;
+
 async function whichPi(customPath) {
-  if (customPath && fs.existsSync(customPath)) return customPath;
+  if (customPath && fs.existsSync(customPath)) {
+    cachedPiPath = customPath;
+    return customPath;
+  }
+  if (cachedPiPath && fs.existsSync(cachedPiPath)) return cachedPiPath;
   const candidates = [
     "/usr/local/bin/pi",
     path.join(os.homedir(), ".local", "bin", "pi"),
@@ -67,7 +75,9 @@ async function whichPi(customPath) {
     });
     p = res2;
   }
-  return p && fs.existsSync(p) ? p : null;
+  const found = p && fs.existsSync(p) ? p : null;
+  if (found) cachedPiPath = found;
+  return found;
 }
 
 async function piVersion(bin) {

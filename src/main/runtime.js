@@ -68,6 +68,7 @@ class PiRuntime {
     if (wanted.sessionDir) args.push("--session-dir", wanted.sessionDir);
 
     const client = new PiRpcClient(bin, { cwd: wanted.cwd, args });
+    let markSpawned = null;
     const startPromise = new Promise((resolve, reject) => {
       let settled = false;
       const onExit = (info) => {
@@ -78,17 +79,21 @@ class PiRuntime {
         this.exitInfo = info;
         this._emit("pi-exit", { info });
       };
-      client.once("exit", onExit);
-      client.on("message", (msg) => this._onMessage(msg));
-      // Give the process a moment to fail fast (bad binary etc).
-      setTimeout(() => {
+      markSpawned = () => {
         if (settled) return;
         settled = true;
         resolve(client);
-      }, 250).unref?.();
+      };
+      client.once("exit", onExit);
+      client.on("message", (msg) => this._onMessage(msg));
+      // Fallback for unusual platforms where ChildProcess does not emit spawn.
+      setTimeout(markSpawned, 250).unref?.();
     });
 
     client.start();
+    // stdin safely buffers commands while pi initializes. Waiting a fixed 250ms
+    // on every cold history tab only added latency; process spawn is sufficient.
+    client.proc?.once("spawn", markSpawned);
     this.starting = startPromise;
     try {
       await startPromise;
@@ -104,8 +109,7 @@ class PiRuntime {
     if (wanted.sessionPath) {
       try {
         await client.call({ type: "switch_session", sessionPath: wanted.sessionPath });
-        const state = await client.call({ type: "get_state" });
-        this.currentSessionFile = state.sessionFile || wanted.sessionPath;
+        this.currentSessionFile = wanted.sessionPath;
       } catch (err) {
         this._teardown();
         throw err;
@@ -327,8 +331,10 @@ class PiRuntime {
     });
     const res = await client.request({ type: "new_session", ...(opts.parentSession ? { parentSession: opts.parentSession } : {}) });
     if (!res.success) throw new Error(res.error || "new_session fallito");
-    if (opts.provider && opts.model) await this.setModel(opts.provider, opts.model);
-    if (opts.thinkingLevel) await this.setThinkingLevel(opts.thinkingLevel);
+    await Promise.all([
+      opts.provider && opts.model ? this.setModel(opts.provider, opts.model) : Promise.resolve(),
+      opts.thinkingLevel ? this.setThinkingLevel(opts.thinkingLevel) : Promise.resolve(),
+    ]);
     this.currentSessionFile = null;
     return res.data;
   }
@@ -345,16 +351,20 @@ class PiRuntime {
         model: opts.model,
         sessionDir: opts.sessionDir,
       });
-      if (opts.provider && opts.model) await this.setModel(opts.provider, opts.model);
-      if (opts.thinkingLevel) await this.setThinkingLevel(opts.thinkingLevel);
+      await Promise.all([
+        opts.provider && opts.model ? this.setModel(opts.provider, opts.model) : Promise.resolve(),
+        opts.thinkingLevel ? this.setThinkingLevel(opts.thinkingLevel) : Promise.resolve(),
+      ]);
       return { ok: true };
     }
     const res = await this._request({ type: "switch_session", sessionPath });
     this.currentSessionFile = sessionPath;
     const st = this.startOpts;
     this.startOpts = { ...st, persist: true, sessionPath };
-    if (opts.provider && opts.model) await this.setModel(opts.provider, opts.model);
-    if (opts.thinkingLevel) await this.setThinkingLevel(opts.thinkingLevel);
+    await Promise.all([
+      opts.provider && opts.model ? this.setModel(opts.provider, opts.model) : Promise.resolve(),
+      opts.thinkingLevel ? this.setThinkingLevel(opts.thinkingLevel) : Promise.resolve(),
+    ]);
     return res;
   }
 

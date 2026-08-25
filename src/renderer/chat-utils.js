@@ -10,6 +10,30 @@
     );
   }
 
+  const COMMAND_OUTPUT_MARKERS = [
+    /^INSTALL_EXIT:\s*-?\d+\s*$/m,
+    /^COMMAND_EXIT:\s*-?\d+\s*$/m,
+    /^EXIT_CODE:\s*-?\d+\s*$/m,
+  ];
+
+  /**
+   * Detect text blocks that are accidental raw command transcripts. Some
+   * agents echo a sentinel followed by stdout/stderr as assistant prose even
+   * though the same execution is already represented by a tool card.
+   */
+  function isRawCommandOutputText(text) {
+    const value = String(text || "").trim();
+    if (!value) return false;
+    return COMMAND_OUTPUT_MARKERS.some((pattern) => pattern.test(value));
+  }
+
+  function sanitizeAssistantBlocks(blocks) {
+    if (!Array.isArray(blocks)) return [];
+    return blocks.filter((block) =>
+      block?.type !== "text" || !isRawCommandOutputText(block.text)
+    );
+  }
+
   function isRetryAttemptError(message) {
     return message?.role === "assistant" && message.stopReason === "error" &&
       !hasVisibleAssistantContent(message.content || []);
@@ -37,7 +61,13 @@
     return output;
   }
 
-  const api = { hasVisibleAssistantContent, isRetryAttemptError, collapseRetryAttempts };
+  const api = {
+    hasVisibleAssistantContent,
+    isRawCommandOutputText,
+    sanitizeAssistantBlocks,
+    isRetryAttemptError,
+    collapseRetryAttempts,
+  };
   root.piChatUtils = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

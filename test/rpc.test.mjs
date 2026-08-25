@@ -65,6 +65,70 @@ test("runtime tabs: switching keeps other chat runtimes alive", async () => {
   pool.stop();
 });
 
+test("runtime tabs: coalesces active deltas and suppresses inactive transcript IPC", async () => {
+  const events = [];
+  const fakes = [];
+  const pool = new RuntimeTabs((_channel, payload) => events.push(payload), (send) => {
+    const fake = {
+      running: false,
+      state: { sessionFile: null, isStreaming: false },
+      async ensureStarted() { this.running = true; },
+      async newSession(opts) { this.running = true; this.cwd = opts.cwd; return { ok: true }; },
+      async getState() { return this.state; },
+      stop() { this.running = false; },
+      emit(type, extra = {}) {
+        if (type === "agent_start") this.state.isStreaming = true;
+        if (type === "agent_settled") this.state.isStreaming = false;
+        send("pi:event", { type, ...extra });
+      },
+    };
+    fakes.push(fake);
+    return fake;
+  });
+
+  const first = await pool.start({ cwd: "/project-a", persist: false });
+  for (let i = 0; i < 25; i++) {
+    fakes[0].emit("message_update", {
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: String(i % 10) },
+    });
+  }
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const activeUpdates = events.filter((event) => event.type === "message_update");
+  assert.equal(activeUpdates.length, 1);
+  assert.equal(activeUpdates[0].assistantMessageEvent.delta.length, 25);
+
+  events.length = 0;
+  for (let i = 0; i < 25; i++) fakes[0].emit("bash_execution_update", { delta: "x" });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const bashUpdates = events.filter((event) => event.type === "bash_execution_update");
+  assert.equal(bashUpdates.length, 1);
+  assert.equal(bashUpdates[0].delta.length, 25);
+
+  events.length = 0;
+  for (let i = 0; i < 25; i++) {
+    fakes[0].emit("tool_execution_update", { toolCallId: "tool-1", partialResult: { content: String(i) } });
+  }
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const toolUpdates = events.filter((event) => event.type === "tool_execution_update");
+  assert.equal(toolUpdates.length, 1);
+  assert.equal(toolUpdates[0].partialResult.content, "24");
+
+  fakes[0].emit("agent_start");
+  const second = await pool.newSession({ cwd: "/project-b" });
+  assert.notEqual(second.tabId, first.tabId);
+  events.length = 0;
+  for (let i = 0; i < 25; i++) {
+    fakes[0].emit("message_update", {
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "x" },
+    });
+  }
+  fakes[0].emit("agent_settled");
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(events.some((event) => event.tabId === first.tabId && event.type === "message_update"), false);
+  assert.ok(events.some((event) => event.tabId === first.tabId && event.type === "tab_status" && event.busy === false));
+  pool.stop();
+});
+
 test("rpc: framing survives U+2028/U+2029 inside JSON strings and correlates ids", async () => {
   const client = startMock();
   try {

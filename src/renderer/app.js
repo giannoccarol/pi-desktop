@@ -11,174 +11,9 @@ const i18n = window.i18n;
 const t = i18n ? i18n.t : (k, v) => k;
 const fmt = (k, v) => t(k, v);
 
-const el = {
-  main: $("#main"),
-  sidebar: $("#sidebar"),
-  projectsList: $("#projects-list"),
-  sessionSearch: $("#session-search"),
-  addProject: $("#btn-add-project"),
-  sessionsCount: $("#sessions-count"),
-  newChat: $("#btn-new-chat"),
-  topNewChat: $("#top-new-chat"),
-  commandsBtn: $("#btn-commands"),
-  treeBtn: $("#btn-tree"),
-  sessionToolsBtn: $("#btn-session-tools"),
-  toggleSidebar: $("#btn-toggle-sidebar"),
-  chatTabs: $("#chat-tabs"),
-  themeBtn: $("#btn-theme"),
-  chat: $("#chat"),
-  messages: $("#messages"),
-  emptyState: $("#empty-state"),
-  emptyHint: $("#empty-hint"),
-  input: $("#input"),
-  slashSuggestions: $("#slash-suggestions"),
-  attachmentTray: $("#attachment-tray"),
-  attachBtn: $("#btn-attach"),
-  attachImageBtn: $("#btn-attach-image"),
-  composerWrap: $("#composer-wrap"),
-  composerActions: $(".composer-actions"),
-  modelDock: $("#model-dock"),
-  sendGroup: $(".send-group"),
-  sendBtn: $("#btn-send"),
-  stopBtn: $("#btn-stop"),
-  queuedNote: $("#queued-note"),
-  busySendChoice: $("#busy-send-choice"),
-  queueBehaviorButtons: document.querySelectorAll("[data-queue-behavior]"),
-  extensionStatuses: $("#extension-statuses"),
-  extensionWidgetsAbove: $("#extension-widgets-above"),
-  extensionWidgetsBelow: $("#extension-widgets-below"),
-  statusCwd: $("#status-cwd"),
-  statusActivity: $("#status-activity"),
-  statusTokens: $("#status-tokens"),
-  modelBtn: $("#model-btn"),
-  modelLabel: $("#model-label"),
-  modelMenu: $("#model-menu"),
-  modelSearch: $("#model-search"),
-  modelList: $("#model-list"),
-  providerBtn: $("#provider-btn"),
-  providerLabel: $("#provider-label"),
-  providerMenu: $("#provider-menu"),
-  providerList: $("#provider-list"),
-  thinkingBtn: $("#thinking-btn"),
-  thinkingLabel: $("#thinking-label"),
-  thinkingMenu: $("#thinking-menu"),
-  thinkingList: $("#thinking-list"),
-  thinkingDropdown: $("#thinking-dropdown"),
-  piChip: $("#pi-chip"),
-  piChipText: $("#pi-chip-text"),
-  modalPi: $("#modal-pi"),
-  piStatusBox: $("#pi-status-box"),
-  btnPiInstall: $("#btn-pi-install"),
-  btnPiUpdate: $("#btn-pi-update"),
-  btnPiRecheck: $("#btn-pi-recheck"),
-  btnPiClose: $("#btn-pi-close"),
-  maintenanceLog: $("#maintenance-log"),
-  modalSettings: $("#modal-settings"),
-  settingCwd: $("#setting-cwd"),
-  btnPickCwd: $("#btn-pick-cwd"),
-  settingPiPath: $("#setting-pipath"),
-  settingSessionsDir: $("#setting-sessionsdir"),
-  settingLanguage: $("#setting-language"),
-  btnSettingsSave: $("#btn-settings-save"),
-  btnSettingsClose: $("#btn-settings-close"),
-  btnSettingsOpen: $("#btn-settings"),
-  settingsTabs: document.querySelectorAll(".settings-tab"),
-  settingsGeneral: $("#settings-general"),
-  settingsRuntime: $("#settings-runtime"),
-  settingsProviders: $("#settings-providers"),
-  projectTrust: $("#setting-project-trust"),
-  defaultTrust: $("#setting-default-trust"),
-  transport: $("#setting-transport"),
-  enabledModels: $("#setting-enabled-models"),
-  nativeTools: document.querySelectorAll(".native-tools input[type=checkbox]"),
-  shellPath: $("#setting-shell-path"),
-  shellPrefix: $("#setting-shell-prefix"),
-  compactReserve: $("#setting-compact-reserve"),
-  compactKeep: $("#setting-compact-keep"),
-  retryMax: $("#setting-retry-max"),
-  retryDelay: $("#setting-retry-delay"),
-  compactEnabled: $("#setting-compact-enabled"),
-  retryEnabled: $("#setting-retry-enabled"),
-  imageResize: $("#setting-image-resize"),
-  blockImages: $("#setting-block-images"),
-  projectTrustNote: $("#project-trust-note"),
-  piSettingsSave: $("#btn-pi-settings-save"),
-  providerSettingsSearch: $("#provider-settings-search"),
-  providerSettingsList: $("#provider-settings-list"),
-  packagesBtn: $("#btn-packages"),
-  modalPackages: $("#modal-packages"),
-  packagesClose: $("#btn-packages-close"),
-  packagesDone: $("#btn-packages-done"),
-  packagesRefresh: $("#btn-packages-refresh"),
-  packageSearch: $("#package-search"),
-  packageType: $("#package-type"),
-  packageSort: $("#package-sort"),
-  packageList: $("#package-list"),
-  packagePrev: $("#package-prev"),
-  packageNext: $("#package-next"),
-  packagePageInfo: $("#package-page-info"),
-  packageCatalogLink: $("#package-catalog-link"),
-  packageLog: $("#package-log"),
-  packageSource: $("#package-source"),
-  packageScope: $("#package-scope"),
-  packageSourceInstall: $("#btn-package-source-install"),
-  packagesUpdate: $("#btn-packages-update"),
-  modelsUpdate: $("#btn-models-update"),
-  packageInstalledList: $("#package-installed-list"),
-  packageInstalledCount: $("#package-installed-count"),
-  packageResourceList: $("#package-resource-list"),
-  packageResourceCount: $("#package-resource-count"),
-  modalUi: $("#modal-ui"),
-  uiTitle: $("#ui-title"),
-  uiMessage: $("#ui-message"),
-  uiOptions: $("#ui-options"),
-  uiInputWrap: $("#ui-input-wrap"),
-  uiInput: $("#ui-input"),
-  uiEditor: $("#ui-editor"),
-  uiOk: $("#ui-ok"),
-  uiCancel: $("#ui-cancel"),
-  modalCommands: $("#modal-commands"),
-  commandsClose: $("#btn-commands-close"),
-  commandSearch: $("#command-search"),
-  commandList: $("#command-list"),
-  modalTree: $("#modal-tree"),
-  treeClose: $("#btn-tree-close"),
-  treeRefresh: $("#btn-tree-refresh"),
-  treeList: $("#tree-list"),
-  treeSummary: $("#tree-summary"),
-  childSession: $("#btn-child-session"),
-  cloneSession: $("#btn-clone-session"),
-  modalSessionTools: $("#modal-session-tools"),
-  sessionToolsClose: $("#btn-session-tools-close"),
-  sessionNameInput: $("#session-name-input"),
-  sessionRename: $("#btn-session-rename"),
-  steeringMode: $("#steering-mode"),
-  followUpMode: $("#follow-up-mode"),
-  autoCompaction: $("#auto-compaction"),
-  autoRetry: $("#auto-retry"),
-  compactInstructions: $("#compact-instructions"),
-  compactBtn: $("#btn-compact"),
-  copyLast: $("#btn-copy-last"),
-  exportHtml: $("#btn-export-html"),
-  abortRetry: $("#btn-abort-retry"),
-  modalAuth: $("#modal-auth"),
-  authTitle: $("#auth-title"),
-  authSubtitle: $("#auth-subtitle"),
-  authStatus: $("#auth-status"),
-  authOptions: $("#auth-options"),
-  authInputWrap: $("#auth-input-wrap"),
-  authInputLabel: $("#auth-input-label"),
-  authInput: $("#auth-input"),
-  authCancel: $("#btn-auth-cancel"),
-  authOk: $("#btn-auth-ok"),
-  toasts: $("#toasts"),
-  sidebarResizer: $("#sidebar-resizer"),
-  chatTooltip: $("#chat-tooltip"),
-  searchClear: $("#search-clear"),
-  globalSearch: document.querySelector(".global-search"),
-};
-
-const state = {
+// Store is the single source of truth – defined in store.js and loaded before app.js
+const el = (typeof window !== "undefined" && window.piStore) ? window.piStore.el : {};
+const state = (typeof window !== "undefined" && window.piStore) ? window.piStore.state : {
   settings: null,
   sessions: [],
   providers: [],
@@ -203,9 +38,8 @@ const state = {
   lastAssistantErrored: false,
   lastAssistantErrorWrap: null,
   retryAttempt: 0,
-  // streaming assembly
-  streamAssistant: null, // {container, blocks:Map, buffers:Map}
-  tools: new Map(), // toolCallId -> {card, outEl, stateEl}
+  streamAssistant: null,
+  tools: new Map(),
   modelsCache: null,
   modelsCacheAt: 0,
   currentModel: null,
@@ -214,11 +48,11 @@ const state = {
   commands: [],
   commandSelection: 0,
   slashSelection: 0,
+  atSelection: 0,
+  mentionResults: [],
+  mentionQuery: null,
   commandsLoading: null,
-  commandUsage: (() => {
-    try { return JSON.parse(localStorage.getItem("pi-desktop-command-usage") || "{}"); }
-    catch { return {}; }
-  })(),
+  commandUsage: (() => { try { return JSON.parse(localStorage.getItem("pi-desktop-command-usage") || "{}"); } catch { return {}; } })(),
   autoRetryEnabled: true,
   directBashRunning: false,
   directBashCard: null,
@@ -262,7 +96,7 @@ function icon(name) {
   return `<i data-lucide="${name}"></i>`;
 }
 
-function relTime(ms) {
+function relTime(ms) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.relTime) return window.piUtils.relTime.apply(null, Array.from(arguments)); 
   const d = Date.now() - ms;
   const m = Math.floor(d / 60000);
   if (m < 1) return t("time.now");
@@ -272,24 +106,24 @@ function relTime(ms) {
   const dd = Math.floor(h / 24);
   if (dd < 7) return t("time.days", {n:dd});
   return new Date(ms).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
-}
+ }
 
-function fmtCost(c) {
+function fmtCost(c) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.fmtCost) return window.piUtils.fmtCost.apply(null, Array.from(arguments)); 
   if (!c && c !== 0) return "";
   if (c >= 1) return `$${c.toFixed(2)}`;
   return `$${c.toFixed(4)}`;
-}
+ }
 
-function fmtTokens(n) {
+function fmtTokens(n) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.fmtTokens) return window.piUtils.fmtTokens.apply(null, Array.from(arguments)); 
   if (n == null) return "";
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
-}
+ }
 
-function basename(p) {
+function basename(p) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.basename) return window.piUtils.basename.apply(null, Array.from(arguments)); 
   if (!p) return "";
   return p.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
-}
+ }
 
 function scrollBottom(force = false) {
   const near = el.chat.scrollHeight - el.chat.scrollTop - el.chat.clientHeight < 160;
@@ -345,55 +179,21 @@ function setConversationMode(active, animate = true) {
   });
 }
 
-function renderAttachmentTray() {
-  el.attachmentTray.innerHTML = "";
-  el.attachmentTray.classList.toggle("hidden", !state.attachments.length);
-  state.attachments.forEach((attachment, index) => {
-    const chip = document.createElement("div");
-    chip.className = "attachment-chip";
-    const preview = attachment.data
-      ? `<img src="data:${escapeHtml(attachment.mimeType)};base64,${attachment.data}" alt="" />`
-      : icon("file");
-    chip.innerHTML = `${preview}<span class="attachment-name"></span><span class="attachment-size">${formatBytes(attachment.size)}</span>` +
-      `<button title="${t("attachment.remove")}" aria-label="${t("attachment.remove")}">${icon("x")}</button>`;
-    chip.querySelector(".attachment-name").textContent = attachment.name;
-    chip.querySelector("button").addEventListener("click", () => {
-      state.attachments.splice(index, 1);
-      renderAttachmentTray();
-    });
-    el.attachmentTray.appendChild(chip);
-  });
-  refreshIcons();
-}
 
-function formatBytes(bytes) {
+
+function formatBytes(bytes) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.formatBytes) return window.piUtils.formatBytes.apply(null, Array.from(arguments)); 
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+ }
 
-async function pickAttachments(kind) {
-  try {
-    const picked = await api.pickFiles(kind);
-    for (const attachment of picked) {
-      if (!state.attachments.some((candidate) => candidate.path === attachment.path)) state.attachments.push(attachment);
-    }
-    if (state.attachments.length > 12) {
-      state.attachments.length = 12;
-      toast(t("toast.attachLimit"), "warn");
-    }
-    renderAttachmentTray();
-    el.input.focus();
-  } catch (err) {
-    toast(t("toast.attachError", {msg: err.message}), "error");
-  }
-}
 
-function clipboardImageExtension(mimeType) {
+
+function clipboardImageExtension(mimeType) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.clipboardImageExtension) return window.piUtils.clipboardImageExtension.apply(null, Array.from(arguments)); 
   return { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" }[mimeType] || "png";
-}
+ }
 
-function bufferToBase64(buffer) {
+function bufferToBase64(buffer) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.bufferToBase64) return window.piUtils.bufferToBase64.apply(null, Array.from(arguments)); 
   const bytes = new Uint8Array(buffer);
   let binary = "";
   const chunkSize = 0x8000;
@@ -401,59 +201,11 @@ function bufferToBase64(buffer) {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
   return btoa(binary);
-}
+ }
 
-async function pasteClipboardImages(event) {
-  const items = [...(event.clipboardData?.items || [])];
-  const imageItems = items.filter((item) => item.kind === "file" && item.type.startsWith("image/"));
-  if (!imageItems.length) return;
-  event.preventDefault();
 
-  const text = event.clipboardData?.getData("text/plain") || "";
-  if (text) {
-    const start = el.input.selectionStart;
-    const end = el.input.selectionEnd;
-    el.input.setRangeText(text, start, end, "end");
-  }
-  let added = 0;
-  for (const item of imageItems) {
-    if (state.attachments.length >= 12) break;
-    const file = item.getAsFile();
-    if (!file || file.size > 15 * 1024 * 1024) {
-      toast("Immagine incollata oltre il limite di 15 MB.", "warn");
-      continue;
-    }
-    const currentBytes = state.attachments.reduce((sum, attachment) => sum + (attachment.size || 0), 0);
-    if (currentBytes + file.size > 40 * 1024 * 1024) {
-      toast("Le immagini superano complessivamente 40 MB.", "warn");
-      continue;
-    }
-    const mimeType = item.type.toLowerCase();
-    state.attachments.push({
-      name: `clipboard-${new Date().toISOString().replace(/[:.]/g, "-")}.${clipboardImageExtension(mimeType)}`,
-      path: null,
-      size: file.size,
-      mimeType,
-      data: bufferToBase64(await file.arrayBuffer()),
-    });
-    added += 1;
-  }
-  renderAttachmentTray();
-  autosize();
-  if (added) toast(`${added} immagine${added === 1 ? "" : "i"} incollata${added === 1 ? "" : "e"}.`, "info", 2400);
-}
 
-function insertCodeBlock() {
-  const start = el.input.selectionStart;
-  const end = el.input.selectionEnd;
-  const selected = el.input.value.slice(start, end);
-  const fence = "```";
-  const inserted = selected ? `${fence}\n${selected}\n${fence}` : `${fence}\n\n${fence}`;
-  el.input.setRangeText(inserted, start, end, "end");
-  if (!selected) el.input.setSelectionRange(start + 4, start + 4);
-  autosize();
-  el.input.focus();
-}
+
 
 // ---------------------------------------------------------------------------
 // Message rendering
@@ -576,6 +328,7 @@ function makeToolCard(toolName, argsPreview, parent = el.messages) {
 }
 
 function escapeHtml(s) {
+  if (typeof window !== "undefined" && window.piUtils && window.piUtils.escapeHtml) return window.piUtils.escapeHtml(s);
   return String(s ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -712,16 +465,16 @@ function renderFinalMessage(message, resultMap) {
   }
 }
 
-function isActivityOnly(blocks) {
+function isActivityOnly(blocks) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.isActivityOnly) return window.piUtils.isActivityOnly.apply(null, Array.from(arguments)); 
   const items = Array.isArray(blocks) ? blocks : [];
   const hasActivity = items.some((block) => block?.type === "toolCall" || block?.type === "thinking");
   const hasAnswer = items.some((block) =>
     block?.type === "image" || (block?.type === "text" && Boolean(block.text?.trim()))
   );
   return hasActivity && !hasAnswer;
-}
+ }
 
-function toolIconName(toolName) {
+function toolIconName(toolName) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.toolIconName) return window.piUtils.toolIconName.apply(null, Array.from(arguments)); 
   const name = String(toolName || "").toLowerCase();
   if (name === "read") return "book-open";
   if (["edit", "write"].includes(name)) return "pencil";
@@ -729,7 +482,7 @@ function toolIconName(toolName) {
   if (["bash", "shell", "powershell"].some((value) => name.startsWith(value))) return "terminal";
   if (name === "ls") return "folder-open";
   return "wrench";
-}
+ }
 
 function toolDisplayName(toolName) {
   const name = String(toolName || "tool").toLowerCase();
@@ -798,14 +551,14 @@ function bundleActivityMessages() {
   refreshIcons();
 }
 
-function textOfBlocks(content) {
+function textOfBlocks(content) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.textOfBlocks) return window.piUtils.textOfBlocks.apply(null, Array.from(arguments)); 
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("\n");
-}
+ }
 
 /** Render assistant content blocks (text/thinking/toolCall) into a container. */
 function renderContentBlocks(container, blocks, resultMap) {
@@ -1007,7 +760,7 @@ function endStreamAssistant(message) {
 // Session history sidebar
 // ---------------------------------------------------------------------------
 
-function tabDisplayTitle(tab) {
+function tabDisplayTitle(tab) { if(typeof window!=="undefined" && window.piNavigation && window.piNavigation.tabDisplayTitle) return window.piNavigation.tabDisplayTitle(tab, state.sessions);
   const session = tab.sessionFile && state.sessions.find((candidate) => candidate.file === tab.sessionFile);
   if (session) return session.hasName ? session.name : truncate(session.preview || t("session.newChat"), 70);
   return tab.title || t("session.newChat");
@@ -1180,12 +933,12 @@ async function refreshSessions() {
   }
 }
 
-function configuredProjects() {
+function configuredProjects() { if(typeof window!=="undefined" && window.piNavigation && window.piNavigation.configuredProjects) return window.piNavigation.configuredProjects(state.settings);
   const values = Array.isArray(state.settings?.projects) ? state.settings.projects : [state.settings?.cwd];
   return [...new Set(values.filter(Boolean))];
 }
 
-function sessionsForProject(projectPath) {
+function sessionsForProject(projectPath) { if(typeof window!=="undefined" && window.piNavigation && window.piNavigation.sessionsForProject) return window.piNavigation.sessionsForProject({sessions: state.sessions, tabs: state.tabs}, projectPath);
   const saved = state.sessions.filter((session) => session.cwd === projectPath);
   const drafts = state.tabs
     .filter((tab) => tab.cwd === projectPath && !tab.sessionFile)
@@ -1547,14 +1300,14 @@ function initSearchEnhancement() {
   sync();
 }
 
-function truncate(s, n) {
+function truncate(s, n) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.truncate) return window.piUtils.truncate.apply(null, Array.from(arguments)); 
   return s && s.length > n ? s.slice(0, n - 1) + "…" : s;
-}
+ }
 
-function preferenceLabel(preference) {
+function preferenceLabel(preference) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.preferenceLabel) return window.piUtils.preferenceLabel.apply(null, Array.from(arguments)); 
   if (!preference) return "";
   return [preference.provider, preference.modelId, preference.thinkingLevel].filter(Boolean).join(" · ");
-}
+ }
 
 function clearChat() {
   el.messages.innerHTML = "";
@@ -1802,14 +1555,14 @@ function chooseCommand(command) {
   el.input.setSelectionRange(el.input.value.length, el.input.value.length);
 }
 
-function commandUsageScore(name) {
+function commandUsageScore(name) { if(typeof window!=="undefined" && window.piPersistence && window.piPersistence.commandUsageScore) return window.piPersistence.commandUsageScore(state.commandUsage, name);
   const usage = state.commandUsage[name];
   if (!usage) return 0;
   const ageDays = Math.max(0, (Date.now() - (usage.lastUsed || 0)) / 86400000);
   return (usage.count || 0) * 100 + Math.max(0, 30 - ageDays);
 }
 
-function recordCommandUsage(name) {
+function recordCommandUsage(name) { if(typeof window!=="undefined" && window.piPersistence && window.piPersistence.recordCommandUsage) return window.piPersistence.recordCommandUsage(state.commandUsage, name);
   if (!name) return;
   const previous = state.commandUsage[name] || { count: 0, lastUsed: 0 };
   state.commandUsage[name] = { count: previous.count + 1, lastUsed: Date.now() };
@@ -2760,378 +2513,41 @@ function appendPackageOutput(line) {
 // Stats & status
 // ---------------------------------------------------------------------------
 
-async function refreshStats() {
-  try {
-    const st = await api.getSessionStats();
-    const bits = [];
-    if (st.tokens?.total) bits.push(`${fmtTokens(st.tokens.total)} tok`);
-    if (typeof st.cost === "number") bits.push(fmtCost(st.cost));
-    if (st.contextUsage) bits.push(`ctx ${st.contextUsage.percent}%`);
-    el.statusTokens.textContent = bits.join(" · ");
-  } catch {}
-}
 
-function setBusy(busy, { dispatchQueue = true } = {}) {
-  state.busy = busy;
-  el.sendBtn.classList.remove("hidden");
-  el.stopBtn.classList.toggle("hidden", !busy);
-  el.busySendChoice.classList.toggle("hidden", !busy);
-  const forceButton = [...el.queueBehaviorButtons].find((button) => button.dataset.queueBehavior === "steer");
-  if (forceButton) forceButton.disabled = Boolean(busy && state.directBashRunning);
-  el.sendBtn.title = busy
-    ? state.queueBehavior === "steer" ? "Forza nella coda di Pi" : "Accoda senza forzare"
-    : "Invia";
-  el.statusActivity.textContent = busy ? "agente al lavoro…" : "";
-  if (!busy && dispatchQueue && !state.queueDispatchPaused && state.localQueue.length && !state.dispatchingLocalQueue) {
-    queueMicrotask(dispatchNextLocalMessage);
-  }
-}
 
-function cancelQueuedMessagesForStop() {
-  const queuedWraps = new Set([
-    ...state.localQueue.map((item) => item.userMessage),
-    ...state.queuedUserMessages.map((item) => item.userMessage),
-  ]);
-  for (const wrap of queuedWraps) setUserMessageStatus(wrap, "interrupted");
-  state.localQueue = [];
-  state.queuedUserMessages = [];
-  state.nativeQueue = { steering: [], followUp: [] };
-  renderQueuePanel();
-}
 
-function finishInterruptedRendering() {
-  if (state.streamAssistant) {
-    const stream = state.streamAssistant;
-    for (const block of stream.blocks.values()) block.node?.classList?.remove("typing");
-    if (stream.mounted && !stream.wrap.querySelector(".error-box")) {
-      const notice = document.createElement("div");
-      notice.className = "error-box interrupted";
-      notice.textContent = "Generazione interrotta.";
-      stream.wrap.appendChild(notice);
-    }
-    state.streamAssistant = null;
-  }
-  for (const card of state.tools.values()) {
-    const status = card.querySelector(".tool-state");
-    if (status) {
-      status.textContent = "interrotto";
-      status.className = "tool-state interrupted";
-    }
-  }
-  state.tools.clear();
-}
 
-async function abortCurrentWork() {
-  if (state.stopInProgress || !state.busy) return;
-  state.stopInProgress = true;
-  state.queueDispatchPaused = true;
-  el.stopBtn.disabled = true;
-  el.statusActivity.textContent = "interruzione in corso…";
-  const hadNativeQueue = Boolean(
-    state.nativeQueue.steering.length || state.nativeQueue.followUp.length || state.queuedUserMessages.length
-  );
-  cancelQueuedMessagesForStop();
-  const isDirectBash = state.directBashRunning;
-  const action = isDirectBash ? api.abortBash() : api.abort();
-  api.abortRetry().catch(() => {});
-  try {
-    const graceful = await Promise.race([
-      action.then(() => true).catch(() => false),
-      new Promise((resolve) => setTimeout(() => resolve(false), hadNativeQueue ? 700 : 3200)),
-    ]);
-    if (!graceful || hadNativeQueue) {
-      el.statusActivity.textContent = "arresto forzato e ripristino sessione…";
-      await api.forceStop();
-      toast("Pi non rispondeva: runtime arrestato e sessione ripristinata.", "warn", 6500);
-    }
-  } catch (err) {
-    toast(`Arresto forzato non riuscito: ${err.message}`, "error", 8000);
-  } finally {
-    setUserMessageStatus(state.activeUserMessage, "interrupted");
-    state.activeUserMessage = null;
-    state.directBashRunning = false;
-    state.directBashCard = null;
-    finishInterruptedRendering();
-    state.stopInProgress = false;
-    state.queueDispatchPaused = false;
-    el.stopBtn.disabled = false;
-    setBusy(false, { dispatchQueue: false });
-    refreshSessionsSoon();
-  }
-}
+
+
+
+
+
 
 // ---------------------------------------------------------------------------
 // Sending
 // ---------------------------------------------------------------------------
 
-function clearComposerAfterQueue() {
-  el.input.value = "";
-  state.attachments = [];
-  renderAttachmentTray();
-  autosize();
-}
 
-function renderQueuePanel() {
-  const nativeSteering = state.nativeQueue.steering || [];
-  const nativeFollowUp = state.nativeQueue.followUp || [];
-  const total = state.localQueue.length + nativeSteering.length + nativeFollowUp.length;
-  el.queuedNote.classList.toggle("hidden", total === 0);
-  if (!total) {
-    el.queuedNote.innerHTML = "";
-    return;
-  }
-  el.queuedNote.innerHTML = `<div class="queue-panel-head">${icon("list-ordered")}<strong>Coda messaggi</strong><span class="muted">${total}</span></div>`;
-  for (const item of state.localQueue) {
-    const row = document.createElement("div");
-    row.className = "queue-row";
-    row.innerHTML = `<span class="queue-badge wait">dopo</span><span class="queue-text"></span>`;
-    row.querySelector(".queue-text").textContent = item.displayText;
-    row.querySelector(".queue-text").title = item.displayText;
-    const edit = document.createElement("button");
-    edit.className = "queue-action";
-    edit.textContent = "Modifica";
-    edit.addEventListener("click", () => editLocalMessage(item.id, row));
-    const force = document.createElement("button");
-    force.className = "queue-action force";
-    force.textContent = "Forza";
-    force.disabled = state.directBashRunning;
-    force.addEventListener("click", () => forceLocalMessage(item.id));
-    const remove = document.createElement("button");
-    remove.className = "queue-action";
-    remove.textContent = "Rimuovi";
-    remove.addEventListener("click", () => removeLocalMessage(item.id));
-    row.append(edit, force, remove);
-    el.queuedNote.appendChild(row);
-  }
-  const appendNative = (text, forced) => {
-    const row = document.createElement("div");
-    row.className = "queue-row";
-    row.innerHTML = `<span class="queue-badge ${forced ? "force" : "wait"}">${forced ? "forzato" : "dopo"}</span><span class="queue-text"></span><span class="muted small">già inviato a Pi</span>`;
-    row.querySelector(".queue-text").textContent = text;
-    row.querySelector(".queue-text").title = text;
-    el.queuedNote.appendChild(row);
-  };
-  nativeSteering.forEach((text) => appendNative(text, true));
-  nativeFollowUp.forEach((text) => appendNative(text, false));
-  refreshIcons();
-}
 
-function editLocalMessage(id, row) {
-  const item = state.localQueue.find((candidate) => candidate.id === id);
-  if (!item) return;
-  row.classList.add("editing");
-  row.innerHTML = `<span class="queue-badge wait">dopo</span><input class="queue-edit-input" type="text" maxlength="20000" aria-label="Modifica messaggio in coda" />`;
-  const input = row.querySelector(".queue-edit-input");
-  input.value = item.displayText;
-  const save = document.createElement("button");
-  save.className = "queue-action force";
-  save.textContent = "Salva";
-  const cancel = document.createElement("button");
-  cancel.className = "queue-action";
-  cancel.textContent = "Annulla";
-  const commit = () => {
-    const value = input.value.trim();
-    if (!value) return toast("Il messaggio in coda non può essere vuoto.", "warn");
-    item.displayText = value;
-    item.message = `${value}${item.messageSuffix || ""}`;
-    const bubble = item.userMessage?.querySelector(".bubble");
-    if (bubble) bubble.textContent = value;
-    renderQueuePanel();
-    toast("Messaggio in coda aggiornato.");
-  };
-  save.addEventListener("click", commit);
-  cancel.addEventListener("click", renderQueuePanel);
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      commit();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      renderQueuePanel();
-    }
-  });
-  row.append(save, cancel);
-  input.focus();
-  input.select();
-}
 
-function removeLocalMessage(id) {
-  const index = state.localQueue.findIndex((item) => item.id === id);
-  if (index < 0) return;
-  const [item] = state.localQueue.splice(index, 1);
-  item.userMessage?.remove();
-  renderQueuePanel();
-  toast("Messaggio rimosso dalla coda.");
-}
 
-async function deliverQueuedItem(item, force = false) {
-  setUserMessageStatus(item.userMessage, "sending");
-  let tracking = null;
-  try {
-    if (state.busy) {
-      if (!force) {
-        setUserMessageStatus(item.userMessage, "localQueued");
-        return false;
-      }
-      tracking = { message: item.message, userMessage: item.userMessage };
-      state.queuedUserMessages.push(tracking);
-      await api.steer(item.message, item.images.length ? item.images : undefined);
-      setUserMessageStatus(item.userMessage, "queued");
-    } else {
-      state.activeUserMessage = item.userMessage;
-      setBusy(true);
-      await api.prompt(item.message, item.images.length ? item.images : undefined);
-      setUserMessageStatus(item.userMessage, "received");
-    }
-    return true;
-  } catch (err) {
-    if (tracking) state.queuedUserMessages = state.queuedUserMessages.filter((entry) => entry !== tracking);
-    setUserMessageStatus(item.userMessage, "localQueued");
-    toast(`Invio dalla coda fallito: ${err.message}`, "error");
-    return false;
-  }
-}
 
-async function forceLocalMessage(id) {
-  if (state.directBashRunning) return toast("Attendi la fine del comando shell prima di forzare.", "warn");
-  const index = state.localQueue.findIndex((item) => item.id === id);
-  if (index < 0) return;
-  const [item] = state.localQueue.splice(index, 1);
-  renderQueuePanel();
-  const delivered = await deliverQueuedItem(item, true);
-  if (!delivered) {
-    state.localQueue.splice(index, 0, item);
-    renderQueuePanel();
-  }
-}
 
-async function dispatchNextLocalMessage() {
-  if (state.busy || state.dispatchingLocalQueue || !state.localQueue.length) return;
-  state.dispatchingLocalQueue = true;
-  const item = state.localQueue.shift();
-  renderQueuePanel();
-  const delivered = await deliverQueuedItem(item, false);
-  if (!delivered) {
-    state.localQueue.unshift(item);
-    renderQueuePanel();
-  }
-  state.dispatchingLocalQueue = false;
-  if (!state.busy && state.localQueue.length) queueMicrotask(dispatchNextLocalMessage);
-}
 
-function resetQueueState() {
-  state.localQueue = [];
-  state.nativeQueue = { steering: [], followUp: [] };
-  state.queuedUserMessages = [];
-  state.dispatchingLocalQueue = false;
-  renderQueuePanel();
-}
 
-async function sendMessage(rawBehavior) {
-  const text = el.input.value.trim();
-  const attachments = state.attachments.slice();
-  if (!text && !attachments.length) return;
-  if (!state.busy && !attachments.length && text.startsWith("!")) {
-    const excludeFromContext = text.startsWith("!!");
-    const command = text.slice(excludeFromContext ? 2 : 1).trim();
-    if (!command) return;
-    el.input.value = "";
-    autosize();
-    await runDirectBash(command, excludeFromContext);
-    return;
-  }
-  const images = attachments
-    .filter((attachment) => attachment.data && attachment.mimeType?.startsWith("image/"))
-    .map((attachment) => ({ type: "image", data: attachment.data, mimeType: attachment.mimeType }));
-  const files = attachments.filter((attachment) => !attachment.mimeType?.startsWith("image/"));
-  const displayText = text || (images.length ? "Analizza queste immagini." : "Analizza gli allegati.");
-  let message = displayText;
-  if (files.length) {
-    message += "\n\nAllegati locali selezionati dall’utente (usa gli strumenti disponibili per leggerli):\n" +
-      files.map((file) => `- ${file.path}`).join("\n");
-  }
 
-  if (state.busy) {
-    const behavior = state.directBashRunning ? "followUp" : rawBehavior || state.queueBehavior;
-    const userMessage = addUserMessage(displayText, attachments, { timestamp: Date.now(), status: "sending" });
-    clearComposerAfterQueue();
-    if (behavior === "followUp") {
-      state.localQueue.push({
-        id: `queue-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        message,
-        displayText,
-        messageSuffix: message.slice(displayText.length),
-        images,
-        userMessage,
-      });
-      setUserMessageStatus(userMessage, "localQueued");
-      renderQueuePanel();
-      toast("Messaggio accodato senza forzare.");
-      return;
-    }
-    const tracking = { message, userMessage };
-    state.queuedUserMessages.push(tracking);
-    try {
-      await api.steer(message, images.length ? images : undefined);
-      setUserMessageStatus(userMessage, "queued");
-      toast("Istruzione forzata dopo lo step corrente.");
-    } catch (err) {
-      state.queuedUserMessages = state.queuedUserMessages.filter((entry) => entry !== tracking);
-      setUserMessageStatus(userMessage, "error");
-      toast(err.message, "error");
-    }
-    return;
-  }
 
-  el.input.value = "";
-  state.attachments = [];
-  renderAttachmentTray();
-  autosize();
-  const userMessage = addUserMessage(displayText, attachments, { timestamp: Date.now(), status: "sending" });
-  state.activeUserMessage = userMessage;
-  setBusy(true);
-  try {
-    await api.prompt(message, images.length ? images : undefined);
-    setUserMessageStatus(userMessage, "received");
-    refreshTabsSoon();
-    refreshSessionsSoon();
-  } catch (err) {
-    setUserMessageStatus(userMessage, "error");
-    if (state.activeUserMessage === userMessage) state.activeUserMessage = null;
-    setBusy(false);
-    if (err.code !== "PI_NOT_INSTALLED") toast(err.message, "error", 8000);
-  }
-}
 
-async function runDirectBash(command, excludeFromContext) {
-  const card = makeToolCard(excludeFromContext ? "bash · fuori contesto" : "bash", command);
-  card.open = true;
-  state.directBashRunning = true;
-  state.directBashCard = card;
-  setBusy(true);
-  el.statusActivity.textContent = "comando shell in esecuzione…";
-  try {
-    const result = await api.bash(command, excludeFromContext);
-    setToolCardResult(card, result.output || "", Boolean(result.exitCode));
-    if (result.truncated && result.fullOutputPath) {
-      card.querySelector(".tool-body pre").textContent += `\n\nOutput completo: ${result.fullOutputPath}`;
-    }
-    if (!result.exitCode) card.open = false;
-    await refreshStats();
-    refreshSessionsSoon();
-  } catch (err) {
-    setToolCardResult(card, err.message, true);
-  } finally {
-    state.directBashRunning = false;
-    state.directBashCard = null;
-    setBusy(false);
-  }
-}
 
-function autosize() {
-  el.input.style.height = "auto";
-  el.input.style.height = Math.min(el.input.scrollHeight, 220) + "px";
-}
+
+
+
+
+
+
+
+
+
 
 // ---------------------------------------------------------------------------
 // pi status / updates (external, independent from the app)
@@ -3269,9 +2685,9 @@ function handleUiRequest(msg) {
   }
 }
 
-function stripAnsi(text) {
+function stripAnsi(text) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.stripAnsi) return window.piUtils.stripAnsi.apply(null, Array.from(arguments)); 
   return String(text || "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
-}
+ }
 
 function updateExtensionStatus(key, text) {
   if (!key) return;
@@ -3519,29 +2935,29 @@ api.on("pi:event", (msg) => {
   }
 });
 
-function parsedToolArgs(args) {
+function parsedToolArgs(args) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.parsedToolArgs) return window.piUtils.parsedToolArgs.apply(null, Array.from(arguments)); 
   if (args && typeof args === "object") return args;
   if (typeof args !== "string") return {};
   try { return JSON.parse(args); } catch { return { value: args }; }
-}
+ }
 
-function fullToolArgs(args) {
+function fullToolArgs(args) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.fullToolArgs) return window.piUtils.fullToolArgs.apply(null, Array.from(arguments)); 
   try {
     return typeof args === "string" ? args : JSON.stringify(args) || "";
   } catch {
     return "";
   }
-}
+ }
 
-function compactProjectPath(value) {
+function compactProjectPath(value) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.compactProjectPath) return window.piUtils.compactProjectPath.apply(null, Array.from(arguments)); 
   const input = String(value || "").replace(/\\/g, "/");
   const cwd = String(state.settings?.cwd || "").replace(/\\/g, "/").replace(/\/$/, "");
   if (cwd && (input === cwd || input.startsWith(`${cwd}/`))) return input.slice(cwd.length + 1) || ".";
   const parts = input.split("/").filter(Boolean);
   return parts.length > 3 ? `…/${parts.slice(-3).join("/")}` : input;
-}
+ }
 
-function changedLineCounts(args) {
+function changedLineCounts(args) { if(typeof window!=="undefined" && window.piUtils && window.piUtils.changedLineCounts) return window.piUtils.changedLineCounts.apply(null, Array.from(arguments)); 
   const edits = Array.isArray(args.edits) ? args.edits : [args];
   let removed = 0;
   let added = 0;
@@ -3552,7 +2968,7 @@ function changedLineCounts(args) {
     if (newText) added += String(newText).split("\n").length;
   }
   return { added, removed };
-}
+ }
 
 function compactToolArgs(toolName, rawArgs) {
   const name = String(toolName || "").toLowerCase();

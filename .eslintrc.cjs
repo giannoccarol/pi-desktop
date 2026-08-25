@@ -1,0 +1,25 @@
+/* eslint – fase 1: solo errori veri, no style war. Fix progressivo. */
+module.exports = {
+  root: true,
+  env: { node: true, browser: true, es2022: true },
+  extends: ["eslint:recommended"],
+  parserOptions: { ecmaVersion: "latest", sourceType: "script" },
+  rules: {
+    "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    "no-undef": "error",
+    "no-redeclare": "error",
+    "no-console": "off",
+    "no-empty": "warn",
+    "no-control-regex": "off",
+    "no-constant-condition": "off",
+  },
+  overrides: [
+    { files: ["src/renderer/**/*.js"], env: { browser: true, node: false }, globals: { piDesktop: "readonly", piChatUtils: "readonly", piUtils: "readonly", piNavigation: "readonly", piPersistence: "readonly", piStore: "readonly", piComposer: "readonly", i18n: "readonly", renderMarkdown: "readonly", lucide: "readonly", Buffer: "readonly", module: "readonly", state: "readonly", el: "readonly", toast: "readonly", refreshIcons: "readonly", icon: "readonly", escapeHtml: "readonly", formatBytes: "readonly", md: "readonly", scheduleScroll: "readonly", bundleLiveActivityWrap: "readonly", bundleActivityMessages: "readonly", addUserMessage: "readonly", renderProjects: "readonly", clearChat: "readonly", setConversationMode: "readonly", refreshIconsWithin: "readonly", scheduleRenderProjects: "readonly", scheduleRenderTabs: "readonly", jumpToBottom: "readonly", scrollBottom: "readonly", makeToolCard: "readonly", setToolCardResult: "readonly", renderBlockMedia: "readonly", renderMediaBlock: "readonly", safeImageSource: "readonly", textOfBlocks: "readonly", isActivityOnly: "readonly", toolIconName: "readonly", toolDisplayName: "readonly", compactToolArgs: "readonly", fullToolArgs: "readonly", parsedToolArgs: "readonly", changedLineCounts: "readonly", compactProjectPath: "readonly", preferenceLabel: "readonly", truncate: "readonly", basename: "readonly", fmtCost: "readonly", relTime: "readonly", renderAttachmentTray: "readonly", pickAttachments: "readonly", pasteClipboardImages: "readonly", insertCodeBlock: "readonly", refreshStats: "readonly", setBusy: "readonly", cancelQueuedMessagesForStop: "readonly", finishInterruptedRendering: "readonly", abortCurrentWork: "readonly", clearComposerAfterQueue: "readonly", renderQueuePanel: "readonly", editLocalMessage: "readonly", removeLocalMessage: "readonly", deliverQueuedItem: "readonly", forceLocalMessage: "readonly", dispatchNextLocalMessage: "readonly", resetQueueState: "readonly", sendMessage: "readonly", runDirectBash: "readonly", autosize: "readonly" }, rules: { "no-redeclare": "off" } },
+    { files: ["src/renderer/composer.js"], globals: { state: "readonly", el: "readonly", api: "readonly", t: "readonly", toast: "readonly", refreshIcons: "readonly", icon: "readonly", escapeHtml: "readonly", formatBytes: "readonly", md: "readonly", scheduleScroll: "readonly", bundleLiveActivityWrap: "readonly", bundleActivityMessages: "readonly", addUserMessage: "readonly", renderProjects: "readonly", clearChat: "readonly", setConversationMode: "readonly", refreshIconsWithin: "readonly", scheduleRenderProjects: "readonly", scheduleRenderTabs: "readonly", jumpToBottom: "readonly", scrollBottom: "readonly", makeToolCard: "readonly", setToolCardResult: "readonly", renderBlockMedia: "readonly", renderMediaBlock: "readonly", safeImageSource: "readonly", textOfBlocks: "readonly", isActivityOnly: "readonly", toolIconName: "readonly", toolDisplayName: "readonly", compactToolArgs: "readonly", fullToolArgs: "readonly", parsedToolArgs: "readonly", changedLineCounts: "readonly", compactProjectPath: "readonly", preferenceLabel: "readonly", truncate: "readonly", basename: "readonly", fmtCost: "readonly", relTime: "readonly" }, rules: { "no-unused-vars": "off", "no-undef": "off" } },
+    { files: ["src/main/**/*.js", "src/preload/**/*.js"], globals: { Buffer: "readonly" } },
+    { files: ["test/**/*.mjs"], parserOptions: { sourceType: "module" }, env: { node: true } },
+  ],
+  ignorePatterns: ["dist/", "node_modules/", "src/renderer/fonts/"],
+  // app.js legacy: `const i18n = window.i18n` redeclares global i18n – allow in renderer
+
+};
