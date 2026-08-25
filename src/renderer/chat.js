@@ -181,7 +181,7 @@ function renderContentBlocks(container, blocks, resultMap) {
       container.appendChild(det);
     } else if (block.type === "toolCall") {
       const toolName = block.name || block.toolName || "tool";
-      const card = makeToolCard(toolName, compactToolArgs(toolName, block.arguments), container);
+      const card = makeToolCard(toolName, compactToolArgs(toolName, block.arguments), container, block.arguments);
       const callId = block.id || block.toolCallId;
       const res = resultMap?.results?.get(callId);
       if (res && !resultMap.consumed.has(callId)) {
@@ -272,6 +272,7 @@ function streamApplyDelta(evt) {
     const b = streamEnsureBlock(idx, "toolcall");
     const toolName = tc.name || "…";
     b.node.dataset.tool = toolName.toLowerCase();
+    try { b.node.dataset.args = typeof tc.arguments === "string" ? tc.arguments : JSON.stringify(tc.arguments ?? {}); } catch {}
     b.node.querySelector(".tool-name").innerHTML = `${icon(toolIconName(toolName))} ${escapeHtml(toolDisplayName(toolName))}`;
     if (tc.id || tc.toolCallId) state.tools.set(tc.id || tc.toolCallId, b.node);
     const argsEl = b.node.querySelector(".tool-args");
@@ -333,6 +334,7 @@ function endStreamAssistant(message) {
       const callId = block.id || block.toolCallId;
       const toolName = block.name || block.toolName || "tool";
       streamed.node.dataset.tool = toolName.toLowerCase();
+      try { streamed.node.dataset.args = typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {}); } catch {}
       streamed.node.querySelector(".tool-name").innerHTML = `${icon(toolIconName(toolName))} ${escapeHtml(toolDisplayName(toolName))}`;
       const argsEl = streamed.node.querySelector(".tool-args");
       argsEl.textContent = compactToolArgs(toolName, block.arguments);

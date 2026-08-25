@@ -34,6 +34,8 @@
     else if (window.initChatTooltip) window.initChatTooltip();
     if (typeof initSearchEnhancement === "function") initSearchEnhancement();
     else if (window.initSearchEnhancement) window.initSearchEnhancement();
+    if (window.piDragDrop && window.piDragDrop.initDragDrop) window.piDragDrop.initDragDrop();
+    else if (typeof initDragDrop === "function") initDragDrop();
     if (el.chat) {
       el.chat.addEventListener("scroll", scheduleScrollVisibility, { passive: true });
       window.addEventListener("resize", scheduleScrollVisibility);
@@ -52,6 +54,35 @@
     el.sendBtn.addEventListener("click", () => (window.sendMessage||window.piComposer?.sendMessage||function(){} )());
     el.stopBtn.addEventListener("click", () => (window.abortCurrentWork||window.piComposer?.abortCurrentWork||function(){} )());
     el.input.addEventListener("keydown", (e) => {
+      // @ mentions have priority when visible
+      if (el.atSuggestions && !el.atSuggestions.classList.contains("hidden")) {
+        const syncAt = window.syncAtSelection||window.piMentions?.syncAtSelection;
+        const applyAt = window.applyAtSuggestion||window.piMentions?.applyAtSuggestion;
+        const hideAt = window.hideAtSuggestions||window.piMentions?.hideAtSuggestions;
+        const results = state.mentionResults || [];
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          state.atSelection = Math.min(results.length - 1, (state.atSelection || 0) + 1);
+          syncAt && syncAt();
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          state.atSelection = Math.max(0, (state.atSelection || 0) - 1);
+          syncAt && syncAt();
+          return;
+        }
+        if ((e.key === "Tab" || e.key === "Enter") && results[state.atSelection]) {
+          e.preventDefault();
+          applyAt && applyAt(results[state.atSelection]);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          hideAt && hideAt();
+          return;
+        }
+      }
       if (!el.slashSuggestions.classList.contains("hidden")) {
         const commands = (window.slashMatches||window.piPalette?.slashMatches||function(){return []})()
         const render = window.renderSlashSuggestions||window.piPalette?.renderSlashSuggestions
@@ -91,11 +122,26 @@
     el.input.addEventListener("input", () => {
       (window.autosize||window.piComposer?.autosize)?.();
       state.slashSelection = 0;
-      (window.renderSlashSuggestions||window.piPalette?.renderSlashSuggestions)?.();
+      // slash suggestions only when not in @ context
+      const atCtx = (window.currentAtQuery||window.piMentions?.currentAtQuery)?.();
+      if (atCtx) {
+        state.atSelection = 0;
+        (window.renderAtSuggestions||window.piMentions?.renderAtSuggestions)?.();
+      } else {
+        (window.hideAtSuggestions||window.piMentions?.hideAtSuggestions)?.();
+        (window.renderSlashSuggestions||window.piPalette?.renderSlashSuggestions)?.();
+      }
     });
     el.input.addEventListener("paste", (...a)=> (window.pasteClipboardImages||window.piComposer?.pasteClipboardImages)?.(...a));
-    el.input.addEventListener("click", ()=>(window.renderSlashSuggestions||window.piPalette?.renderSlashSuggestions)?.());
-    el.input.addEventListener("blur", () => setTimeout(()=>(window.hideSlashSuggestions||window.piPalette?.hideSlashSuggestions)?.(), 120));
+    el.input.addEventListener("click", ()=>{
+      const atCtx = (window.currentAtQuery||window.piMentions?.currentAtQuery)?.();
+      if (atCtx) (window.renderAtSuggestions||window.piMentions?.renderAtSuggestions)?.();
+      else (window.renderSlashSuggestions||window.piPalette?.renderSlashSuggestions)?.();
+    });
+    el.input.addEventListener("blur", () => setTimeout(()=>{
+      (window.hideSlashSuggestions||window.piPalette?.hideSlashSuggestions)?.();
+      (window.hideAtSuggestions||window.piMentions?.hideAtSuggestions)?.();
+    }, 150));
     el.attachBtn.addEventListener("click", () => (window.pickAttachments||window.piComposer?.pickAttachments)?.("files"));
     el.attachImageBtn.addEventListener("click", () => (window.pickAttachments||window.piComposer?.pickAttachments)?.("images"));
     for (const button of el.queueBehaviorButtons) {

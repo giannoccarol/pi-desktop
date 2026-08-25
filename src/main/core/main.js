@@ -1,6 +1,6 @@
 "use strict";
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, globalShortcut, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 // execFile moved to mention-service.js
@@ -17,8 +17,10 @@ const { createMentionService } = require("../services/mention-service");
 const { UpdateService } = require("../updates/update-service");
 
 let win = null;
+let tray = null;
 let settings = null;
 let appUpdateService = null;
+const GLOBAL_HOTKEY = "CommandOrControl+Shift+P";
 let nextAuthRequestId = 1;
 const pendingAuthRequests = new Map();
 const authControllers = new Map();
@@ -144,6 +146,63 @@ function resolveWindowIcon() {
   return undefined;
 }
 
+function showWindow() {
+  if (!win) {
+    createWindow();
+    return;
+  }
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) win.show();
+  win.focus();
+}
+
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: "Mostra Pi Desktop", click: () => showWindow() },
+    { label: "Nuova chat", click: () => { showWindow(); if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } },
+    { type: "separator" },
+    { label: "Esci", role: "quit" },
+  ]);
+}
+
+function createTray() {
+  if (tray) return tray;
+  try {
+    const iconPath = resolveWindowIcon();
+    if (!iconPath) return null;
+    const image = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    tray = new Tray(image);
+    tray.setToolTip("Pi Desktop");
+    tray.setContextMenu(buildTrayMenu());
+    tray.on("click", () => showWindow());
+    return tray;
+  } catch (err) {
+    console.warn("[tray] creazione fallita:", err.message);
+    return null;
+  }
+}
+
+function destroyTray() {
+  try { tray?.destroy(); } catch {}
+  tray = null;
+}
+
+function registerGlobalShortcut() {
+  try {
+    globalShortcut.unregisterAll();
+    const ok = globalShortcut.register(GLOBAL_HOTKEY, () => showWindow());
+    if (!ok) console.warn("[hotkey] registrazione fallita:", GLOBAL_HOTKEY);
+    return ok;
+  } catch (err) {
+    console.warn("[hotkey] errore:", err.message);
+    return false;
+  }
+}
+
+function unregisterGlobalShortcut() {
+  try { globalShortcut.unregisterAll(); } catch {}
+}
+
 function createWindow() {
   const windowIcon = resolveWindowIcon();
   if (!windowIcon) console.warn("[window] icon not found, checked build/icon.png and icon.png");
@@ -181,15 +240,14 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
+    showWindow();
   });
 
   app.whenReady().then(() => {
     settings = loadSettings();
     createWindow();
+    try { createTray(); } catch {}
+    try { registerGlobalShortcut(); } catch {}
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
@@ -200,15 +258,39 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on("window-all-closed", () => {
+  // Keep app running in tray if tray exists; otherwise quit (macOS keeps app alive)
+  if (process.platform === "darwin") return;
+  if (tray) return;
   appUpdateService?.destroy();
   runtime.stop();
   app.quit();
 });
 
 app.on("will-quit", () => {
+  unregisterGlobalShortcut();
+  destroyTray();
   appUpdateService?.destroy();
   runtime.stop();
 });
+
+// Expose for unit testing (not used at runtime)
+if (process.env.NODE_ENV === "test" || typeof globalThis.__PI_TEST__ !== "undefined") {
+  try {
+    module.exports._trayTest = {
+      GLOBAL_HOTKEY,
+      showWindow: () => showWindow(),
+      buildTrayMenu,
+      createTray,
+      destroyTray,
+      registerGlobalShortcut,
+      unregisterGlobalShortcut,
+      getTray: () => tray,
+      setTray: (v) => { tray = v; },
+      setWin: (v) => { win = v; },
+      getWin: () => win,
+    };
+  } catch {}
+}
 
 const runtime = new RuntimeTabs((channel, payload) => {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
@@ -327,6 +409,23 @@ const mentionService = createMentionService(() => settings?.cwd);
 const searchMentionCandidates = mentionService.searchMentionCandidates;
 
 ipcMain.handle("fs:searchFiles", (_e, query) => searchMentionCandidates(query));
+
+// Drag&drop: lista file dentro una cartella droppata (relativi alla cartella stessa)
+ipcMain.handle("fs:listDropped", async (_e, absPath) => {
+  try {
+    const p = String(absPath || "").trim();
+    if (!p) return [];
+    let stat;
+    try { stat = fs.statSync(p); } catch { return []; }
+    if (stat.isFile()) return [path.basename(p)];
+    if (!stat.isDirectory()) return [];
+    // riusa listProjectFiles se possibile, altrimenti walk minimale
+    try {
+      const rel = await mentionService.listProjectFiles(p);
+      return rel;
+    } catch { return []; }
+  } catch { return []; }
+});
 
 ipcMain.handle("projects:add", async () => {
   const res = await dialog.showOpenDialog(win, {

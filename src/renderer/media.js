@@ -118,11 +118,14 @@
     return wrap;
   }
 
-  function makeToolCard(toolName, argsPreview, parent) {
+  function makeToolCard(toolName, argsPreview, parent, fullArgs) {
     const p = parent || el.messages;
     const card = document.createElement("details");
     card.className = "tool-card";
     card.dataset.tool = String(toolName || "tool").toLowerCase();
+    if (fullArgs != null) {
+      try { card.dataset.args = typeof fullArgs === "string" ? fullArgs : JSON.stringify(fullArgs); } catch { card.dataset.args = String(fullArgs); }
+    }
     const displayName = (window.piChat && window.piChat.toolDisplayName)
       ? window.piChat.toolDisplayName(toolName)
       : (toolName || "tool");
@@ -183,6 +186,28 @@
     st.className = `tool-state ${isError ? "err" : t("tool.ok")}`;
     const pre = card.querySelector(".tool-body pre");
     pre.textContent = text || t("tool.noOutput");
+    // diff view for edit/write
+    try {
+      const tool = String(card.dataset.tool || "").toLowerCase();
+      if ((tool === "edit" || tool === "write") && window.piDiffView) {
+        let parsedArgs = {};
+        const rawArgs = card.dataset.args;
+        if (rawArgs) {
+          try { parsedArgs = JSON.parse(rawArgs); } catch { parsedArgs = {}; }
+        }
+        const html = window.piDiffView.renderDiff(tool, parsedArgs, text);
+        if (html) {
+          const body = card.querySelector(".tool-body");
+          // remove previous diff if any
+          body.querySelector(".diff-view")?.remove();
+          const tmp = document.createElement("div");
+          tmp.innerHTML = html;
+          const diffEl = tmp.firstElementChild;
+          if (diffEl) body.insertBefore(diffEl, pre);
+          refreshIcons();
+        }
+      }
+    } catch {}
     renderBlockMedia(card.querySelector(".tool-body"), content, "Output");
   }
 

@@ -1,5 +1,79 @@
 "use strict";
 (function (root) {
+  const NOTIF_ENABLED_KEY = "pi-desktop-notifications-enabled";
+  const NOTIF_SOUND_KEY = "pi-desktop-notifications-sound";
+  function isNotificationsEnabled(storage) {
+    try {
+      const s = storage || (typeof localStorage !== "undefined" ? localStorage : null);
+      if (!s) return true;
+      const v = s.getItem(NOTIF_ENABLED_KEY);
+      if (v === null) return true;
+      return v !== "false" && v !== "0";
+    } catch { return true; }
+  }
+  function isSoundEnabled(storage) {
+    try {
+      const s = storage || (typeof localStorage !== "undefined" ? localStorage : null);
+      if (!s) return false;
+      return s.getItem(NOTIF_SOUND_KEY) === "true";
+    } catch { return false; }
+  }
+  function shouldNotify(options = {}) {
+    const enabled = options.enabled !== undefined ? options.enabled : isNotificationsEnabled(options.storage);
+    if (!enabled) return false;
+    const hidden = options.documentHidden !== undefined ? options.documentHidden : (typeof document !== "undefined" ? Boolean(document.hidden) : false);
+    let focused;
+    if (options.windowFocused !== undefined) focused = Boolean(options.windowFocused);
+    else if (typeof document !== "undefined" && typeof document.hasFocus === "function") focused = Boolean(document.hasFocus());
+    else focused = !hidden;
+    return Boolean(hidden || !focused);
+  }
+  function buildNotificationPayload(msg, opts = {}) {
+    const tr = opts.t || ((k) => k);
+    let title = "Pi Desktop";
+    let body = "";
+    if (msg.type === "agent_settled" || msg.type === "agent_end") {
+      title = tr("notification.agentDone", null) && tr("notification.agentDone") !== "notification.agentDone" ? tr("notification.agentDone") : "Agente completato";
+      body = msg.isError || msg.error ? String(msg.error || "Errore") : (tr("notification.agentDoneBody") !== "notification.agentDoneBody" ? tr("notification.agentDoneBody") : "Pi ha finito il turno.");
+    } else if (msg.type === "turn_end") {
+      title = tr("notification.turnDone") !== "notification.turnDone" ? tr("notification.turnDone") : "Turno completato";
+      body = "Turno completato.";
+    } else {
+      title = "Pi Desktop";
+      body = String(msg.type || "");
+    }
+    return { title, body };
+  }
+  function playNotificationSound() {
+    try {
+      if (!isSoundEnabled()) return;
+      const AudioCtor = (typeof window !== "undefined" && window.Audio) || (typeof globalThis !== "undefined" && globalThis.Audio);
+      if (!AudioCtor) return;
+      const audio = new AudioCtor("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==");
+      audio.volume = 0.4;
+      const p = audio.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } catch {}
+  }
+  function showNotification(msg) {
+    try {
+      if (!shouldNotify()) return;
+      const payload = buildNotificationPayload(msg, { t: (root.i18n && root.i18n.t) ? root.i18n.t : (k) => k });
+      const Notif = (typeof window !== "undefined" && window.Notification) || (typeof globalThis !== "undefined" && globalThis.Notification);
+      if (!Notif) return;
+      if (Notif.permission === "granted") {
+        try { new Notif(payload.title, { body: payload.body }); } catch {}
+        playNotificationSound();
+      } else if (Notif.permission !== "denied" && typeof Notif.requestPermission === "function") {
+        Notif.requestPermission().then((perm) => {
+          if (perm === "granted") {
+            try { new Notif(payload.title, { body: payload.body }); } catch {}
+            playNotificationSound();
+          }
+        }).catch(() => {});
+      }
+    } catch {}
+  }
   function createRuntimeEvents({ state, el, api, t, icon, escapeHtml, textOfBlocks, compactToolArgs, fullToolArgs, toolIconName, makeToolCard, setToolCardResult, renderBlockMedia, beginStreamAssistant, streamApplyDelta, endStreamAssistant, setBusy, setUserMessageStatus, refreshStats, refreshSessionsSoon, refreshTabsSoon, refreshIcons, renderQueuePanel, renderTabs, renderProjects, updateNavigationStatus, handleUiRequest, scheduleScroll }) {
     function handleEvent(msg) {
       if (msg.tabId) {
@@ -22,14 +96,14 @@
       }
       switch (msg.type) {
         case "agent_start": state.lastAssistantErrored=false; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(true); setUserMessageStatus(state.activeUserMessage,"processing"); break;
-        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); root.piSessionView?.refreshSessionCache?.(msg.tabId); break;
+        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); root.piSessionView?.refreshSessionCache?.(msg.tabId); showNotification(msg); break;
         case "message_start":
           if (msg.message?.role==="assistant") { setUserMessageStatus(state.activeUserMessage,"processing"); beginStreamAssistant(); }
           else if (msg.message?.role==="user") { const txt=textOfBlocks(msg.message.content); const idx=state.queuedUserMessages.findIndex(e=>e.message===txt); if(idx>=0){ const [entry]=state.queuedUserMessages.splice(idx,1); state.activeUserMessage=entry.userMessage; setUserMessageStatus(entry.userMessage,"processing"); } }
           break;
         case "message_update": streamApplyDelta(msg); break;
         case "message_end": endStreamAssistant(msg.message); break;
-        case "turn_end": refreshStats(); break;
+        case "turn_end": refreshStats(); showNotification(msg); break;
         case "tool_execution_start": { const name=msg.toolName||"tool"; const card=state.tools.get(msg.toolCallId)||makeToolCard(name, compactToolArgs(name,msg.args)); card.dataset.tool=name.toLowerCase(); card.querySelector(".tool-name").innerHTML=`${icon(toolIconName(name))} ${escapeHtml(name)}`; const a=card.querySelector(".tool-args"); a.textContent=compactToolArgs(name,msg.args); a.title=fullToolArgs(msg.args); state.tools.set(msg.toolCallId,card); refreshIcons(); break; }
         case "tool_execution_update": { const card=state.tools.get(msg.toolCallId); if(card){ card.querySelector(".tool-body pre").textContent=textOfBlocks(msg.partialResult?.content); renderBlockMedia(card.querySelector(".tool-body"), msg.partialResult?.content, "Anteprima"); } break; }
         case "tool_execution_end": { const card=state.tools.get(msg.toolCallId); if(card){ setToolCardResult(card, textOfBlocks(msg.result?.content), Boolean(msg.isError), msg.result?.content); state.tools.delete(msg.toolCallId); } break; }
@@ -97,14 +171,14 @@
       }
       switch (msg.type) {
         case "agent_start": state.lastAssistantErrored=false; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(true); setUserMessageStatus(state.activeUserMessage,"processing"); break;
-        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); root.piSessionView?.refreshSessionCache?.(msg.tabId); break;
+        case "agent_settled": setUserMessageStatus(state.activeUserMessage, state.lastAssistantErrored?"failed":"done"); state.activeUserMessage=null; state.lastAssistantErrorWrap=null; state.retryAttempt=0; setBusy(false); refreshStats(); refreshSessionsSoon(); root.piSessionView?.refreshSessionCache?.(msg.tabId); showNotification(msg); break;
         case "message_start":
           if (msg.message?.role==="assistant") { setUserMessageStatus(state.activeUserMessage,"processing"); beginStreamAssistant(); }
           else if (msg.message?.role==="user") { const txt=textOfBlocks(msg.message.content); const idx=state.queuedUserMessages.findIndex(e=>e.message===txt); if(idx>=0){ const [entry]=state.queuedUserMessages.splice(idx,1); state.activeUserMessage=entry.userMessage; setUserMessageStatus(entry.userMessage,"processing"); } }
           break;
         case "message_update": streamApplyDelta(msg); break;
         case "message_end": endStreamAssistant(msg.message); break;
-        case "turn_end": refreshStats(); break;
+        case "turn_end": refreshStats(); showNotification(msg); break;
         case "tool_execution_start": { const name=msg.toolName||"tool"; const card=state.tools.get(msg.toolCallId)||makeToolCard(name, compactToolArgs(name,msg.args)); card.dataset.tool=name.toLowerCase(); const nEl=card.querySelector(".tool-name"); if(nEl) nEl.innerHTML=`${icon(toolIconName(name))} ${escapeHtml(toolDisplayName(name))}`; const a=card.querySelector(".tool-args"); if(a){ a.textContent=compactToolArgs(name,msg.args); a.title=fullToolArgs(msg.args); } state.tools.set(msg.toolCallId,card); if(root.piUi) root.piUi.refreshIcons(); break; }
         case "tool_execution_update": { const card=state.tools.get(msg.toolCallId); if(card){ const pre=card.querySelector(".tool-body pre"); if(pre) pre.textContent=textOfBlocks(msg.partialResult?.content); renderBlockMedia(card.querySelector(".tool-body"), msg.partialResult?.content, "Anteprima"); } break; }
         case "tool_execution_end": { const card=state.tools.get(msg.toolCallId); if(card){ setToolCardResult(card, textOfBlocks(msg.result?.content), Boolean(msg.isError), msg.result?.content); state.tools.delete(msg.toolCallId); } break; }
@@ -126,6 +200,6 @@
     if (api && api.on) api.on("pi:event", handleEvent);
     return handleEvent;
   }
-  root.piRuntimeEvents = { createRuntimeEvents, bindGlobalPiEvents };
-  if (typeof module!=="undefined"&&module.exports) module.exports={ createRuntimeEvents, bindGlobalPiEvents };
+  root.piRuntimeEvents = { createRuntimeEvents, bindGlobalPiEvents, shouldNotify, buildNotificationPayload, showNotification, isNotificationsEnabled, isSoundEnabled };
+  if (typeof module!=="undefined"&&module.exports) module.exports={ createRuntimeEvents, bindGlobalPiEvents, shouldNotify, buildNotificationPayload, showNotification, isNotificationsEnabled, isSoundEnabled, NOTIF_ENABLED_KEY, NOTIF_SOUND_KEY };
 })(typeof window!=="undefined"?window:globalThis);

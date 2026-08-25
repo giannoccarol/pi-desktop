@@ -862,6 +862,21 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 .tool-state.interrupted { color: var(--amber); }
 .tool-body { max-height: 260px; overflow: auto; margin-left: 121px; padding: 5px 7px 8px; border-left: 1px solid var(--hairline); }
 .tool-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 var(--mono); }
+/* Diff view */
+.diff-view { margin: 6px 0 8px; overflow: hidden; border: 1px solid var(--hairline); border-radius: 8px; background: var(--surface); }
+.diff-header { padding: 6px 10px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); font: 11px var(--mono); color: var(--muted); }
+.diff-path { color: var(--text); font-weight: 600; }
+.diff-hunk-header { padding: 4px 10px; background: color-mix(in srgb, var(--blue) 7%, var(--surface-2)); color: var(--muted); font: 11px var(--mono); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+.diff-hunk-header:first-child { border-top: 0; }
+.diff-lines { font: 12px/1.5 var(--mono); }
+.diff-line { display: flex; gap: 8px; padding: 1px 10px; white-space: pre-wrap; word-break: break-all; }
+.diff-line.added { background: color-mix(in srgb, var(--green) 12%, transparent); }
+.diff-line.removed { background: color-mix(in srgb, var(--red) 10%, transparent); }
+.diff-line.context { color: var(--muted); }
+.diff-marker { flex: 0 0 10px; text-align: center; font-weight: 700; }
+.diff-line.added .diff-marker { color: var(--green); }
+.diff-line.removed .diff-marker { color: var(--red); }
+.diff-text { flex: 1; min-width: 0; }
 .tool-args { min-width: 0; max-width: none; flex: 1; overflow: hidden; color: var(--muted); opacity: .82; text-overflow: ellipsis; white-space: nowrap; }
 .activity-only .tool-card, .activity-only details.think { margin: 0; }
 .activity-bundle .tool-card { border: 0; border-radius: 4px; background: transparent; }
@@ -954,6 +969,24 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 .slash-suggestion:hover, .slash-suggestion.active { background: var(--hover); }
 .slash-suggestion .command-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .at-suggestion { grid-template-columns: auto 1fr auto; }
+/* Drag & drop preview tree */
+.drop-preview { margin: 8px 0 6px; padding: 8px; border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface-2); box-shadow: var(--shadow-card); max-height: 280px; overflow: auto; }
+.drop-preview-head { display: flex; align-items: center; gap: 8px; padding: 4px 4px 8px; border-bottom: 1px solid var(--hairline); margin-bottom: 6px; font-size: 12px; }
+.drop-preview-head strong { flex: 1; }
+.drop-preview-actions { display: flex; gap: 4px; align-items: center; }
+.drop-tree { display: flex; flex-direction: column; gap: 1px; }
+.drop-tree-row { display: flex; align-items: center; gap: 4px; min-height: 26px; border-radius: 6px; }
+.drop-tree-row:hover { background: var(--hover); }
+.drop-tree-row.collapsed + .drop-tree-children { display: none; }
+.drop-tree-label { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+.drop-tree-label input[type="checkbox"] { width: 14px; height: 14px; }
+.drop-tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drop-tree-toggle { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; }
+.drop-tree-toggle:hover { background: var(--surface-3); }
+.drop-tree-toggle svg { width: 12px; height: 12px; }
+.drop-tree-children { display: flex; flex-direction: column; gap: 1px; }
+#composer.drag-over { outline: 2px dashed color-mix(in srgb, var(--blue) 40%, transparent); outline-offset: 2px; background: color-mix(in srgb, var(--blue) 6%, var(--surface)); }
+#composer-wrap.drag-over { background: color-mix(in srgb, var(--blue) 4%, transparent); border-radius: 12px; }
 .at-suggestion .command-name { display: flex; align-items: center; gap: 7px; max-width: 100%; }
 .at-suggestion .command-name svg { width: 15px; height: 15px; flex: none; opacity: .65; }
 #composer:focus-within { box-shadow: var(--shadow-card); }
