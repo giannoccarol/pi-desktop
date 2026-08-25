@@ -2,9 +2,9 @@
 // Composer + queue – extracted from app.js monolith (head). Loaded before app.js, globals shared.
 
 // Explicit deps – no bare globals from app.js
-const el = window.piStore ? window.piStore.el : {};
-const state = window.piStore ? window.piStore.state : {};
-const api = window.piDesktop;
+var el = window.piStore ? window.piStore.el : {};
+var state = window.piStore ? window.piStore.state : {};
+var api = window.piDesktop;
 function t(k, v){ return window.i18n ? window.i18n.t(k, v) : String(k); }
 function toast(m,k,ms){ return window.piUi ? window.piUi.toast(m,k,ms) : void 0; }
 function icon(n){ return window.piUi ? window.piUi.icon(n) : `<i data-lucide="${n}"></i>`; }

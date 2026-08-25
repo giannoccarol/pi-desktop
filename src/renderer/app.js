@@ -4,7 +4,7 @@
 // Pi Desktop renderer
 // ---------------------------------------------------------------------------
 
-const api = window.piDesktop;
+var api = window.piDesktop;
 const { hasVisibleAssistantContent, collapseRetryAttempts } = window.piChatUtils;
 const $ = (sel) => document.querySelector(sel);
 const i18n = window.i18n;
@@ -12,8 +12,8 @@ const t = i18n ? i18n.t : (k, v) => k;
 const fmt = (k, v) => t(k, v);
 
 // Store is the single source of truth – defined in store.js and loaded before app.js
-const el = window.piStore.el;
-const state = window.piStore.state;
+var el = window.piStore.el;
+var state = window.piStore.state;
 
 // ---------------------------------------------------------------------------
 // Utilities

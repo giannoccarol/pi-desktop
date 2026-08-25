@@ -2,9 +2,9 @@
 // Sidebar + tabs – extracted from app.js monolith. Loaded before app.js, globals shared.
 
 // Explicit deps – no reliance on app.js bare globals (fragile across script order)
-const el = window.piStore ? window.piStore.el : {};
-const state = window.piStore ? window.piStore.state : {};
-const api = window.piDesktop;
+var el = window.piStore ? window.piStore.el : {};
+var state = window.piStore ? window.piStore.state : {};
+var api = window.piDesktop;
 function t(k, v){ return window.i18n ? window.i18n.t(k, v) : String(k); }
 function toast(m,k,ms){ return window.piUi ? window.piUi.toast(m,k,ms) : void 0; }
 function icon(n){ return window.piUi ? window.piUi.icon(n) : `<i data-lucide="${n}"></i>`; }
@@ -31,8 +31,8 @@ function newChat(p){ return window.piSession ? window.piSession.newChat(p) : Pro
 function setConversationMode(a,b){ return window.piUi ? window.piUi.setConversationMode(a,b) : void 0; }
 function jumpToBottom(){ return window.piUi ? window.piUi.jumpToBottom() : void 0; }
 function resetQueueState(){ return window.piComposer ? window.piComposer.resetQueueState.apply(null, arguments) : void 0; }
-let sessionsTimer = null;
-let tabsTimer = null;
+var sessionsTimer = null;
+var tabsTimer = null;
 
 function stashActiveTabContext() {
   if (!state.activeTabId) return;
