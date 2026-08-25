@@ -15,6 +15,7 @@ test("ui: module exposes expected API", async () => {
 
 test("ui: live scroll follows prior user intent and restores each chat position", async () => {
   globalThis.requestAnimationFrame=(fn)=>{ fn(); return 1; };
+  globalThis.cancelAnimationFrame=()=>{};
   const chat={scrollHeight:1200,scrollTop:700,clientHeight:400,style:{scrollBehavior:""}};
   globalThis.piStore={el:{chat},state:{chatStickToBottom:true,conversationActive:true}};
   const ui=globalThis.piUi;
@@ -31,6 +32,10 @@ test("ui: live scroll follows prior user intent and restores each chat position"
   assert.equal(chat.scrollTop,420,"new content must not move a reader who scrolled up");
   ui.restoreChatScrollState({scrollTop:260,stickToBottom:false});
   assert.equal(chat.scrollTop,260);
+  chat.scrollHeight=2400;
+  ui.jumpToBottom();
+  assert.equal(chat.scrollTop,2400,"opening a chat pins immediately to the latest message");
+  assert.equal(globalThis.piStore.state.chatStickToBottom,true);
 });
 
 test("message-view: messageTime handles null, ms, seconds, Date", async () => {

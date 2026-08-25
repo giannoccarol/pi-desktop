@@ -184,9 +184,12 @@
         hash = Math.imul(hash, 16777619);
       }
     };
+    const seen = new WeakSet();
     const visit = (value) => {
       if (value == null) return add(value);
       if (typeof value !== "object") return add(value);
+      if (seen.has(value)) return add("[Circular]");
+      seen.add(value);
       if (Array.isArray(value)) {
         add(`[${value.length}]`);
         for (const item of value) visit(item);

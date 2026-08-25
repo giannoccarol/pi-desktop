@@ -56,8 +56,10 @@
     return html;
   }
 
+  const MAX_QUOTE_DEPTH = 16;
+
   /** Render markdown source to an HTML string. */
-  function renderMarkdown(src) {
+  function renderMarkdown(src, quoteDepth = 0) {
     if (!src) return "";
     const text = String(src).replace(/\r\n/g, "\n");
     const lines = text.split("\n");
@@ -115,14 +117,20 @@
         }
       }
 
-      // blockquote
-      if (/^\s*>\s?/.test(line)) {
+      // blockquote — iterative depth cap: a line of ">>>>>>…" used to recurse
+      // until RangeError: Maximum call stack size exceeded when opening a chat.
+      if (/^\s*>/.test(line)) {
         const buf = [];
-        while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+        while (i < lines.length && /^\s*>/.test(lines[i])) {
           buf.push(lines[i].replace(/^\s*>\s?/, ""));
           i++;
         }
-        out += `<blockquote>${renderMarkdown(buf.join("\n"))}</blockquote>`;
+        const inner = buf.join("\n");
+        if (quoteDepth >= MAX_QUOTE_DEPTH) {
+          out += `<blockquote>${renderInline(esc(inner)).replace(/\n/g, "<br/>")}</blockquote>`;
+        } else {
+          out += `<blockquote>${renderMarkdown(inner, quoteDepth + 1)}</blockquote>`;
+        }
         continue;
       }
 

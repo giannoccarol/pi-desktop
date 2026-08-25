@@ -102,6 +102,14 @@ test("utils: bufferToBase64", () => {
   }
 });
 
+test("utils: messageListStats handles circular refs without overflowing", () => {
+  const cyclic = { role: "user", content: "hi" };
+  cyclic.self = cyclic;
+  const stats = utils.messageListStats([cyclic]);
+  assert.equal(typeof stats.revision, "string");
+  assert.ok(stats.bytes > 0);
+});
+
 // ---- chat-utils (regression lock) ----
 test("chat-utils: collapseRetryAttempts hides intermediate errors", () => {
   const msgs = [

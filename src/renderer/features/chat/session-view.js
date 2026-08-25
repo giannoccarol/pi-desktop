@@ -73,7 +73,7 @@
       if(window.piUtils?.messageListStats){
         const ha=window.piUtils.messageListStats(a);
         const hb=window.piUtils.messageListStats(b);
-        return ha.hash===hb.hash && ha.bytes===hb.bytes;
+        return ha.revision===hb.revision && ha.bytes===hb.bytes;
       }
     }catch{}
     try{ return JSON.stringify(a)===JSON.stringify(b); }catch{ return false; }
@@ -113,7 +113,8 @@
     }
     for(let i=0;i<displayMessages.length;i++){
       if(!isCurrent()) return false;
-      renderFn(displayMessages[i],{results, consumed});
+      try { renderFn(displayMessages[i],{results, consumed}); }
+      catch(err){ console.error("renderFinalMessage fallita", err); }
       if((i+1)%CHUNK===0 && i+1<displayMessages.length){ window.piUi?.scheduleScroll(); await nextFrame(); }
     }
     return true;
@@ -173,12 +174,18 @@
       state.commands=[]; state.activeTabId=opened.tabId||state.activeTabId; state.activeSessionFile=session.file;
       el.statusCwd.textContent=session.cwd||"";
       await reloadConversationFromRuntime({restoreTab:true, paintedCache:painted, switchGeneration:generation});
+      if(generation===state.switchGeneration) window.piUi?.jumpToBottom();
     }catch(err){
       if(generation!==state.switchGeneration) return;
       if(window.piChat?.clearChat) window.piChat.clearChat(); else el.messages.innerHTML="";
       el.emptyState.classList.remove("hidden"); window.piUi?.setConversationMode(false,false);
       window.piUi?.toast(`Impossibile aprire la sessione: ${err.message}`,"error");
-    }finally{ if(generation===state.switchGeneration) clearSessionLoading(); }
+    }finally{
+      if(generation===state.switchGeneration){
+        window.piUi?.jumpToBottom();
+        clearSessionLoading();
+      }
+    }
   }
   // expose for app.js compat
   window.piSessionView={

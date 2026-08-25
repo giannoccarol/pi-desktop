@@ -52,21 +52,33 @@
 
   // Dopo un restore al fondo il contenuto continua a dimensionarsi (immagini
   // lazy, tool card, highlight): senza re-pin la viewport resta a metà chat.
+  // Uno stabile di un solo frame non basta: lucide/virtualization cambiano
+  // l'altezza 1–2 frame dopo. Serve anche scroll-behavior:auto per tutta la pin.
   let bottomPinRaf = 0;
-  function pinBottomUntilSettled(maxFrames = 60) {
+  function pinBottomUntilSettled(maxFrames = 90) {
     if (bottomPinRaf) cancelAnimationFrame(bottomPinRaf);
+    const elStart = getEl();
+    const previousBehavior = elStart.chat ? elStart.chat.style.scrollBehavior : "";
+    if (elStart.chat) elStart.chat.style.scrollBehavior = "auto";
     let frames = 0;
+    let stable = 0;
     let lastHeight = -1;
-    const step = () => {
+    const finish = () => {
       bottomPinRaf = 0;
       const el = getEl();
-      if (!el.chat || getState().chatStickToBottom !== true) return;
-      el.chat.scrollTop = el.chat.scrollHeight;
+      if (el.chat) el.chat.style.scrollBehavior = previousBehavior;
       queueMicrotask(updateScrollBottomVisibility);
-      if (el.chat.scrollHeight !== lastHeight && ++frames <= maxFrames) {
-        lastHeight = el.chat.scrollHeight;
-        bottomPinRaf = requestAnimationFrame(step);
-      }
+    };
+    const step = () => {
+      const el = getEl();
+      if (!el.chat || getState().chatStickToBottom !== true) return finish();
+      el.chat.scrollTop = el.chat.scrollHeight;
+      const height = el.chat.scrollHeight;
+      if (height === lastHeight) stable += 1;
+      else { stable = 0; lastHeight = height; }
+      frames += 1;
+      if (stable >= 8 || frames >= maxFrames) return finish();
+      bottomPinRaf = requestAnimationFrame(step);
     };
     bottomPinRaf = requestAnimationFrame(step);
   }
@@ -76,18 +88,19 @@
     const state = getState();
     if (!el.chat) return;
     const useBottom = snapshot?.stickToBottom ?? fallbackToBottom;
-    const previous = el.chat.style.scrollBehavior;
-    el.chat.style.scrollBehavior = "auto";
     if (useBottom) {
+      el.chat.style.scrollBehavior = "auto";
       el.chat.scrollTop = el.chat.scrollHeight;
       state.chatStickToBottom = true;
       pinBottomUntilSettled();
     } else {
       const maxTop = Math.max(0, el.chat.scrollHeight - el.chat.clientHeight);
+      const previous = el.chat.style.scrollBehavior;
+      el.chat.style.scrollBehavior = "auto";
       el.chat.scrollTop = Math.min(Math.max(0, Number(snapshot?.scrollTop) || 0), maxTop);
+      el.chat.style.scrollBehavior = previous;
       state.chatStickToBottom = false;
     }
-    requestAnimationFrame(() => { el.chat.style.scrollBehavior = previous; });
     queueMicrotask(updateScrollBottomVisibility);
   }
 
@@ -114,11 +127,9 @@
   function jumpToBottom() {
     const el = getEl();
     if (!el.chat) return;
-    const previous = el.chat.style.scrollBehavior;
     el.chat.style.scrollBehavior = "auto";
     el.chat.scrollTop = el.chat.scrollHeight;
     getState().chatStickToBottom = true;
-    requestAnimationFrame(() => { el.chat.style.scrollBehavior = previous; });
     pinBottomUntilSettled();
     queueMicrotask(updateScrollBottomVisibility);
   }

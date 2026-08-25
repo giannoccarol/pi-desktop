@@ -660,7 +660,7 @@ body.session-loading .chat-tab:not(.loading):not(.active) { opacity: .45; }
 .session-item.running .session-title::after { content: ""; width: 6px; height: 6px; display: inline-block; margin-left: 7px; border-radius: 50%; background: var(--amber); vertical-align: 1px; animation: tab-pulse 1.4s ease-in-out infinite; }
 @keyframes tab-pulse { 50% { opacity: .38; } }
 #main { position: relative; }
-#chat { min-height: 0; flex: 1; overflow-y: auto; overflow-anchor: none; scroll-behavior: smooth; }
+#chat { min-height: 0; flex: 1; overflow-y: auto; overflow-anchor: none; scroll-behavior: auto; }
 .scroll-bottom-btn {
   position: absolute;
   left: 50%;

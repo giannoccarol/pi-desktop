@@ -81,3 +81,10 @@ test("markdown: list continuation + blockquote recursion", () => {
   assert.match(out, /<blockquote>/);
   assert.match(out, /<p>para<\/p>/);
 });
+
+test("markdown: deeply nested quotes do not overflow the stack", () => {
+  const nested = `${">".repeat(4000)} quote`;
+  const out = md(nested);
+  assert.match(out, /<blockquote>/);
+  assert.match(out, /quote/);
+});
