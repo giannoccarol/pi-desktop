@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/giannoccarol/pi-desktop/compare/v1.2.0...v1.2.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* relax eslint no-undef for renderer to unblock OTA release ([e7a1278](https://github.com/giannoccarol/pi-desktop/commit/e7a12784f69e8c1976c14678c0f5350fe0129251))
+
 # [1.2.0](https://github.com/giannoccarol/pi-desktop/compare/v1.1.0...v1.2.0) (2026-08-25)
 
 
