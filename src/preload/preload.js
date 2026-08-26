@@ -98,7 +98,8 @@ contextBridge.exposeInMainWorld("piDesktop", {
 
   // events from main
   on(channel, cb) {
-    if (channel !== "pi:event" && channel !== "pi:maintenance-output" && channel !== "pi:package-output" && channel !== "pi:auth-request" && channel !== "update:state") return () => {};
+    const ALLOWED_CHANNELS = ["pi:event", "pi:maintenance-output", "pi:package-output", "pi:auth-request", "pi:tray-new-chat", "update:state"];
+    if (!ALLOWED_CHANNELS.includes(channel)) return () => {};
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on(channel, handler);
     listeners.set(cb, handler);

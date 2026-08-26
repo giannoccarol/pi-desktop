@@ -159,3 +159,17 @@ test("tray: module loads and exposes test helpers when mocked (integration)", as
   assert.match(content, /setContextMenu/);
   assert.match(content, /tray\.on\("click"/);
 });
+
+test("tray: 'Nuova chat' dal menu raggiunge il renderer (regression)", async () => {
+  const fs = await import("node:fs");
+  // 1. main invia l'evento al webContents
+  const main = fs.readFileSync(path.join(__dirname, "../../src/main/core/main.js"), "utf8");
+  assert.match(main, /pi:tray-new-chat/);
+  // 2. preload espone il canale nella allowlist di on()
+  const preload = fs.readFileSync(path.join(__dirname, "../../src/preload/preload.js"), "utf8");
+  assert.match(preload, /["']pi:tray-new-chat["']/);
+  // 3. bootstrap sottoscrive e invoca newChat
+  const bootstrap = fs.readFileSync(path.join(__dirname, "../../src/renderer/core/bootstrap.js"), "utf8");
+  assert.match(bootstrap, /api\.on\(\s*["']pi:tray-new-chat["']/);
+  assert.match(bootstrap, /piSession\?\.newChat/);
+});

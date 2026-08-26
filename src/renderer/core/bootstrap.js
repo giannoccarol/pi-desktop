@@ -158,6 +158,10 @@
 
     el.newChat.addEventListener("click", () => (window.newChat||window.piSession?.newChat)?.());
     el.topNewChat.addEventListener("click", () => (window.newChat||window.piSession?.newChat)?.());
+    // "Nuova chat" dal menu tray (main invia pi:tray-new-chat dopo showWindow)
+    if (api && typeof api.on === "function") {
+      api.on("pi:tray-new-chat", () => { (window.newChat||window.piSession?.newChat)?.(); });
+    }
     el.commandsBtn.addEventListener("click", ()=> (window.openCommandPalette||window.piPalette?.openCommandPalette)?.());
     el.treeBtn.addEventListener("click", ()=> (window.openSessionTree||window.piSession?.openSessionTree)?.());
     el.sessionToolsBtn.addEventListener("click", ()=> (window.openSessionTools||window.piSession?.openSessionTools)?.());
