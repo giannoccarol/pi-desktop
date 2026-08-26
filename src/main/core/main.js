@@ -26,6 +26,12 @@ if (!app.isPackaged) {
   app.setPath("userData", path.join(app.getPath("appData"), "Pi Desktop (dev)"));
 }
 
+// Override esplicito via env: usato dalla suite e2e (Playwright) per isolare
+// completamente lo stato dell'app sotto test.
+if (process.env.PI_DESKTOP_USER_DATA) {
+  app.setPath("userData", process.env.PI_DESKTOP_USER_DATA);
+}
+
 let win = null;
 let tray = null;
 let settings = null;
