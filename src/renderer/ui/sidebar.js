@@ -294,10 +294,37 @@ async function refreshSessions() {
   }
 }
 
+// Firma del rendering sidebar: se nulla e' cambiato si salta la ricostruzione.
+// Prima veniva ricostruito TUTTO il DOM ad ogni chiamata (anche a ogni tick di
+// polling invariato ogni 10s): churn DOM, focus/locator instabili, costo O(n).
+// Le etichette relative al tempo si aggiornano comunque grazie al bucket minuto.
+let lastProjectsSig = null;
+function projectsRenderSignature(q, projects) {
+  const s = window.piStore ? window.piStore.state : {};
+  return JSON.stringify([
+    q,
+    window.i18n?.getLang?.() || "",
+    Math.floor(Date.now() / 60000),
+    s.settings?.cwd ?? null,
+    s.activeSessionFile ?? null,
+    s.activeTabId ?? null,
+    Boolean(s.creatingChat),
+    s.openingSessionFile ?? null,
+    s.openProjectMenu ?? null,
+    [...(s.expandedProjects || [])].sort(),
+    [...(s.projectLimits || new Map())].map(([k, v]) => [k, v]),
+    (s.tabs || []).map((tb) => [tb.id, tb.sessionFile || "", Boolean(tb.busy)]),
+    projects.map((p) => [
+      p.path,
+      p.matchesProject ? 1 : 0,
+      p.sessions.map((x) => [x.file, x.modified, x.name || "", x.preview || "", x.busy ? 1 : 0, x.tabId || "", x.hasName ? 1 : 0]),
+    ]),
+  ]);
+}
+
 function renderProjects() {
   const q = (el.sessionSearch.value || "").toLowerCase().trim();
   const previousScrollTop = el.projectsList.scrollTop;
-  el.projectsList.innerHTML = "";
   const projects = configuredProjects().map((projectPath) => {
     const sessions = sessionsForProject(projectPath);
     const matchesProject = `${basename(projectPath)} ${projectPath}`.toLowerCase().includes(q);
@@ -306,6 +333,15 @@ function renderProjects() {
     );
     return { path: projectPath, sessions, matchesProject, matchingSessions };
   }).filter((project) => !q || project.matchesProject || project.matchingSessions.length);
+
+  const sig = projectsRenderSignature(q, projects);
+  if (sig === lastProjectsSig && el.projectsList.childElementCount > 0) {
+    // Nulla e' cambiato: conserva il DOM esistente (niente rebuild, niente churn).
+    el.projectsList.scrollTop = previousScrollTop;
+    return;
+  }
+  lastProjectsSig = sig;
+  el.projectsList.innerHTML = "";
 
   for (const project of projects) {
     const active = project.path === state.settings?.cwd;

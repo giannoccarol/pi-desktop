@@ -154,7 +154,11 @@
     if(!completed||!isCurrent()) return false;
     if(window.piChat?.clearChat) window.piChat.clearChat();
     else { liveMessages.innerHTML=""; state.streamAssistant=null; state.tools.clear(); }
-    liveMessages.replaceChildren(...staging.childNodes);
+    // Move via fragment: niente spread di migliaia di nodi come argomenti
+    // (limiti di stack/arita') e un'unica inserzione nel DOM reale.
+    const moveFrag=document.createDocumentFragment();
+    while(staging.firstChild) moveFrag.appendChild(staging.firstChild);
+    liveMessages.appendChild(moveFrag);
     window.piUi?.refreshIcons?.();
     return true;
   }
@@ -194,6 +198,7 @@
   async function openHistorySession(session){
     if(state.creatingChat) return;
     const generation=++state.switchGeneration;
+    try { historyState.file = null; } catch {} // la storia progressiva riparte pulita
     window.piSidebar?.stashActiveTabContext?.();
     let painted=null;
     let stage="open";
@@ -260,6 +265,90 @@
       if(generation===state.switchGeneration) clearSessionLoading();
     }
   }
+  // --- Cronologia progressiva (#perf): le chat lunghissime aprono con la
+  // finestra di contesto del runtime (ultimi ~100 messaggi). Scrollando in cima,
+  // i messaggi piu' vecchi vengono precaricati a chunk dal file JSONL completo
+  // (gia' letto da sessions:preview), mantenendo l'ancora di scroll.
+  const historyState = { file: null, full: null, start: -1, loading: false };
+  const HISTORY_CHUNK = 150;
+
+  async function ensureFullHistory(file) {
+    if (historyState.file === file && historyState.full) return historyState.full;
+    const preview = await api.previewSession(file).catch(() => null);
+    const raw = preview?.messages || [];
+    const full = (window.piChatUtils?.collapseRetryAttempts ?? ((m) => m))(raw);
+    historyState.file = file;
+    historyState.full = full;
+    historyState.start = -1; // ancora da allineare alla finestra renderizzata
+    return full;
+  }
+
+  async function loadOlderHistory() {
+    const s = state;
+    const file = s.activeSessionFile;
+    const c = el.chat || document.querySelector("#chat");
+    if (!file || !c || historyState.loading) return null;
+    // Guardia sul DOM reale: serve una conversazione gia' renderizzata
+    const msgsElNow = el.messages || document.querySelector("#messages");
+    if (!msgsElNow || msgsElNow.children.length === 0) return null;
+    const g0 = s.switchGeneration;
+    historyState.loading = true;
+    try {
+      const full = await ensureFullHistory(file);
+      if (g0 !== s.switchGeneration || !full.length) return null;
+      if (historyState.start < 0) {
+        // Allinea la finestra: quello che mostra il runtime sono gli ultimi N
+        const gm = await api.getMessages(s.activeTabId);
+        if (g0 !== s.switchGeneration) return null;
+        const cur = gm && gm.messages ? gm.messages : (Array.isArray(gm) ? gm : []);
+        historyState.start = Math.max(0, full.length - cur.length);
+        if (historyState.start === 0) return null; // gia' a inizio file
+      }
+      const from = Math.max(0, historyState.start - HISTORY_CHUNK);
+      const count = historyState.start - from;
+      if (count <= 0) return null;
+
+      // Pairing tool-call/result sull'intero storico, render su staging
+      const results = new Map();
+      for (const m of full) if (m.role === "toolResult" && m.toolCallId) results.set(m.toolCallId, m);
+      const consumed = new Set();
+      const renderFn = window.piChat?.renderFinalMessage || window.renderFinalMessage;
+      const staging = document.createElement("div");
+      const savedMsgs = el.messages;
+      el.messages = staging;
+      try {
+        for (let i = from; i < historyState.start; i++) {
+          try { renderFn(full[i], { results, consumed }); } catch { /* salta messaggi problematici */ }
+        }
+      } finally { el.messages = savedMsgs; }
+      if (!staging.firstChild) { historyState.start = from; return count; }
+
+      // Ancora di scroll: aggiungi sopra senza far saltare la viewport
+      const prevSH = c.scrollHeight, prevST = c.scrollTop;
+      const wasStick = s.chatStickToBottom;
+      s.chatStickToBottom = false;
+      const frag = document.createDocumentFragment();
+      while (staging.firstChild) frag.appendChild(staging.firstChild);
+      savedMsgs.insertBefore(frag, savedMsgs.firstChild);
+      c.scrollTop = c.scrollHeight - prevSH + prevST;
+      s.chatStickToBottom = wasStick;
+      historyState.start = from;
+      window.piUi?.refreshIcons?.();
+      window.piUi?.updateScrollBottomVisibility?.();
+      return count;
+    } finally {
+      historyState.loading = false;
+    }
+  }
+
+  // Auto-trigger vicino allo scroll-top
+  try {
+    (el.chat || document.querySelector("#chat"))?.addEventListener("scroll", () => {
+      const c = el.chat || document.querySelector("#chat");
+      if (c && c.scrollTop <= 140) loadOlderHistory().catch(() => {});
+    }, { passive: true });
+  } catch {}
+
   // expose for app.js compat
   window.piSessionView={
     getCachedSessionSnapshot, getCachedSessionMessages, cacheSessionMessages,
@@ -267,6 +356,7 @@
     markSessionCacheDirty, markActiveCacheDirty, refreshSessionCache,
     setSessionLoading, clearSessionLoading, renderConversation,
     reloadConversationFromRuntime, openHistorySession,
+    loadOlderHistory,
     _refreshHeader: window.refreshHeaderFromState || null,
   };
   // also expose globals expected by inline handlers

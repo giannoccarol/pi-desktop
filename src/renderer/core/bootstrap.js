@@ -557,16 +557,28 @@
     ]);
     el.emptyState.classList.remove("hidden");
     el.input.focus();
-
-    setInterval(() => {
-      (window.refreshSessions||window.piSidebar?.refreshSessions)?.();
-      (window.refreshPiStatus||window.piStatus?.refreshPiStatus)?.();
-      (window.refreshGitStatus||window.piStatus?.refreshGitStatus)?.();
-    }, 10000);
   }
 
   window.piBootstrap = { wireUi, boot };
   window.wireUi = wireUi;
   window.boot = boot;
+
+  // Polling di stato: in pausa quando la finestra e' nascosta (CPU/batteria),
+  // con refresh immediato al ritorno in primo piano. Registrato a module scope
+  // cosi' esiste subito, indipendentemente dal completamento di boot().
+  // Esposto come __piPollTick per i test e2e.
+  async function pollTick() {
+    if (document.hidden) return;
+    await Promise.allSettled([
+      (window.refreshSessions || window.piSidebar?.refreshSessions)?.(),
+      (window.refreshPiStatus || window.piStatus?.refreshPiStatus)?.(),
+      (window.refreshGitStatus || window.piStatus?.refreshGitStatus)?.(),
+    ]);
+  }
+  window.__piPollTick = pollTick;
+  setInterval(pollTick, 10000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pollTick();
+  });
   if (typeof module !== "undefined" && module.exports) module.exports = { wireUi, boot };
 })();

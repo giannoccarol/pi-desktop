@@ -6,10 +6,11 @@
 import { test, expect } from "@playwright/test";
 import { launchApp, readManifest, piAvailable, saveMetrics, printStats, stats } from "./helpers/app.mjs";
 
-// Budget di regressione: molto sopra la media osservata ma abbastanza stretti
-// da bloccare un deterioramento netto dell'esperienza di switch.
-const BUDGET_P50_MS = 600;
-const BUDGET_P95_MS = 2000;
+// Budget di regressione post-ottimizzazioni: osservato p50~84ms / p95~135ms
+// su macchina dev (suite completa). Headroom ~4x per evitare flakes,
+// abbastanza stretti da bloccare deterioramenti netti dello switch.
+const BUDGET_P50_MS = 300;
+const BUDGET_P95_MS = 800;
 
 test.describe("perf: switch tra chat", () => {
   test.skip(!piAvailable(), "agente pi non disponibile");
