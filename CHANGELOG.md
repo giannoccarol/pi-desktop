@@ -1,3 +1,10 @@
+## [0.9.3](https://github.com/giannoccarol/pi-desktop/compare/v0.9.2...v0.9.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **renderer:** feedback sempre visibile per 'Nuova chat' dal menu tray ([8f1e56b](https://github.com/giannoccarol/pi-desktop/commit/8f1e56b4e580cde91f760194d1d38125525dfb07))
+
 ## [0.9.2](https://github.com/giannoccarol/pi-desktop/compare/v0.9.1...v0.9.2) (2026-08-26)
 
 
