@@ -1,3 +1,10 @@
+# [0.10.0](https://github.com/giannoccarol/pi-desktop/compare/v0.9.3...v0.10.0) (2026-08-26)
+
+
+### Features
+
+* **main:** override userData via env PI_DESKTOP_USER_DATA ([247aded](https://github.com/giannoccarol/pi-desktop/commit/247adedcd1a06da21fd422073ecd87002404163a))
+
 ## [0.9.3](https://github.com/giannoccarol/pi-desktop/compare/v0.9.2...v0.9.3) (2026-08-26)
 
 
