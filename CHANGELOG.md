@@ -1,3 +1,10 @@
+## [0.9.2](https://github.com/giannoccarol/pi-desktop/compare/v0.9.1...v0.9.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **main:** handoff di versione al secondo avvio + userData dev isolata ([7ba0a8f](https://github.com/giannoccarol/pi-desktop/commit/7ba0a8f0f202f44c1b5f969b7e82d20d699dba21))
+
 # [0.9.0](https://github.com/giannoccarol/pi-desktop/compare/v0.8.0...v0.9.0) (2026-08-25)
 
 
