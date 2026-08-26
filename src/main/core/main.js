@@ -17,6 +17,14 @@ const { createMentionService } = require("../services/mention-service");
 const gitService = require("../services/git-service");
 const ipcSanitize = require("../services/ipc-sanitize");
 const { UpdateService } = require("../updates/update-service");
+const { shouldHandoverToSecondInstance } = require("./single-instance");
+
+// In sviluppo usa una userData dedicata: evita che `npm start` collida con
+// l'istanza installata (stesso single-instance lock su ~/.config/Pi Desktop)
+// e che dev e produzione condividano settings/sessioni.
+if (!app.isPackaged) {
+  app.setPath("userData", path.join(app.getPath("appData"), "Pi Desktop (dev)"));
+}
 
 let win = null;
 let tray = null;
@@ -337,12 +345,32 @@ process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
 
-// Single instance lock.
-if (!app.requestSingleInstanceLock()) {
+// Single instance lock con handoff tra versioni.
+// La seconda istanza passa la propria versione come additionalData: se e' diversa
+// (app aggiornata/reinstallata), quella vecchia si spegne e rilancia dal binario
+// attualmente installato. Cosi' dopo un update il primo avvio mostra davvero la
+// nuova versione invece del vecchio processo rimasto vivo nel tray.
+const APP_VERSION = app.getVersion();
+let handingOverToNewVersion = false;
+
+if (!app.requestSingleInstanceLock({ version: APP_VERSION })) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
-    try { showWindow(); } catch (err) { console.warn("[second-instance] showWindow fallita:", err.message); }
+  app.on("second-instance", (_ev, _argv, additionalData) => {
+    if (handingOverToNewVersion) return;
+    if (!shouldHandoverToSecondInstance(APP_VERSION, additionalData)) {
+      try { showWindow(); } catch (err) { console.warn("[second-instance] showWindow fallita:", err.message); }
+      return;
+    }
+    handingOverToNewVersion = true;
+    const incoming = additionalData && typeof additionalData === "object" ? additionalData.version : "?";
+    console.log(`[single-instance] seconda istanza v${incoming} != attuale v${APP_VERSION}: riavvio sull'app aggiornata`);
+    try { app.relaunch({ args: process.argv.slice(1) }); } catch (err) { console.warn("[single-instance] relaunch fallito:", err.message); }
+    // Fallback: se quit resta appeso (tray/runtime occupati), forza l'uscita.
+    setTimeout(() => { try { app.exit(0); } catch {} }, 3000);
+    try { appUpdateService?.destroy(); } catch {}
+    try { runtime.stop(); } catch {}
+    app.quit();
   });
 
   app.whenReady().then(() => {
