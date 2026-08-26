@@ -52,3 +52,15 @@ git add -A && git commit -m "fix(renderer): ..."
 1. `npx electron . --enable-logging` → cerca `Uncaught ReferenceError` in console
 2. Verifica che ogni funzione usata in `wireUi()` (`src/renderer/app.js:2107`) sia definita e che il suo file sia in `index.html`
 3. `npm run verify` ti dirà esattamente quale modulo manca (`FAIL: renderer integrity`)
+
+## Test E2E Playwright
+
+Suite Electron end-to-end con mockup gigante (12 progetti / ~25k messaggi) e misurazione
+delle performance di switch/rendering. Documentazione completa: `docs/e2e-testing.md`.
+
+```bash
+npm run test:e2e        # intera suite (~30s, richiede il binario `pi` per le spec runtime)
+npm run test:e2e:perf   # solo misurazioni @perf con budget p50/p95
+```
+
+Le metriche finiscono in `e2e/.artifacts/metrics/`. Non serve `playwright install`.

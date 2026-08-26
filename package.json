@@ -18,6 +18,8 @@
     "verify:smoke": "node scripts/verify/smoke-electron.js",
     "prepare": "node scripts/hooks/install-hooks.js && node scripts/build/prepare-build-assets.js",
     "test": "node --test \"test/**/*.test.mjs\"",
+    "test:e2e": "playwright test -c e2e/playwright.config.mjs",
+    "test:e2e:perf": "playwright test -c e2e/playwright.config.mjs --grep @perf",
     "test:legacy": "node test/rpc.test.mjs",
     "lint": "eslint src --ext .js,.mjs",
     "lint:fix": "eslint src --ext .js,.mjs --fix",
@@ -27,6 +29,7 @@
     "release:assets": "node scripts/build/release-assets.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^10.0.1",
