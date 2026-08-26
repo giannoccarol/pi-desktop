@@ -158,9 +158,23 @@
 
     el.newChat.addEventListener("click", () => (window.newChat||window.piSession?.newChat)?.());
     el.topNewChat.addEventListener("click", () => (window.newChat||window.piSession?.newChat)?.());
-    // "Nuova chat" dal menu tray (main invia pi:tray-new-chat dopo showWindow)
+    // "Nuova chat" dal menu tray (main invia pi:tray-new-chat dopo showWindow).
+    // Se il tab corrente e' gia' una chat vuota, newSession lo riusa senza creare
+    // un nuovo tab (vedi RuntimeTabs.newSession): mostriamo comunque un feedback,
+    // cosi' l'azione dal menu non e' mai un no-op silenzioso.
     if (api && typeof api.on === "function") {
-      api.on("pi:tray-new-chat", () => { (window.newChat||window.piSession?.newChat)?.(); });
+      api.on("pi:tray-new-chat", async () => {
+        const previousTabId = state.activeTabId;
+        try {
+          await (window.newChat||window.piSession?.newChat)?.();
+        } finally {
+          setSidebarVisible(true);
+          if (state.activeTabId === previousTabId) {
+            toast("Sei già su una chat vuota: scrivi qui per iniziare", "info");
+          }
+          el.input?.focus();
+        }
+      });
     }
     el.commandsBtn.addEventListener("click", ()=> (window.openCommandPalette||window.piPalette?.openCommandPalette)?.());
     el.treeBtn.addEventListener("click", ()=> (window.openSessionTree||window.piSession?.openSessionTree)?.());

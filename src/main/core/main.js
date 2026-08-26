@@ -190,7 +190,7 @@ function tTray(key, vars = {}) {
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     { label: tTray("tray.show"), click: () => showWindow() },
-    { label: tTray("tray.newChat"), click: () => { showWindow(); try { if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } catch {} } },
+    { label: tTray("tray.newChat"), click: () => { console.log("[tray] nuova chat richiesta"); showWindow(); try { if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } catch {} } },
     { type: "separator" },
     { label: tTray("tray.quit"), role: "quit" },
   ]);
