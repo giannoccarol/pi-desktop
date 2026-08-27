@@ -1,3 +1,10 @@
+# [0.16.0](https://github.com/giannoccarol/pi-desktop/compare/v0.15.0...v0.16.0) (2026-08-27)
+
+
+### Features
+
+* **ui:** enhance search and session management features ([503cf15](https://github.com/giannoccarol/pi-desktop/commit/503cf15c62759ba614cad2bf089e703202adcfe4))
+
 # [0.15.0](https://github.com/giannoccarol/pi-desktop/compare/v0.14.3...v0.15.0) (2026-08-27)
 
 
