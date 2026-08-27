@@ -8,6 +8,19 @@ const path = require("path");
 const NPM_PACKAGE = "@earendil-works/pi-coding-agent";
 const REGISTRY_URL = `https://registry.npmjs.org/${NPM_PACKAGE}/latest`;
 
+const IS_WIN32 = process.platform === "win32";
+
+// npm global shims are .cmd/.bat on Windows and need a shell to be spawned.
+function needsShell(bin) {
+  return IS_WIN32 && /\.(cmd|bat)$/i.test(bin);
+}
+
+// npm global installs drop shims into `<prefix>`; on Windows this is %APPDATA%\npm.
+function npmGlobalBinDir() {
+  if (IS_WIN32 && process.env.APPDATA) return path.join(process.env.APPDATA, "npm");
+  return null;
+}
+
 /** GUI apps inherit a minimal PATH; augment it so we can find pi / npm. */
 function augmentedPath() {
   const extra = [
@@ -34,7 +47,7 @@ function run(bin, args, opts = {}) {
     execFile(
       bin,
       args,
-      { env: execEnv(), timeout: opts.timeout || 20000, encoding: "utf8", shell: opts.shell || false },
+      { env: execEnv(), timeout: opts.timeout || 20000, encoding: "utf8", shell: opts.shell || needsShell(bin), windowsHide: true },
       (err, stdout, stderr) => {
         resolve({ ok: !err, code: err && typeof err.code === "number" ? err.code : null, stdout: stdout || "", stderr: stderr || "", err: err ? String(err.message) : null });
       }
@@ -58,11 +71,23 @@ async function whichPi(customPath) {
     path.join(os.homedir(), "bin", "pi"),
     path.join(os.homedir(), ".npm-global", "bin", "pi"),
   ];
+  const npmBin = npmGlobalBinDir();
+  if (npmBin) {
+    candidates.push(path.join(npmBin, "pi.cmd"), path.join(npmBin, "pi.exe"), path.join(npmBin, "pi"));
+  }
   for (const c of candidates) {
     try {
       fs.accessSync(c, fs.constants.X_OK);
       return c;
     } catch {}
+  }
+  if (IS_WIN32) {
+    // Windows has no `which` / `/bin/sh`; resolve via `where`.
+    const res = await run("where.exe", ["pi"]).catch(() => ({ ok: false }));
+    const p = res.ok ? res.stdout.trim().split(/\r?\n/)[0] : "";
+    const found = p && fs.existsSync(p) ? p : null;
+    if (found) cachedPiPath = found;
+    return found;
   }
   const res = await run("which", ["pi"]).catch(() => ({ ok: false }));
   // Some shells need login PATH; fall back to sh -lc.
@@ -161,7 +186,7 @@ function runMaintenance(kind, settings, onOutput) {
           args = ["install", "-g", "--ignore-scripts", NPM_PACKAGE];
         }
         emit(`$ ${cmd} ${args.join(" ")}`);
-        const child = spawn(cmd, args, { env: execEnv(), stdio: ["ignore", "pipe", "pipe"] });
+        const child = spawn(cmd, args, { env: execEnv(), stdio: ["ignore", "pipe", "pipe"], shell: needsShell(cmd), windowsHide: true });
         child.stdout.on("data", (d) => d.toString().split("\n").forEach(emit));
         child.stderr.on("data", (d) => d.toString().split("\n").forEach(emit));
         child.on("error", async (err) => {
