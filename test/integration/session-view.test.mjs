@@ -11,7 +11,7 @@ test("session-view extracted: app.js delegates to piSessionView",()=>{
   assert.match(app,/function getCachedSessionMessages/);
   assert.match(app,/function openHistorySession/);
   assert.match(app,/toast.openSessionFail/);
-  assert.match(app,/toast.sessionTruncated/);
+  assert.doesNotMatch(app,/toast\.sessionTruncated/);
   assert.match(app,/\[openHistorySession\] pin/);
   const main=fs.readFileSync(path.join(root,"src/renderer/core/app.js"),"utf8");
   assert.match(main,/piSessionView/);

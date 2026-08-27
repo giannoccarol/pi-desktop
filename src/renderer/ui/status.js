@@ -112,11 +112,14 @@ async function setupAppUpdates() {
     const icon = btn.querySelector("i");
     const label = btn.querySelector("span");
     btn.addEventListener("click", async () => {
-      if (appUpdateState?.status === "available") {
+      const phase = updateActionPhase(appUpdateState);
+      if (phase === "download") {
         btn.disabled = true;
         const res = await api.downloadAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      } else if (appUpdateState?.status === "downloaded") {
+        if (res?.state) handleAppUpdateState(res.state);
+        else if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+        btn.disabled = false;
+      } else if (phase === "install") {
         btn.disabled = true;
         toast(t("updates.app.pacmanInstalling"), "info", 8000);
         const res = await api.installAppUpdate();
@@ -138,8 +141,8 @@ async function setupAppUpdates() {
         await api.relaunchApp();
         return;
       }
-      const s = appUpdateState?.status;
-      if (s === "downloaded") {
+      const phase = updateActionPhase(appUpdateState);
+      if (phase === "install") {
         settingsBtn.disabled = true;
         if (settingsStatus) settingsStatus.textContent = t("updates.app.pacmanInstalling");
         const res = await api.installAppUpdate();
@@ -150,11 +153,13 @@ async function setupAppUpdates() {
         settingsBtn.disabled = false;
         return;
       }
-      if (s === "available") {
+      if (phase === "download") {
+        settingsBtn.disabled = true;
         const res = await api.downloadAppUpdate();
         if (res?.state) handleAppUpdateState(res.state);
         else if (res.manual || res.opened) toast(t("updates.app.manualOpened"), "info", 9000);
         else if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+        settingsBtn.disabled = false;
         return;
       }
       settingsBtn.disabled = true;
@@ -172,6 +177,32 @@ async function setupAppUpdates() {
   } catch {}
 }
 
+function updateVersionIsNewer(state) {
+  const current = String(state?.currentVersion || "");
+  const available = String(state?.availableVersion || "");
+  if (!current || !available) return false;
+  const normalize = (value) => String(value).split(/[.-]/).map((part) => parseInt(part, 10) || 0);
+  const left = normalize(available);
+  const right = normalize(current);
+  const len = Math.max(left.length, right.length, 3);
+  for (let i = 0; i < len; i += 1) {
+    const delta = (left[i] || 0) - (right[i] || 0);
+    if (delta > 0) return true;
+    if (delta < 0) return false;
+  }
+  return false;
+}
+
+function updateActionPhase(state) {
+  if (!state) return "check";
+  if (state.status === "downloading") return "downloading";
+  if (state.status === "checking") return "checking";
+  if (state.status === "downloaded" && state.cachedInstall && state.pendingPackagePath) return "install";
+  if (state.status === "available" || updateVersionIsNewer(state)) return "download";
+  if (state.status === "downloaded") return "install";
+  return "check";
+}
+
 function manualUpdateHint(state) {
   if (state.cachedInstall && state.pendingPackagePath) {
     return t("updates.app.cachedReady", { version: state.availableVersion || "?" });
@@ -185,14 +216,16 @@ function handleAppUpdateState(state) {
   appUpdateState = state;
   const manual = state.autoInstall === false;
   const cached = Boolean(state.cachedInstall);
+  const phase = updateActionPhase(state);
   const btn = el.btnAppUpdate;
   if (btn) {
     const icon = btn.querySelector("i");
     const label = btn.querySelector("span");
-    const visible = ["available", "downloading", "downloaded"].includes(String(state.status));
+    const visible = ["available", "downloading", "downloaded"].includes(String(state.status))
+      || updateVersionIsNewer(state);
     btn.classList.toggle("hidden", !visible);
     btn.disabled = state.status === "downloading" || state.status === "checking";
-    if (state.status === "available") {
+    if (state.status === "available" || (updateVersionIsNewer(state) && state.status !== "downloading")) {
       if (manual) {
         if (icon) icon.setAttribute("data-lucide", "download");
         if (label) label.textContent = t("settings.downloadAvailable");
@@ -257,23 +290,23 @@ function handleAppUpdateState(state) {
         ? t("updates.app.cachedReady", { version: state.availableVersion || "?" })
         : manual ? manualUpdateHint(state) : t("settings.restartToUpdate");
     }
-    else if (state.status === "idle") el.checkAppUpdateStatus.textContent = t("settings.upToDate");
+    else if (state.status === "idle" && !updateVersionIsNewer(state)) el.checkAppUpdateStatus.textContent = t("settings.upToDate");
     else if (state.status === "error" && state.error) el.checkAppUpdateStatus.textContent = state.error;
-    else if (state.availableVersion) el.checkAppUpdateStatus.textContent = `${t("settings.updateAvailable")} (${state.availableVersion})`;
+    else if (updateVersionIsNewer(state)) el.checkAppUpdateStatus.textContent = `${t("settings.updateAvailable")} (${state.availableVersion})`;
   }
   if (el.btnCheckAppUpdate) {
-    if (state.status === "available") {
-      el.btnCheckAppUpdate.textContent = manual ? t("settings.downloadAvailable") : t("settings.downloadAvailable");
+    if (phase === "download") {
+      el.btnCheckAppUpdate.textContent = t("settings.downloadAvailable");
       el.btnCheckAppUpdate.disabled = false;
-    } else if (state.status === "downloading") {
+    } else if (phase === "downloading") {
       el.btnCheckAppUpdate.textContent = t("updates.app.downloading", { progress: state.progress || 0 });
       el.btnCheckAppUpdate.disabled = true;
-    } else if (state.status === "downloaded") {
+    } else if (phase === "install") {
       el.btnCheckAppUpdate.textContent = cached
         ? t("updates.app.installPackage")
         : manual ? t("settings.openRelease") : t("settings.restartToUpdate");
       el.btnCheckAppUpdate.disabled = false;
-    } else if (state.status === "checking") {
+    } else if (phase === "checking") {
       el.btnCheckAppUpdate.textContent = t("settings.checking");
       el.btnCheckAppUpdate.disabled = true;
     } else {
