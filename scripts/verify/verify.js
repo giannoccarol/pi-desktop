@@ -15,7 +15,10 @@ function log(step, msg) {
 }
 
 function run(cmd, args, opts = {}) {
-  const res = spawnSync(cmd, args, { cwd: root, encoding: "utf8", ...opts });
+  // Su Windows npm/npx sono shim .cmd: spawnSync diretto fallisce (ENOENT),
+  // serve una shell.
+  const needShell = process.platform === "win32" && /^(npm|npx)$/i.test(cmd);
+  const res = spawnSync(cmd, args, { cwd: root, encoding: "utf8", shell: needShell, ...opts });
   const out = (res.stdout || "") + (res.stderr || "");
   return { ok: res.status === 0, out, status: res.status };
 }
@@ -78,7 +81,7 @@ let failed = false;
   console.log(r.out.slice(0, 4000));
   if (r.status !== 0 && r.out.includes("error")) {
     // se ci sono errori veri
-    const errCheck = spawnSync("npx", ["eslint", "src", "--ext", ".js,.mjs", "-f", "json"], { cwd: root, encoding: "utf8" });
+    const errCheck = spawnSync("npx", ["eslint", "src", "--ext", ".js,.mjs", "-f", "json"], { cwd: root, encoding: "utf8", shell: process.platform === "win32" });
     try {
       const json = JSON.parse(errCheck.stdout);
       const errors = json.reduce((a, f) => a + f.errorCount, 0);

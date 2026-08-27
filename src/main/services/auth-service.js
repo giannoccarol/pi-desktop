@@ -11,17 +11,26 @@ let cachedRoot = null;
 async function findPackageRoot(settings) {
   const bin = await whichPi(settings.piPath || undefined);
   if (!bin) throw new Error("pi non installato");
-  let cursor = path.dirname(fs.realpathSync(bin));
-  while (true) {
-    const manifest = path.join(cursor, "package.json");
-    if (fs.existsSync(manifest)) {
-      try {
-        if (JSON.parse(fs.readFileSync(manifest, "utf8")).name === "@earendil-works/pi-coding-agent") return cursor;
-      } catch {}
+  const binDir = path.dirname(fs.realpathSync(bin));
+  const startDirs = [binDir];
+  if (process.platform === "win32") {
+    // On Windows the npm global shim (.cmd) is a real file in <prefix>\npm, not
+    // a symlink into the package; the package lives in the sibling node_modules.
+    startDirs.push(path.join(binDir, "node_modules", "@earendil-works", "pi-coding-agent"));
+  }
+  for (const start of startDirs) {
+    let cursor = start;
+    while (true) {
+      const manifest = path.join(cursor, "package.json");
+      if (fs.existsSync(manifest)) {
+        try {
+          if (JSON.parse(fs.readFileSync(manifest, "utf8")).name === "@earendil-works/pi-coding-agent") return cursor;
+        } catch {}
+      }
+      const parent = path.dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
     }
-    const parent = path.dirname(cursor);
-    if (parent === cursor) break;
-    cursor = parent;
   }
   throw new Error("Installazione di pi non compatibile con il login integrato");
 }
