@@ -1,3 +1,10 @@
+# [0.14.0](https://github.com/giannoccarol/pi-desktop/compare/v0.13.1...v0.14.0) (2026-08-27)
+
+
+### Features
+
+* **settings:** enhance user settings management and notifications ([9d3eab4](https://github.com/giannoccarol/pi-desktop/commit/9d3eab4deca5e2adc92d7936194abfdbb57ff2d8))
+
 ## [0.13.1](https://github.com/giannoccarol/pi-desktop/compare/v0.13.0...v0.13.1) (2026-08-27)
 
 
