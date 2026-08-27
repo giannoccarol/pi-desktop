@@ -74,6 +74,42 @@ function findPendingPackage(packageType, pendingDir = getUpdaterPendingDir()) {
   return files[0] || null;
 }
 
+function parseVersionFromPackageName(filename) {
+  const match = String(filename || "").match(/(\d+\.\d+\.\d+)/);
+  return match ? match[1] : null;
+}
+
+function compareVersions(a, b) {
+  const normalize = (value) => String(value || "").split(/[.-]/).map((part) => parseInt(part, 10) || 0);
+  const left = normalize(a);
+  const right = normalize(b);
+  const len = Math.max(left.length, right.length, 3);
+  for (let i = 0; i < len; i += 1) {
+    const delta = (left[i] || 0) - (right[i] || 0);
+    if (delta !== 0) return delta < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+function clearPendingPackages(packageType, pendingDir = getUpdaterPendingDir()) {
+  const ext = LINUX_PACKAGE_EXT[packageType];
+  if (!ext || !fs.existsSync(pendingDir)) return;
+  for (const name of fs.readdirSync(pendingDir)) {
+    if (!name.endsWith(ext)) continue;
+    try { fs.unlinkSync(path.join(pendingDir, name)); } catch {}
+  }
+  try {
+    const infoPath = path.join(pendingDir, "update-info.json");
+    if (fs.existsSync(infoPath)) fs.unlinkSync(infoPath);
+  } catch {}
+}
+
+function pendingPackageNeedsInstall(packagePath, currentVersion) {
+  const pendingVersion = parseVersionFromPackageName(path.basename(packagePath));
+  if (!pendingVersion || !currentVersion) return true;
+  return compareVersions(pendingVersion, currentVersion) > 0;
+}
+
 function installLinuxPackage(packagePath, packageType, spawnImpl = spawn) {
   return new Promise((resolve) => {
     const args = packageType === "deb"
@@ -207,16 +243,41 @@ class UpdateService {
   }
 
   getPendingPackagePath() {
-    return findPendingPackage(this.packageType, getUpdaterPendingDir());
+    const pending = findPendingPackage(this.packageType, getUpdaterPendingDir());
+    if (!pending) return null;
+    if (!pendingPackageNeedsInstall(pending, this.app.getVersion())) return null;
+    return pending;
+  }
+
+  reconcilePendingPackage() {
+    if (!supportsCachedPackageInstall(this.packageType)) return;
+    const pendingDir = getUpdaterPendingDir();
+    const pending = findPendingPackage(this.packageType, pendingDir);
+    if (!pending) return;
+    if (!pendingPackageNeedsInstall(pending, this.app.getVersion())) {
+      clearPendingPackages(this.packageType, pendingDir);
+      if (["available", "downloaded", "downloading"].includes(this.state.status)) {
+        this.setState({
+          status: "idle",
+          availableVersion: null,
+          progress: 0,
+          error: null,
+        });
+      }
+      return;
+    }
+    if (["idle", "available", "downloaded"].includes(this.state.status)) {
+      this.setState({
+        status: "downloaded",
+        availableVersion: parseVersionFromPackageName(path.basename(pending)) || this.state.availableVersion,
+        progress: 100,
+        error: null,
+      });
+    }
   }
 
   syncPendingPackageState() {
-    if (!supportsCachedPackageInstall(this.packageType)) return;
-    const pending = this.getPendingPackagePath();
-    if (!pending) return;
-    if (["idle", "available", "downloaded"].includes(this.state.status)) {
-      this.setState({ status: "downloaded", progress: 100, error: null });
-    }
+    this.reconcilePendingPackage();
   }
 
   getState() {
@@ -299,8 +360,15 @@ class UpdateService {
       if (pending && (this.state.status === "downloaded" || this.state.status === "available")) {
         const result = await installLinuxPackage(pending, this.packageType, this.spawnImpl);
         if (!result.success) return { success: false, error: result.error || "Installazione fallita" };
+        clearPendingPackages(this.packageType, getUpdaterPendingDir());
+        this.setState({
+          status: "idle",
+          availableVersion: null,
+          progress: 0,
+          error: null,
+        });
         this.timers.setImmediate(() => this.app.quit());
-        return { success: true, installed: true, packagePath: pending };
+        return { success: true, installed: true, packagePath: pending, restartRequired: true };
       }
       if (this.state.status === "available" || this.state.status === "downloaded") {
         this.shell.openExternal(RELEASE_URL).catch(() => {});
@@ -337,6 +405,10 @@ module.exports = {
   supportsCachedPackageInstall,
   getUpdaterPendingDir,
   findPendingPackage,
+  parseVersionFromPackageName,
+  compareVersions,
+  clearPendingPackages,
+  pendingPackageNeedsInstall,
   installLinuxPackage,
   RELEASE_URL,
 };
