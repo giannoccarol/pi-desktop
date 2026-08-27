@@ -22,7 +22,12 @@ class PiRuntime {
     this.starting = null;
     this.currentSessionFile = null;
     this._opChain = Promise.resolve();
+    this._recentLogs = [];
+    this._exitCount = 0;
   }
+
+  getRecentLogs() { return this._recentLogs.slice(-120); }
+  _pushLog(line) { const entry = `[${new Date().toISOString().slice(11,19)}] ${String(line).slice(0,800)}`; this._recentLogs.push(entry); if(this._recentLogs.length>200) this._recentLogs.splice(0,100); }
 
   _withLock(fn) {
     const run = this._opChain.then(() => fn());
@@ -96,12 +101,15 @@ class PiRuntime {
     const startPromise = new Promise((resolve, reject) => {
       let settled = false;
       const onExit = (info) => {
+        if (info.stderr) this._pushLog(`pi exit stderr: ${info.stderr.slice(0,500)}`);
+        else this._pushLog(`pi exit code=${info.code} signal=${info.signal||""}`);
         if (!settled) {
           settled = true;
           reject(new Error(info.stderr ? `pi è uscito subito: ${info.stderr.slice(0, 300)}` : "pi è uscito subito"));
         }
         this.exitInfo = info;
-        this._emit("pi-exit", { info });
+        this._exitCount++;
+        this._emit("pi-exit", { info, exitCount: this._exitCount });
       };
       markSpawned = () => {
         if (settled) return;
