@@ -173,6 +173,7 @@ async function runPi(args, settings, onOutput) {
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      shell: process.platform === "win32" && /\.(cmd|bat)$/i.test(bin),
     });
     let stdout = "";
     let stderr = "";

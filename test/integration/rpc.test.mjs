@@ -208,6 +208,22 @@ test("updater: compares installed and registry semantic versions", () => {
   assert.equal(semverCompare("0.85.0", "0.84.3"), 1);
 });
 
+test("updater: finds the npm global pi shim on Windows via %APPDATA%", { skip: process.platform !== "win32" }, async () => {
+  const { whichPi } = require("../../src/main/updates/updater.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-desktop-appdata-"));
+  const prev = process.env.APPDATA;
+  try {
+    process.env.APPDATA = dir;
+    fs.mkdirSync(path.join(dir, "npm"));
+    fs.writeFileSync(path.join(dir, "npm", "pi.cmd"), "@echo off\r\n");
+    assert.equal(await whichPi(undefined), path.join(dir, "npm", "pi.cmd"));
+  } finally {
+    if (prev === undefined) delete process.env.APPDATA;
+    else process.env.APPDATA = prev;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("providers: preserves OAuth entries, masks keys, and writes auth.json with mode 0600", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-desktop-auth-"));
   const authFile = path.join(dir, "auth.json");
