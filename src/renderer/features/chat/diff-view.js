@@ -75,13 +75,23 @@
   }
 
   function getDiffMode() {
+    if (root.piUiSettings?.diffMode) {
+      return root.piUiSettings.diffMode(root.piStore?.state?.settings);
+    }
     try {
       const v = (typeof localStorage !== "undefined" && localStorage.getItem("pi-diff-mode")) || "unified";
       return v === "split" ? "split" : "unified";
     } catch { return "unified"; }
   }
   function setDiffMode(mode) {
-    try { if (typeof localStorage !== "undefined") localStorage.setItem("pi-diff-mode", mode === "split" ? "split" : "unified"); } catch {}
+    const resolved = mode === "split" ? "split" : "unified";
+    if (root.piUiSettings?.persistDiffMode && root.piDesktop?.setSettings) {
+      root.piUiSettings.persistDiffMode(root.piDesktop, resolved).catch((err) => {
+        console.warn("[diff-mode]", err);
+      });
+    } else {
+      try { if (typeof localStorage !== "undefined") localStorage.setItem("pi-diff-mode", resolved); } catch {}
+    }
   }
 
   function renderReadPreview(toolName, args, output) {

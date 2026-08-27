@@ -26,6 +26,22 @@ function firstUserText(content) {
 // while mtime+size are unchanged, so repeated listings stay cheap even with
 // thousands of sessions on disk.
 const sessionMetaCache = new Map(); // file -> { mtimeMs, size, parsed }
+const sessionMessagesCache = new Map(); // file -> { mtimeMs, size, messages }
+
+function readSessionMessagesCached(file) {
+  let st;
+  try {
+    st = fs.statSync(file);
+  } catch {
+    return [];
+  }
+  const cached = sessionMessagesCache.get(file);
+  if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) return cached.messages;
+  const messages = readSessionMessages(file).messages;
+  if (sessionMessagesCache.size > 24) sessionMessagesCache.clear();
+  sessionMessagesCache.set(file, { mtimeMs: st.mtimeMs, size: st.size, messages });
+  return messages;
+}
 
 /**
  * Parse one session file. Only reads the header plus a bounded number of
@@ -113,7 +129,8 @@ function parseSessionFile(file, stat = null) {
     if (sessionMetaCache.size > 5000) sessionMetaCache.clear();
     sessionMetaCache.set(file, { mtimeMs: st.mtimeMs, size: st.size, parsed });
     return parsed;
-  } catch {
+  } catch (err) {
+    console.warn("[sessions] parse fallito:", file, err?.message || err);
     return null;
   } finally {
     try {
@@ -196,7 +213,7 @@ function readSessionMessages(file) {
 }
 
 function readSessionMessagesSlice(file, start, end) {
-  const { messages } = readSessionMessages(file);
+  const messages = readSessionMessagesCached(file);
   const from = Math.max(0, start | 0);
   const to = Math.min(messages.length, end | 0);
   if (to <= from) return [];
@@ -204,7 +221,7 @@ function readSessionMessagesSlice(file, start, end) {
 }
 
 function countSessionMessages(file) {
-  return readSessionMessages(file).messages.length;
+  return readSessionMessagesCached(file).length;
 }
 
 module.exports = {

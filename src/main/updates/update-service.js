@@ -1,10 +1,19 @@
 "use strict";
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { spawn } = require("child_process");
 const { app, shell } = require("electron");
 
 const RELEASE_URL = "https://github.com/giannoccarol/pi-desktop/releases/latest";
+const UPDATER_CACHE_DIR = "pi-desktop-updater";
+
+const LINUX_PACKAGE_EXT = {
+  pacman: ".pacman",
+  deb: ".deb",
+  rpm: ".rpm",
+};
 
 let autoUpdater;
 try {
@@ -21,9 +30,100 @@ function readPackageType() {
   }
 }
 
+/** Fallback when package-type was not bundled (builds before 0.13). */
+function inferPackageType(appRef = app) {
+  const fromFile = readPackageType();
+  if (fromFile) return fromFile;
+  if (process.platform === "win32") return "win";
+  if (process.platform === "darwin") return "mac";
+  if (process.platform !== "linux") return "";
+  const exe = typeof appRef.getPath === "function" ? String(appRef.getPath("exe") || "") : "";
+  if (process.env.APPIMAGE || exe.includes(".AppImage")) return "appimage";
+  // Pacman/deb/rpm installs under /usr or /opt — no auto-install via electron-updater.
+  return "pacman";
+}
+
 function supportsAutoInstall(platform, packageType) {
   if (platform === "win32" || platform === "darwin") return true;
   return packageType === "appimage";
+}
+
+function supportsCachedPackageInstall(packageType) {
+  return Object.prototype.hasOwnProperty.call(LINUX_PACKAGE_EXT, packageType);
+}
+
+function getUpdaterPendingDir(homedir = os.homedir()) {
+  const cacheRoot = process.env.XDG_CACHE_HOME || path.join(homedir, ".cache");
+  return path.join(cacheRoot, UPDATER_CACHE_DIR, "pending");
+}
+
+function findPendingPackage(packageType, pendingDir = getUpdaterPendingDir()) {
+  const ext = LINUX_PACKAGE_EXT[packageType];
+  if (!ext || !fs.existsSync(pendingDir)) return null;
+  const files = fs.readdirSync(pendingDir)
+    .filter((name) => name.endsWith(ext))
+    .map((name) => path.join(pendingDir, name))
+    .filter((filePath) => {
+      try {
+        return fs.statSync(filePath).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  return files[0] || null;
+}
+
+function parseVersionFromPackageName(filename) {
+  const match = String(filename || "").match(/(\d+\.\d+\.\d+)/);
+  return match ? match[1] : null;
+}
+
+function compareVersions(a, b) {
+  const normalize = (value) => String(value || "").split(/[.-]/).map((part) => parseInt(part, 10) || 0);
+  const left = normalize(a);
+  const right = normalize(b);
+  const len = Math.max(left.length, right.length, 3);
+  for (let i = 0; i < len; i += 1) {
+    const delta = (left[i] || 0) - (right[i] || 0);
+    if (delta !== 0) return delta < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+function clearPendingPackages(packageType, pendingDir = getUpdaterPendingDir()) {
+  const ext = LINUX_PACKAGE_EXT[packageType];
+  if (!ext || !fs.existsSync(pendingDir)) return;
+  for (const name of fs.readdirSync(pendingDir)) {
+    if (!name.endsWith(ext)) continue;
+    try { fs.unlinkSync(path.join(pendingDir, name)); } catch {}
+  }
+  try {
+    const infoPath = path.join(pendingDir, "update-info.json");
+    if (fs.existsSync(infoPath)) fs.unlinkSync(infoPath);
+  } catch {}
+}
+
+function pendingPackageNeedsInstall(packagePath, currentVersion) {
+  const pendingVersion = parseVersionFromPackageName(path.basename(packagePath));
+  if (!pendingVersion || !currentVersion) return true;
+  return compareVersions(pendingVersion, currentVersion) > 0;
+}
+
+function installLinuxPackage(packagePath, packageType, spawnImpl = spawn) {
+  return new Promise((resolve) => {
+    const args = packageType === "deb"
+      ? ["dpkg", "-i", packagePath]
+      : packageType === "rpm"
+        ? ["dnf", "install", "-y", packagePath]
+        : ["pacman", "-U", "--noconfirm", packagePath];
+    const child = spawnImpl("pkexec", args, { stdio: "ignore" });
+    child.on("error", (error) => resolve({ success: false, error: error.message }));
+    child.on("close", (code) => {
+      if (code === 0) resolve({ success: true });
+      else resolve({ success: false, error: `Installazione terminata con codice ${code}` });
+    });
+  });
 }
 
 class UpdateService {
@@ -33,6 +133,7 @@ class UpdateService {
       if (this.window && !this.window.isDestroyed()) this.window.webContents.send(channel, payload);
     });
     this.app = dependencies.app || app;
+    this.shell = dependencies.shell || shell;
     this.autoUpdater = dependencies.autoUpdater || autoUpdater;
     this.timers = {
       setTimeout: dependencies.setTimeout || setTimeout,
@@ -45,8 +146,9 @@ class UpdateService {
     this.startupTimer = null;
     this.timer = null;
     this.updaterListeners = [];
-    this.packageType = readPackageType();
+    this.packageType = inferPackageType(this.app);
     this.autoInstall = supportsAutoInstall(process.platform, this.packageType);
+    this.spawnImpl = dependencies.spawn || spawn;
     this.state = {
       status: this.app.isPackaged ? "idle" : "disabled",
       currentVersion: this.app.getVersion(),
@@ -101,17 +203,20 @@ class UpdateService {
       progress: Math.max(0, Math.min(100, Math.round(progress.percent || 0))),
       error: null,
     }));
-    this.listenToUpdater("update-downloaded", (info) => this.setState({
-      status: "downloaded",
-      availableVersion: info.version,
-      progress: 100,
-      error: null,
-    }));
+    this.listenToUpdater("update-downloaded", (info) => {
+      this.setState({
+        status: "downloaded",
+        availableVersion: info.version,
+        progress: 100,
+        error: null,
+      });
+    });
     this.listenToUpdater("error", (error) => this.setState({
       status: "error",
       error: error instanceof Error ? error.message : String(error),
     }));
 
+    this.syncPendingPackageState();
     this.startupTimer = this.timers.setTimeout(() => this.check(false), 15000);
     this.startupTimer.unref?.();
     this.timer = this.timers.setInterval(() => this.check(false), 6 * 60 * 60 * 1000);
@@ -137,8 +242,53 @@ class UpdateService {
     this.initialized = false;
   }
 
+  getPendingPackagePath() {
+    const pending = findPendingPackage(this.packageType, getUpdaterPendingDir());
+    if (!pending) return null;
+    if (!pendingPackageNeedsInstall(pending, this.app.getVersion())) return null;
+    return pending;
+  }
+
+  reconcilePendingPackage() {
+    if (!supportsCachedPackageInstall(this.packageType)) return;
+    const pendingDir = getUpdaterPendingDir();
+    const pending = findPendingPackage(this.packageType, pendingDir);
+    if (!pending) return;
+    if (!pendingPackageNeedsInstall(pending, this.app.getVersion())) {
+      clearPendingPackages(this.packageType, pendingDir);
+      if (["available", "downloaded", "downloading"].includes(this.state.status)) {
+        this.setState({
+          status: "idle",
+          availableVersion: null,
+          progress: 0,
+          error: null,
+        });
+      }
+      return;
+    }
+    if (["idle", "available", "downloaded"].includes(this.state.status)) {
+      this.setState({
+        status: "downloaded",
+        availableVersion: parseVersionFromPackageName(path.basename(pending)) || this.state.availableVersion,
+        progress: 100,
+        error: null,
+      });
+    }
+  }
+
+  syncPendingPackageState() {
+    this.reconcilePendingPackage();
+  }
+
   getState() {
-    return { ...this.state };
+    const state = { ...this.state, packageType: this.packageType, autoInstall: this.autoInstall };
+    const pending = supportsCachedPackageInstall(this.packageType) ? this.getPendingPackagePath() : null;
+    state.pendingPackage = pending ? path.basename(pending) : null;
+    if (!this.autoInstall && state.status === "downloaded" && !pending) {
+      state.status = "available";
+      state.progress = 0;
+    }
+    return state;
   }
 
   async check(manual = true) {
@@ -148,8 +298,11 @@ class UpdateService {
     if (!this.autoUpdater) {
       return { success: false, error: "Updater not available", state: this.getState() };
     }
-    if (["downloading", "downloaded"].includes(this.state.status)) {
+    if (this.autoInstall && ["downloading", "downloaded"].includes(this.state.status)) {
       return { success: false, skipped: true, state: this.getState() };
+    }
+    if (!this.autoInstall && this.state.status === "downloaded" && !this.getPendingPackagePath()) {
+      this.setState({ status: "available", progress: 0 });
     }
     try {
       await this.autoUpdater.checkForUpdates();
@@ -164,6 +317,28 @@ class UpdateService {
   }
 
   async download() {
+    if (!this.autoInstall) {
+      if (supportsCachedPackageInstall(this.packageType)) {
+        if (this.state.status === "downloaded" && this.getPendingPackagePath()) {
+          return { success: true, skipped: true, state: this.getState() };
+        }
+        if (this.state.status === "available" && this.autoUpdater) {
+          try {
+            await this.autoUpdater.downloadUpdate();
+            this.syncPendingPackageState();
+            return { success: true, state: this.getState() };
+          } catch (error) {
+            this.setState({ status: "error", error: error.message });
+            return { success: false, error: error.message, state: this.getState() };
+          }
+        }
+      }
+      if (this.state.status === "available" || this.state.status === "downloaded") {
+        await this.shell.openExternal(RELEASE_URL).catch(() => {});
+        return { success: true, manual: true, opened: true, state: this.getState() };
+      }
+      return { success: false, error: "No update is ready to download", state: this.getState() };
+    }
     if (this.state.status !== "available") {
       return { success: false, error: "No update is ready to download", state: this.getState() };
     }
@@ -179,16 +354,33 @@ class UpdateService {
     }
   }
 
-  install() {
+  async install() {
+    if (!this.autoInstall) {
+      const pending = supportsCachedPackageInstall(this.packageType) ? this.getPendingPackagePath() : null;
+      if (pending && (this.state.status === "downloaded" || this.state.status === "available")) {
+        const result = await installLinuxPackage(pending, this.packageType, this.spawnImpl);
+        if (!result.success) return { success: false, error: result.error || "Installazione fallita" };
+        clearPendingPackages(this.packageType, getUpdaterPendingDir());
+        this.setState({
+          status: "idle",
+          availableVersion: null,
+          progress: 0,
+          error: null,
+        });
+        this.timers.setImmediate(() => this.app.quit());
+        return { success: true, installed: true, packagePath: pending, restartRequired: true };
+      }
+      if (this.state.status === "available" || this.state.status === "downloaded") {
+        this.shell.openExternal(RELEASE_URL).catch(() => {});
+        return { success: true, manual: true, opened: true };
+      }
+      return { success: false, error: "No update is available" };
+    }
     if (this.state.status !== "downloaded") {
       return { success: false, error: "No downloaded update is ready to install" };
     }
     if (!this.autoUpdater) {
       return { success: false, error: "Updater not available" };
-    }
-    if (!this.autoInstall) {
-      shell.openExternal(RELEASE_URL).catch(() => {});
-      return { success: true, manual: true };
     }
     this.timers.setImmediate(() => this.autoUpdater.quitAndInstall(false, true));
     return { success: true };
@@ -205,4 +397,18 @@ class UpdateService {
   }
 }
 
-module.exports = { UpdateService, readPackageType, supportsAutoInstall, RELEASE_URL };
+module.exports = {
+  UpdateService,
+  readPackageType,
+  inferPackageType,
+  supportsAutoInstall,
+  supportsCachedPackageInstall,
+  getUpdaterPendingDir,
+  findPendingPackage,
+  parseVersionFromPackageName,
+  compareVersions,
+  clearPendingPackages,
+  pendingPackageNeedsInstall,
+  installLinuxPackage,
+  RELEASE_URL,
+};

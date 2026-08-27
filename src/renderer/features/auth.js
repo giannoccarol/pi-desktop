@@ -166,6 +166,8 @@
     try {
       await api.savePiSettings(patch, trustDecision);
       state.autoRetryEnabled = el.retryEnabled.checked;
+      if (el.autoRetry) el.autoRetry.checked = el.retryEnabled.checked;
+      try { await api.setAutoRetry(el.retryEnabled.checked); } catch {}
       state.modelsCache = null;
       state.commands = [];
       toast("Impostazioni native Pi salvate; runtime ricaricato.");

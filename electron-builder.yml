@@ -17,6 +17,7 @@ files:
   - "!**/*.map"
   - "!**/*.md"
 
+afterPack: scripts/build/after-pack.js
 extraResources: []
 
 artifactName: Pi-Desktop-${version}-${os}-${arch}.${ext}
