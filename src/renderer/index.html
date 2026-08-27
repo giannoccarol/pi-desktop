@@ -30,6 +30,13 @@
           <input id="session-search" type="search" data-i18n-placeholder="search.placeholder" data-i18n-aria-label="search.aria" spellcheck="false" />
           <span class="search-shortcut">⌘K</span>
           <button id="search-clear" class="search-clear hidden" type="button" data-i18n-aria-label="search.clear.aria"><i data-lucide="x"></i></button>
+          <button id="search-mode-toggle" class="icon-btn tiny" type="button" title="Titolo / Contenuto" aria-label="Cambia modalità ricerca">Aa</button>
+        </div>
+        <div id="bulk-bar" class="bulk-bar hidden" role="toolbar" aria-label="Azioni bulk">
+          <span id="bulk-count" class="muted small">0 selezionate</span>
+          <button id="btn-bulk-export" class="btn ghost small" type="button"><i data-lucide="file-down"></i> Esporta</button>
+          <button id="btn-bulk-delete" class="btn ghost small" type="button" style="color:var(--red)"><i data-lucide="trash-2"></i> Elimina</button>
+          <button id="btn-bulk-cancel" class="btn ghost small" type="button"><i data-lucide="x"></i></button>
         </div>
 
         <div class="projects-head">
@@ -61,6 +68,8 @@
         </button>
         <div id="chat-tabs" class="chat-tabs" role="tablist" aria-label="Chat aperte"></div>
         <span class="flex-spacer"></span>
+        <button id="btn-explorer" class="icon-btn" title="Esplora file" aria-label="Esplora file"><i data-lucide="folder-tree"></i></button>
+        <button id="btn-terminal" class="icon-btn" title="Terminale" aria-label="Terminale"><i data-lucide="terminal"></i></button>
         <button id="btn-commands" class="icon-btn" data-i18n-title="btn.commands.title" data-i18n-aria-label="btn.commands.aria">
           <i data-lucide="command"></i>
         </button>
@@ -85,7 +94,10 @@
         </button>
       </header>
 
+      <div id="health-banner" class="hidden" style="padding:8px 16px;background:color-mix(in srgb,var(--amber) 12%,var(--surface));border-bottom:1px solid var(--hairline);display:flex;gap:8px;align-items:center;font-size:12px"><i data-lucide="alert-triangle" style="width:14px;height:14px;color:var(--amber)"></i><span id="health-banner-text" class="grow"></span><button id="btn-health-log" class="btn ghost small" type="button">Log</button></div>
       <div id="extension-statuses" class="extension-statuses hidden" aria-live="polite"></div>
+      <div id="explorer-panel" class="hidden" style="border-bottom:1px solid var(--hairline);background:var(--surface);max-height:260px;overflow:auto;padding:8px 12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><strong style="font-size:12px">Explorer</strong><span class="flex-spacer"></span><button id="btn-explorer-close" class="icon-btn tiny" type="button"><i data-lucide="x"></i></button></div><div id="explorer-list" style="font-size:12px"></div></div>
+      <div id="terminal-panel" class="hidden" style="border-top:1px solid var(--hairline);background:#0f1115;color:#d4d4d4;padding:8px 12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><i data-lucide="terminal" style="width:14px;height:14px"></i><strong style="font-size:12px;color:#fafafa">Terminale</strong><span class="muted small" style="color:#888">bash nel progetto corrente</span><span class="flex-spacer"></span><button id="btn-terminal-close" class="icon-btn tiny" type="button" style="color:#888"><i data-lucide="x"></i></button></div><pre id="terminal-output" style="max-height:160px;overflow:auto;background:#161616;border-radius:6px;padding:8px;font:12px var(--mono);white-space:pre-wrap;word-break:break-word;margin:0 0 6px"></pre><div style="display:flex;gap:6px"><input id="terminal-input" type="text" placeholder="comando shell + Invio" spellcheck="false" style="flex:1;background:#1e1e1e;border:1px solid #333;color:#fafafa;border-radius:6px;padding:6px 8px;font:12px var(--mono)" /><button id="btn-terminal-run" class="btn small primary" type="button">Esegui</button></div><label style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:#888"><input id="terminal-exclude" type="checkbox" /> escludi dal contesto</label></div>
 
       <section id="chat" aria-live="polite">
         <div id="messages"></div>
@@ -256,6 +268,12 @@
             <label><input id="setting-notifications-sound" type="checkbox" /> <span data-i18n="settings.notifications.sound">Riproduci suono</span></label>
           </div>
           <small class="muted" data-i18n="settings.notifications.help">Richiede permesso del sistema. Disattiva per silenziare.</small>
+        </div>
+        <div class="field" id="budgets-field">
+          <span>Budget per progetto (opzionale)</span>
+          <div id="budgets-list" class="col gap" style="margin:6px 0"></div>
+          <button id="btn-budgets-add" class="btn ghost small" type="button"><i data-lucide="plus"></i> Aggiungi budget progetto corrente</button>
+          <small class="muted">Limiti di costo/token salvati in settings.json e rispettati dal runtime.</small>
         </div>
         <div class="field app-update-row">
           <span data-i18n="settings.appUpdate.label">Pi Desktop — versione</span>
@@ -471,6 +489,7 @@
         <button id="btn-compact" class="btn ghost"><i data-lucide="archive"></i> <span data-i18n="btn.compactNow">Compatta ora</span></button>
         <button id="btn-copy-last" class="btn ghost"><i data-lucide="copy"></i> <span data-i18n="btn.copyLast">Copia ultima risposta</span></button>
         <button id="btn-export-html" class="btn ghost"><i data-lucide="file-down"></i> <span data-i18n="btn.exportHtml">Esporta HTML</span></button>
+        <button id="btn-export-md" class="btn ghost"><i data-lucide="file-text"></i> Esporta Markdown</button>
         <button id="btn-abort-retry" class="btn ghost"><i data-lucide="ban"></i> <span data-i18n="btn.abortRetry">Ferma retry</span></button>
       </div>
     </div>
@@ -520,6 +539,11 @@
   <script src="features/chat/diff-view.js"></script>
   <script src="features/chat/dragdrop.js"></script>
   <script src="features/costs.js"></script>
+  <script src="features/explorer.js"></script>
+  <script src="features/terminal.js"></script>
+  <script src="features/bulk.js"></script>
+  <script src="features/budgets.js"></script>
+  <script src="features/health.js"></script>
   <script src="features/session/session.js"></script>
   <script src="features/chat/session-view.js"></script>
   <script src="ui/status.js"></script>

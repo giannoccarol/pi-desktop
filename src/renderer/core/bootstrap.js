@@ -62,6 +62,37 @@
     else if (window.initSearchEnhancement) window.initSearchEnhancement();
     if (window.piDragDrop && window.piDragDrop.initDragDrop) window.piDragDrop.initDragDrop();
     else if (typeof initDragDrop === "function") initDragDrop();
+    try{ window.piExplorer?.init?.(); }catch{}
+    try{ window.piTerminal?.init?.(); }catch{}
+    try{ window.piBulk?.init?.(); }catch{}
+    try{ window.piBudgets?.init?.(); }catch{}
+    try{ window.piHealth?.init?.(); }catch{}
+    try{
+      const scwd = el.statusCwd;
+      if(scwd){
+        scwd.style.cursor = "pointer";
+        scwd.title = "Clicca per dettagli costi";
+        scwd.addEventListener("click", ()=>{
+          try{
+            const cwd = state.settings?.cwd;
+            const agg = window.piCosts?.getProjectCosts?.(cwd, state.sessions, null) || {count:0,cost:0,tokens:0};
+            const txt = window.piCosts?.formatProjectCost?.(agg, window.i18n?.t) || `${agg.count} chat · ${agg.tokens} tok · $${agg.cost}`;
+            window.piUi?.toast?.(`${cwd||"progetto"}: ${txt}`, "info", 5000);
+            window.piCosts?.renderProjectCosts?.();
+          }catch{}
+        });
+      }
+    }catch{}
+    try{
+      if(api && api.on){
+        api.on("pi:event", (msg)=>{
+          if(msg?.type==="pi-exit" && msg.info && !msg.info.expected){
+            const s = state; s.healthBanner = `pi uscito: code=${msg.info.code||"?"} ${String(msg.info.stderr||"").slice(0,120)}`;
+            window.piHealth?.renderBanner?.();
+          }
+        });
+      }
+    }catch{}
     // virtualization for chat tool cards
     try { (window.piChat && window.piChat.initVirtualization && window.piChat.initVirtualization()) || (typeof initVirtualization === "function" && initVirtualization()); } catch {}
     // costs dashboard periodic refresh
@@ -223,7 +254,27 @@
         toast(`Impossibile aggiungere il progetto: ${err.message}`, "error");
       }
     });
-    el.sessionSearch.addEventListener("input", () => (window.renderProjects||window.piSidebar?.renderProjects)?.());
+    el.sessionSearch.addEventListener("input", async () => {
+      const mode = state.searchMode || "title";
+      if(mode==="fulltext" && el.sessionSearch.value.trim().length>=2){
+        try{
+          const res = await api.searchFullText(el.sessionSearch.value.trim());
+          state.searchFullTextResults = res;
+        }catch{ state.searchFullTextResults = []; }
+      } else {
+        state.searchFullTextResults = [];
+      }
+      (window.renderProjects||window.piSidebar?.renderProjects)?.();
+    });
+    el.searchModeToggle?.addEventListener("click", ()=>{
+      state.searchMode = state.searchMode==="fulltext" ? "title" : "fulltext";
+      el.searchModeToggle.textContent = state.searchMode==="fulltext" ? "Tx" : "Aa";
+      el.searchModeToggle.title = state.searchMode==="fulltext" ? "Ricerca nel contenuto" : "Ricerca titolo/preview";
+      if(state.searchMode==="fulltext" && el.sessionSearch.value.trim().length>=2){
+        api.searchFullText(el.sessionSearch.value.trim()).then(r=>{ state.searchFullTextResults=r; (window.renderProjects||window.piSidebar?.renderProjects)?.(); }).catch(()=>{});
+      } else { state.searchFullTextResults=[]; }
+      (window.renderProjects||window.piSidebar?.renderProjects)?.();
+    });
 
     el.commandsClose.addEventListener("click", () => el.modalCommands.close());
     el.commandSearch.addEventListener("input", () => {
@@ -287,6 +338,20 @@
         const result = await api.exportHtml();
         if (!result.cancelled) toast(`Sessione esportata in ${result.path}`);
       } catch (err) { toast(`Export fallito: ${err.message}`, "error"); }
+    });
+    document.getElementById("btn-export-md")?.addEventListener("click", async () => {
+      try{
+        const msgs = await api.getMessages();
+        const lines = (msgs.messages||[]).map(m=>{
+          const role = m.role==='user'?'## Utente': m.role==='assistant'?'## Pi':'## '+m.role;
+          const text = Array.isArray(m.content)? m.content.map(b=>b.text||b.thinking||'').join("\n") : String(m.content||"");
+          return `${role}\n\n${text}`;
+        }).join("\n\n---\n\n");
+        const blob = new Blob([lines], {type:"text/markdown"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href=url; a.download=`pi-session-${new Date().toISOString().slice(0,10)}.md`; a.click(); URL.revokeObjectURL(url);
+        toast("Markdown esportato");
+      }catch(err){ toast(`Export md fallito: ${err.message}`,"error"); }
     });
     el.abortRetry.addEventListener("click", async () => {
       try { await api.abortRetry(); toast("Retry interrotto."); }
@@ -420,6 +485,7 @@
     }
     if (i18n) i18n.applyI18n();
     el.btnSettingsOpen.addEventListener("click", () => {
+      try{ window.piBudgets?.render?.(); }catch{}
       el.settingCwd.textContent = state.settings.cwd || "";
       el.settingPiPath.value = state.settings.piPath || "";
       el.settingSessionsDir.value = state.settings.sessionsDir || "";

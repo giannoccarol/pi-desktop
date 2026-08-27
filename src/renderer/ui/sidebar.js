@@ -329,14 +329,22 @@ function projectsRenderSignature(q, projects) {
 }
 
 function renderProjects() {
-  const q = (el.sessionSearch.value || "").toLowerCase().trim();
+  const qRaw = (el.sessionSearch.value || "").trim();
+  const q = qRaw.toLowerCase();
+  const isFulltext = state.searchMode === "fulltext" && q.length >= 2;
+  const fulltextSet = isFulltext ? new Set((state.searchFullTextResults||[]).map(s=>s.file)) : null;
   const previousScrollTop = el.projectsList.scrollTop;
   const projects = configuredProjects().map((projectPath) => {
     const sessions = sessionsForProject(projectPath);
     const matchesProject = `${basename(projectPath)} ${projectPath}`.toLowerCase().includes(q);
-    const matchingSessions = sessions.filter((session) =>
-      `${session.name || ""} ${session.preview || ""}`.toLowerCase().includes(q)
-    );
+    let matchingSessions;
+    if(isFulltext && q){
+      matchingSessions = sessions.filter((session) => fulltextSet.has(session.file));
+    } else {
+      matchingSessions = sessions.filter((session) =>
+        `${session.name || ""} ${session.preview || ""}`.toLowerCase().includes(q)
+      );
+    }
     return { path: projectPath, sessions, matchesProject, matchingSessions };
   }).filter((project) => !q || project.matchesProject || project.matchingSessions.length);
 
@@ -440,7 +448,8 @@ function renderProjects() {
         const isActive = session.tabId ? session.tabId === state.activeTabId : session.file === state.activeSessionFile;
         const isLoading = session.file === state.openingSessionFile;
         const item = document.createElement("div");
-        item.className = "session-item" + (isActive ? " active" : "") + (isLoading ? " loading" : "") + (openTab?.busy || session.busy ? " running" : "");
+        const isSelected = state.bulkMode && state.selectedSessions.has(session.file);
+        item.className = "session-item" + (isActive ? " active" : "") + (isLoading ? " loading" : "") + (openTab?.busy || session.busy ? " running" : "") + (isSelected ? " selected" : "");
         item.dataset.sessionFile = session.file || "";
         item.dataset.tabId = session.tabId || openTab?.id || "";
         const displayName = session.hasName ? session.name : truncate(session.preview || t("session.newChat"), 120);
@@ -458,17 +467,41 @@ function renderProjects() {
           `<div class="session-meta"><span>${isLoading ? t("session.loading") : relTime(session.modified)}</span>` +
           `<button class="sess-del" title="Elimina sessione" aria-label="Elimina sessione">${icon("trash-2")}</button></div>`;
         item.querySelector(".session-title").textContent = displayName;
+        // bulk checkbox
+        if(state.bulkMode){
+          const cb = document.createElement("input");
+          cb.type = "checkbox"; cb.checked = isSelected;
+          cb.style.cssText = "width:14px;height:14px;flex:0 0 14px";
+          cb.addEventListener("click", (ev)=>{ ev.stopPropagation(); window.piBulk?.toggleSession(session.file); });
+          item.prepend(cb);
+        }
         item.addEventListener("click", async (ev) => {
           if (ev.target.closest(".sess-del")) return;
+          if (ev.target.closest('input[type="checkbox"]')) return;
+          if (state.bulkMode) { window.piBulk?.toggleSession(session.file); return; }
           if (state.creatingChat) return;
           if (session.tabId) await switchToTab(session.tabId);
           else if (openTab) await switchToTab(openTab.id);
           else await openHistorySession(session);
         });
+        // long-press / right-click to enter bulk mode
+        item.addEventListener("contextmenu", (ev)=>{ ev.preventDefault(); if(!state.bulkMode) window.piBulk?.toggleSession(session.file); });
+        const meta = state.settings?.sessionMeta?.[session.file] || state.sessionMeta?.[session.file] || null;
+        if(meta?.pinned){
+          const pin = document.createElement("span"); pin.textContent="📌"; pin.title="Pinned"; pin.style.cssText="font-size:10px;margin-left:4px";
+          item.querySelector(".session-title")?.appendChild(pin);
+          item.style.order=-1;
+        }
         const deleteButton = item.querySelector(".sess-del");
         if (session.draft) {
           deleteButton.title = "Chiudi bozza";
           deleteButton.setAttribute("aria-label", "Chiudi bozza");
+        } else if(!state.bulkMode){
+          const pinBtn = document.createElement("button");
+          pinBtn.className="sess-del"; pinBtn.style.right="34px"; pinBtn.title=meta?.pinned?"Sblocca":"Fissa in alto";
+          pinBtn.innerHTML = icon(meta?.pinned?"pin-off":"pin");
+          pinBtn.addEventListener("click", async (e)=>{ e.stopPropagation(); try{ await api.setSessionMeta(session.file, {pinned: !meta?.pinned}); const metaMap = await api.getSessionMeta(); state.settings.sessionMeta = metaMap; if(!state.sessionMeta) state.sessionMeta=metaMap; renderProjects(); }catch(err){ toast(err.message,"error"); } });
+          item.appendChild(pinBtn);
         }
         deleteButton.addEventListener("click", async (e) => {
           e.stopPropagation();
@@ -488,7 +521,8 @@ function renderProjects() {
       if (!candidates.length) {
         const empty = document.createElement("div");
         empty.className = "project-empty";
-        empty.textContent = q ? t("project.empty.noMatch") : t("project.empty.none");
+        if(q && state.searchMode==="fulltext") empty.textContent = "Nessun risultato nel contenuto.";
+        else empty.textContent = q ? t("project.empty.noMatch") : t("project.empty.none");
         chats.appendChild(empty);
       } else if (!q) {
         const hasMore = candidates.length > limit;
