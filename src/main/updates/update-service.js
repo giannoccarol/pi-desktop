@@ -1,12 +1,29 @@
 "use strict";
 
-const { app } = require("electron");
+const fs = require("fs");
+const path = require("path");
+const { app, shell } = require("electron");
+
+const RELEASE_URL = "https://github.com/giannoccarol/pi-desktop/releases/latest";
 
 let autoUpdater;
 try {
   ({ autoUpdater } = require("electron-updater"));
 } catch {
   autoUpdater = null;
+}
+
+function readPackageType() {
+  try {
+    return fs.readFileSync(path.join(process.resourcesPath, "package-type"), "utf8").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function supportsAutoInstall(platform, packageType) {
+  if (platform === "win32" || platform === "darwin") return true;
+  return packageType === "appimage";
 }
 
 class UpdateService {
@@ -28,12 +45,16 @@ class UpdateService {
     this.startupTimer = null;
     this.timer = null;
     this.updaterListeners = [];
+    this.packageType = readPackageType();
+    this.autoInstall = supportsAutoInstall(process.platform, this.packageType);
     this.state = {
       status: this.app.isPackaged ? "idle" : "disabled",
       currentVersion: this.app.getVersion(),
       availableVersion: null,
       progress: 0,
       error: null,
+      packageType: this.packageType,
+      autoInstall: this.autoInstall,
     };
   }
 
@@ -58,7 +79,7 @@ class UpdateService {
     }
 
     this.autoUpdater.autoDownload = false;
-    this.autoUpdater.autoInstallOnAppQuit = true;
+    this.autoUpdater.autoInstallOnAppQuit = this.autoInstall;
     this.autoUpdater.allowDowngrade = false;
     this.autoUpdater.allowPrerelease = this.app.getVersion().includes("-");
 
@@ -165,6 +186,10 @@ class UpdateService {
     if (!this.autoUpdater) {
       return { success: false, error: "Updater not available" };
     }
+    if (!this.autoInstall) {
+      shell.openExternal(RELEASE_URL).catch(() => {});
+      return { success: true, manual: true };
+    }
     this.timers.setImmediate(() => this.autoUpdater.quitAndInstall(false, true));
     return { success: true };
   }
@@ -180,4 +205,4 @@ class UpdateService {
   }
 }
 
-module.exports = { UpdateService };
+module.exports = { UpdateService, readPackageType, supportsAutoInstall, RELEASE_URL };

@@ -18,6 +18,7 @@ const gitService = require("../services/git-service");
 const ipcSanitize = require("../services/ipc-sanitize");
 const { UpdateService } = require("../updates/update-service");
 const { shouldHandoverToSecondInstance } = require("./single-instance");
+const { startStaleInstallWatch, performHandoverRelaunch } = require("./version-watch");
 
 // In sviluppo usa una userData dedicata: evita che `npm start` collida con
 // l'istanza installata (stesso single-instance lock su ~/.config/Pi Desktop)
@@ -54,7 +55,8 @@ function loadSettings() {
     sessionsDir: "",
     sidebarVisible: true,
     language: "it",
-    userName: "Lorenzo",
+    userName: "",
+    userNamePromptSeen: false,
     lastModel: null,
     lastThinkingLevel: null,
     sessionPreferences: {},
@@ -64,6 +66,9 @@ function loadSettings() {
     const projects = Array.isArray(loaded.projects) ? loaded.projects : [loaded.cwd];
     loaded.projects = [...new Set([loaded.cwd, ...projects].filter((value) => typeof value === "string" && value.trim()))];
     loaded.sessionPreferences = loaded.sessionPreferences && typeof loaded.sessionPreferences === "object" ? loaded.sessionPreferences : {};
+    if (loaded.userNamePromptSeen === undefined && String(loaded.userName || "").trim()) {
+      loaded.userNamePromptSeen = true;
+    }
     return loaded;
   } catch {
     return defaults;
@@ -359,6 +364,23 @@ process.on("unhandledRejection", (reason) => {
 // nuova versione invece del vecchio processo rimasto vivo nel tray.
 const APP_VERSION = app.getVersion();
 let handingOverToNewVersion = false;
+let stopStaleInstallWatch = () => {};
+
+function notifyStaleInstall(payload) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    win.webContents.send("app:stale-install", payload);
+  } catch (err) {
+    console.warn("[version-watch] notify fallita:", err.message);
+  }
+}
+
+function relaunchInstalledApp() {
+  if (handingOverToNewVersion) return;
+  handingOverToNewVersion = true;
+  stopStaleInstallWatch();
+  performHandoverRelaunch({ app, runtime, appUpdateService });
+}
 
 if (!app.requestSingleInstanceLock({ version: APP_VERSION })) {
   app.quit();
@@ -372,12 +394,8 @@ if (!app.requestSingleInstanceLock({ version: APP_VERSION })) {
     handingOverToNewVersion = true;
     const incoming = additionalData && typeof additionalData === "object" ? additionalData.version : "?";
     console.log(`[single-instance] seconda istanza v${incoming} != attuale v${APP_VERSION}: riavvio sull'app aggiornata`);
-    try { app.relaunch({ args: process.argv.slice(1) }); } catch (err) { console.warn("[single-instance] relaunch fallito:", err.message); }
-    // Fallback: se quit resta appeso (tray/runtime occupati), forza l'uscita.
-    setTimeout(() => { try { app.exit(0); } catch {} }, 3000);
-    try { appUpdateService?.destroy(); } catch {}
-    try { runtime.stop(); } catch {}
-    app.quit();
+    stopStaleInstallWatch();
+    performHandoverRelaunch({ app, runtime, appUpdateService });
   });
 
   app.whenReady().then(() => {
@@ -385,6 +403,13 @@ if (!app.requestSingleInstanceLock({ version: APP_VERSION })) {
     createWindow();
     try { createTray(); } catch {}
     try { registerGlobalShortcut(); } catch {}
+    if (app.isPackaged) {
+      stopStaleInstallWatch = startStaleInstallWatch({
+        app,
+        runningVersion: APP_VERSION,
+        notify: notifyStaleInstall,
+      });
+    }
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
@@ -404,6 +429,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", () => {
+  stopStaleInstallWatch();
   unregisterGlobalShortcut();
   destroyTray();
   appUpdateService?.destroy();
@@ -490,7 +516,7 @@ async function rememberCurrentPreference() {
 ipcMain.handle("settings:get", () => publicSettings());
 
 ipcMain.handle("settings:set", async (_e, patch) => {
-  const allowed = ["cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language"];
+  const allowed = ["cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language", "userName", "userNamePromptSeen"];
   const previousCwd = settings.cwd;
   const previousPiPath = settings.piPath;
   const previousSessionsDir = settings.sessionsDir;
@@ -500,6 +526,10 @@ ipcMain.handle("settings:set", async (_e, patch) => {
     else if (k === "language") {
       const v = String(patch[k] || "").toLowerCase();
       if (v === "it" || v === "en") settings[k] = v;
+    } else if (k === "userName") {
+      settings[k] = String(patch[k] || "").trim().slice(0, 40);
+    } else if (k === "userNamePromptSeen") {
+      settings[k] = Boolean(patch[k]);
     } else settings[k] = patch[k];
   }
   if ("cwd" in patch) settings.projects = [...new Set([...(settings.projects || []), settings.cwd])];
@@ -789,7 +819,7 @@ ipcMain.handle("pi:getMessages", async (_e, tabId) => {
     return ipcSanitize.sanitizeMessagesPayload(payload);
   } catch (err) {
     console.error("[getMessages] sanitize fallita:", err);
-    return { messages: [] };
+    return { messages: [], truncated: false, hiddenCount: 0, loadError: "sanitize_failed" };
   }
 });
 ipcMain.handle("pi:getAvailableModels", async () => {
@@ -1044,10 +1074,14 @@ ipcMain.handle("packages:update", async (_e, target) => {
 
 // --- app OTA (electron-updater, GitHub Releases) ----------------------------
 
-ipcMain.handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null }));
+ipcMain.handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null, autoInstall: true, packageType: "" }));
 ipcMain.handle("update:check", async () => (appUpdateService ? appUpdateService.check(true) : { success: false, error: "Updater not initialized" }));
 ipcMain.handle("update:download", async () => (appUpdateService ? appUpdateService.download() : { success: false, error: "Updater not initialized" }));
 ipcMain.handle("update:install", () => (appUpdateService ? appUpdateService.install() : { success: false, error: "Updater not initialized" }));
+ipcMain.handle("app:relaunch", () => {
+  relaunchInstalledApp();
+  return { success: true };
+});
 
 // --- pi CLI updates (independent of the app) --------------------------------
 

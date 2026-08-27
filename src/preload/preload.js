@@ -71,6 +71,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
   checkAppUpdate: () => ipcRenderer.invoke("update:check"),
   downloadAppUpdate: () => ipcRenderer.invoke("update:download"),
   installAppUpdate: () => ipcRenderer.invoke("update:install"),
+  relaunchApp: () => ipcRenderer.invoke("app:relaunch"),
   // pi CLI updates
   updateStatus: () => ipcRenderer.invoke("pi:updateStatus"),
   maintenance: (kind) => ipcRenderer.invoke("pi:maintenance", kind),
@@ -99,7 +100,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
 
   // events from main
   on(channel, cb) {
-    const ALLOWED_CHANNELS = ["pi:event", "pi:maintenance-output", "pi:package-output", "pi:auth-request", "pi:tray-new-chat", "update:state"];
+    const ALLOWED_CHANNELS = ["pi:event", "pi:maintenance-output", "pi:package-output", "pi:auth-request", "pi:tray-new-chat", "update:state", "app:stale-install"];
     if (!ALLOWED_CHANNELS.includes(channel)) return () => {};
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on(channel, handler);

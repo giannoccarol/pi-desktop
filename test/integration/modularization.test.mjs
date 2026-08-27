@@ -58,6 +58,12 @@ test("regression: all extracted modules are loadable and expose expected API", (
   assert.match(sidebar, /function renderProjects/);
   assert.match(sidebar, /function renderTabs/);
   assert.match(sidebar, /function switchToTab/);
+  assert.match(sidebar, /window\.newChat\s*\|\|\s*window\.piSession\?\.newChat/);
+
+  const session = fs.readFileSync(path.join(root, "src/renderer/features/session/session.js"), "utf8");
+  assert.match(session, /window\.piSession\s*=/);
+  assert.match(session, /window\.newChat\s*=/);
+  assert.match(session, /async function newChat/);
 });
 
 test("regression: stateful renderer modules keep helpers out of the shared global scope", () => {

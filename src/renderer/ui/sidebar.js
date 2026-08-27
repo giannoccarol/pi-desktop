@@ -30,7 +30,7 @@ function clearSessionLoading(){ return window.piSessionView ? window.piSessionVi
 function renderConversation(m,c){ return window.piSessionView ? window.piSessionView.renderConversation(m,c) : Promise.resolve(false); }
 function reloadConversationFromRuntime(o){ return window.piSessionView ? window.piSessionView.reloadConversationFromRuntime(o) : Promise.resolve(false); }
 function openHistorySession(s){ return window.piSessionView ? window.piSessionView.openHistorySession(s) : Promise.resolve(); }
-function newChat(p){ return window.piSession ? window.piSession.newChat(p) : Promise.resolve(); }
+function newChat(p){ return (window.newChat || window.piSession?.newChat)?.(p) ?? Promise.resolve(); }
 function setConversationMode(a,b){ return window.piUi ? window.piUi.setConversationMode(a,b) : void 0; }
 function resetQueueState(){ return window.piComposer ? window.piComposer.resetQueueState.apply(null, arguments) : void 0; }
 var sessionsTimer = null;

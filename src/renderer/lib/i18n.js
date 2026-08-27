@@ -36,7 +36,8 @@ const DICT = {
     "btn.packages.aria": "Apri lo store plugin",
     "btn.theme.title": "Cambia tema",
     "btn.theme.aria": "Cambia tema",
-    "hero.greeting": "Ciao Lorenzo,",
+    "hero.greeting": "Ciao {name},",
+    "userName.fallback": "Utente",
     "hero.subtitle": "come posso aiutarti oggi?",
     "composer.placeholder": "Scrivi un messaggio a Pi Agent…",
     "composer.slash.aria": "Comandi Pi suggeriti",
@@ -225,6 +226,7 @@ const DICT = {
     "toast.deleteFail": "Eliminazione fallita: {msg}",
     "toast.openSessionFail": "Impossibile aprire la sessione: {msg}",
     "toast.sessionTruncated": "Conversazione lunga: mostro gli ultimi {shown} messaggi ({hidden} nascosti).",
+    "toast.sessionLoadError": "Impossibile caricare i messaggi della chat (errore interno).",
     "toast.sessionStillOpening": "La chat si sta ancora collegando. Riprova tra un istante.",
     "toast.commandFailed": "Cambio fallito: {msg}",
     "confirm.deleteSession": "Eliminare definitivamente questa sessione?",
@@ -326,7 +328,12 @@ const DICT = {
     "updates.app.availableVersion": "Pi Desktop {version} disponibile",
     "updates.app.downloading": "Scaricamento {progress}%",
     "updates.app.restart": "Riavvia per aggiornare",
+    "updates.app.manualInstall": "Apri release GitHub",
+    "updates.app.manualReady": "Aggiornamento scaricato — installa con pacman/AUR",
+    "updates.app.manualOpened": "Apri la pagina release per installare l'aggiornamento con il package manager.",
     "updates.app.ready": "Aggiornamento pronto — riavvia per installare",
+    "app.staleInstall": "È installata la v{installed} ma stai usando la v{running}. Riavvia per applicare l'aggiornamento.",
+    "app.restartNow": "Riavvia ora",
     "updates.app.failed": "Aggiornamento fallito: {error}",
     "updates.app.checking": "Verifica aggiornamenti…",
     "updates.app.checkTitle": "Aggiornamento app",
@@ -527,7 +534,8 @@ const DICT = {
     "btn.packages.aria": "Open plugin store",
     "btn.theme.title": "Toggle theme",
     "btn.theme.aria": "Toggle theme",
-    "hero.greeting": "Hi Lorenzo,",
+    "hero.greeting": "Hi {name},",
+    "userName.fallback": "there",
     "hero.subtitle": "how can I help you today?",
     "composer.placeholder": "Write a message to Pi Agent…",
     "composer.slash.aria": "Suggested Pi commands",
@@ -707,6 +715,7 @@ const DICT = {
     "toast.deleteFail": "Deletion failed: {msg}",
     "toast.openSessionFail": "Could not open session: {msg}",
     "toast.sessionTruncated": "Long conversation: showing the last {shown} messages ({hidden} hidden).",
+    "toast.sessionLoadError": "Could not load chat messages (internal error).",
     "toast.sessionStillOpening": "This chat is still connecting. Try again in a moment.",
     "toast.commandFailed": "Change failed: {msg}",
     "confirm.deleteSession": "Delete this session permanently?",
@@ -808,7 +817,12 @@ const DICT = {
     "updates.app.availableVersion": "Pi Desktop {version} available",
     "updates.app.downloading": "Downloading {progress}%",
     "updates.app.restart": "Restart to update",
+    "updates.app.manualInstall": "Open GitHub release",
+    "updates.app.manualReady": "Update downloaded — install via pacman/AUR",
+    "updates.app.manualOpened": "Open the release page to install the update with your package manager.",
     "updates.app.ready": "Update ready — restart to install",
+    "app.staleInstall": "v{installed} is installed but you're still running v{running}. Restart to apply the update.",
+    "app.restartNow": "Restart now",
     "updates.app.failed": "Update failed: {error}",
     "updates.app.checking": "Checking for updates…",
     "updates.app.checkTitle": "App update",
@@ -1020,6 +1034,21 @@ function onChange(cb) {
   return () => listeners.delete(cb);
 }
 
+function displayUserName(name) {
+  const trimmed = String(name || "").trim();
+  return trimmed || translate("userName.fallback");
+}
+
+function refreshUserNameUI(name) {
+  const display = displayUserName(name);
+  const profileName = document.querySelector("[data-profile-name]");
+  const profileAvatar = document.querySelector("[data-profile-avatar]");
+  const greeting = document.querySelector("[data-greeting]");
+  if (profileName) profileName.textContent = display;
+  if (profileAvatar) profileAvatar.textContent = (display[0] || "?").toUpperCase();
+  if (greeting) greeting.textContent = translate("hero.greeting", { name: display });
+}
+
 function applyI18n() {
   // data-i18n, data-i18n-placeholder, data-i18n-title, data-i18n-aria
   document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -1041,9 +1070,11 @@ function applyI18n() {
   });
   // also update html lang
   document.documentElement.lang = currentLang;
+  const savedName = window.piStore?.state?.settings?.userName;
+  refreshUserNameUI(savedName);
 }
 
 // init lang attribute immediately
 try { document.documentElement.lang = currentLang; } catch {}
 
-window.i18n = { t: translate, getLang, setLang, applyI18n, onChange, DICT };
+window.i18n = { t: translate, getLang, setLang, applyI18n, onChange, refreshUserNameUI, displayUserName, DICT };

@@ -169,8 +169,13 @@
       (!requestedTabId || requestedTabId===state.activeTabId);
     const [msgs, current]=await Promise.all([api.getMessages(requestedTabId), api.getState(requestedTabId)]);
     if(!isCurrent()) return false;
+    if(msgs.loadError){
+      window.piUi?.toast?.(t("toast.sessionLoadError"), "error", 6500);
+      return false;
+    }
     const displayMessages=window.piChatUtils.collapseRetryAttempts(msgs.messages||[]);
-    if(msgs.truncated && msgs.hiddenCount){
+    const shouldExpandHistory = Boolean(msgs.truncated && msgs.hiddenCount);
+    if(shouldExpandHistory){
       window.piUi?.toast?.(t("toast.sessionTruncated", { shown: displayMessages.length, hidden: msgs.hiddenCount }), "info", 5200);
     }
     state.activeSessionFile=current.sessionFile||null;
@@ -179,6 +184,9 @@
     if(!identical){
       const painted=await renderConversation(displayMessages,isCurrent);
       if(painted===false||!isCurrent()) return false;
+    }
+    if(shouldExpandHistory && state.activeSessionFile){
+      void expandTruncatedHistory(state.activeSessionFile, msgs.hiddenCount, switchGeneration);
     }
     cacheSessionMessages(state.activeSessionFile, displayMessages, state.activeTabId);
     cacheSessionDom(state.activeSessionFile, state.activeTabId);
@@ -279,8 +287,21 @@
     const full = (window.piChatUtils?.collapseRetryAttempts ?? ((m) => m))(raw);
     historyState.file = file;
     historyState.full = full;
-    historyState.start = -1; // ancora da allineare alla finestra renderizzata
+    historyState.start = -1;
     return full;
+  }
+
+  async function expandTruncatedHistory(file, hiddenCount, switchGeneration) {
+    if (!file || !hiddenCount) return;
+    let remaining = hiddenCount;
+    for (let guard = 0; remaining > 0 && guard < 40; guard += 1) {
+      if (switchGeneration != null && switchGeneration !== state.switchGeneration) return;
+      if (state.activeSessionFile !== file) return;
+      const loaded = await loadOlderHistory();
+      if (!loaded || loaded <= 0) break;
+      remaining -= loaded;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
   }
 
   async function loadOlderHistory() {

@@ -21,18 +21,35 @@
   function setSidebarVisible(v){ return (window.piUi ? window.piUi.setSidebarVisible : window.setSidebarVisible)?.apply(null, arguments); }
   function applyTheme(th){ return (window.piUi ? window.piUi.applyTheme : window.applyTheme)?.apply(null, arguments); }
   function applyUserName(name) {
-    const n = (name || "").trim() || "Lorenzo";
-    const profileName = document.querySelector("[data-profile-name]");
-    const profileAvatar = document.querySelector("[data-profile-avatar]");
-    const greeting = document.querySelector("[data-greeting]");
-    if (profileName) profileName.textContent = n;
-    if (profileAvatar) profileAvatar.textContent = (n || "L")[0].toUpperCase();
-    if (greeting) greeting.textContent = `Ciao ${n},`;
+    if (window.i18n?.refreshUserNameUI) window.i18n.refreshUserNameUI(name);
   }
 
   function getUiRequest() {
     if (window.piExtensionBridge && window.piExtensionBridge.getUiRequest) return window.piExtensionBridge.getUiRequest();
     return window.uiRequest;
+  }
+
+  function setupStaleInstallWatch() {
+    if (!api.on) return;
+    const showStaleInstall = (payload) => {
+      if (!payload) return;
+      toast(t("app.staleInstall", {
+        installed: payload.installedVersion || "?",
+        running: payload.runningVersion || "?",
+      }), "warn", 15000);
+      if (el.checkAppUpdateStatus) {
+        el.checkAppUpdateStatus.textContent = t("app.staleInstall", {
+          installed: payload.installedVersion || "?",
+          running: payload.runningVersion || "?",
+        });
+      }
+      if (el.btnCheckAppUpdate) {
+        el.btnCheckAppUpdate.textContent = t("app.restartNow");
+        el.btnCheckAppUpdate.disabled = false;
+        el.btnCheckAppUpdate.dataset.staleRestart = "1";
+      }
+    };
+    api.on("app:stale-install", showStaleInstall);
   }
 
   function wireUi() {
@@ -552,6 +569,7 @@
     wireUi();
     // setupAppUpdates via piStatus
     (window.setupAppUpdates||window.piStatus?.setupAppUpdates)?.();
+    setupStaleInstallWatch();
     // Explicit permission request for notifications if enabled
     try {
       const v = localStorage.getItem("pi-desktop-notifications-enabled");
@@ -588,10 +606,9 @@
     el.emptyState.classList.remove("hidden");
     el.input.focus();
 
-    // Primo avvio: se il nome non e' mai stato impostato dall'utente, chiedilo
-    const savedName = (state.settings.userName || "").trim();
-    if (!savedName || savedName === "Lorenzo") {
-      setTimeout(() => showNameDialog(savedName === "Lorenzo"), 1500);
+    // Primo avvio: chiedi il nome una sola volta finche' l'utente non conferma o salta
+    if (!state.settings.userNamePromptSeen && !(state.settings.userName || "").trim()) {
+      setTimeout(() => showNameDialog(false), 1500);
     }
   }
 
@@ -623,19 +640,20 @@
     window.piUi?.refreshIcons?.(dlg);
     const inp = dlg.querySelector("#welcome-name-input");
     inp.focus();
-    const save = async () => {
-      const name = inp.value.trim();
-      if (name && name !== state.settings.userName) {
-        const s = await api.setSettings({ userName: name });
-        state.settings = s;
-        applyUserName(name);
-      }
+    const dismiss = async (patch = {}) => {
+      const s = await api.setSettings({ userNamePromptSeen: true, ...patch });
+      state.settings = s;
+      if ("userName" in patch) applyUserName(state.settings.userName);
       dlg.close();
       dlg.remove();
     };
+    const save = async () => {
+      const name = inp.value.trim();
+      await dismiss(name ? { userName: name } : {});
+    };
     dlg.querySelector("#welcome-ok").addEventListener("click", save);
     inp.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
-    dlg.querySelector("#welcome-skip").addEventListener("click", () => { dlg.close(); dlg.remove(); });
+    dlg.querySelector("#welcome-skip").addEventListener("click", () => { void dismiss(); });
   }
 
   window.piBootstrap = { wireUi, boot };

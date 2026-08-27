@@ -183,3 +183,17 @@ async function newChat(projectPath = state.settings?.cwd, parentSession = null) 
     renderProjects();
   }
 }
+
+window.piSession = {
+  loadSessionTree,
+  openSessionTree,
+  forkFromEntry,
+  cloneActiveSession,
+  newChildSession,
+  openSessionTools,
+  renameSession,
+  compactSession,
+  newChat,
+};
+window.newChat = newChat;
+if (typeof module !== "undefined" && module.exports) module.exports = window.piSession;
