@@ -1,3 +1,10 @@
+# [0.17.0](https://github.com/giannoccarol/pi-desktop/compare/v0.16.0...v0.17.0) (2026-08-27)
+
+
+### Features
+
+* **sessions, ui:** enhance session management and budget features ([7efa56f](https://github.com/giannoccarol/pi-desktop/commit/7efa56f790221da43603b6c6d1929a4681e8a225))
+
 # [0.16.0](https://github.com/giannoccarol/pi-desktop/compare/v0.15.0...v0.16.0) (2026-08-27)
 
 
