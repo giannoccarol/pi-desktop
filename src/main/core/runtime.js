@@ -21,27 +21,51 @@ class PiRuntime {
     this.startOpts = null;
     this.starting = null;
     this.currentSessionFile = null;
+    this._opChain = Promise.resolve();
+  }
+
+  _withLock(fn) {
+    const run = this._opChain.then(() => fn());
+    this._opChain = run.catch(() => {});
+    return run;
+  }
+
+  _wantedOpts(opts = {}) {
+    const base = this.startOpts || {};
+    return {
+      cwd: opts.cwd !== undefined ? opts.cwd : base.cwd,
+      provider: opts.provider !== undefined ? opts.provider : base.provider,
+      model: opts.model !== undefined ? opts.model : base.model,
+      persist: opts.persist !== undefined ? Boolean(opts.persist) : Boolean(base.persist),
+      sessionPath: opts.sessionPath !== undefined ? opts.sessionPath : (base.sessionPath || null),
+      sessionDir: opts.sessionDir !== undefined ? opts.sessionDir : base.sessionDir,
+      piPath: opts.piPath !== undefined ? opts.piPath : base.piPath,
+      name: opts.name !== undefined ? opts.name : base.name,
+    };
+  }
+
+  async _applySessionOptions(opts = {}) {
+    await Promise.all([
+      opts.provider && opts.model
+        ? this._requestUnlocked({ type: "set_model", provider: opts.provider, modelId: opts.model })
+        : Promise.resolve(),
+      opts.thinkingLevel
+        ? this._requestUnlocked({ type: "set_thinking_level", level: opts.thinkingLevel })
+        : Promise.resolve(),
+    ]);
   }
 
   _emit(type, payload) {
     this.send("pi:event", { type, ...payload });
   }
 
-  async ensureStarted(opts = {}) {
-    const wanted = {
-      cwd: opts.cwd || undefined,
-      provider: opts.provider || undefined,
-      model: opts.model || undefined,
-      persist: Boolean(opts.persist),
-      sessionPath: opts.sessionPath || null,
-      sessionDir: opts.sessionDir || undefined,
-      piPath: opts.piPath || undefined,
-      name: opts.name || undefined,
-    };
+  async ensureStarted(opts = {}, { nested = false } = {}) {
+    const wanted = this._wantedOpts(opts);
     if (this.client && this._matches(wanted) && !this.exitInfo) return this.client;
     if (this.starting) await this.starting;
     if (this.client && this._matches(wanted) && !this.exitInfo) return this.client;
-    return this._start(wanted);
+    const start = () => this._start(wanted);
+    return nested ? start() : this._withLock(start);
   }
 
   _matches(w) {
@@ -53,7 +77,7 @@ class PiRuntime {
   }
 
   async _start(wanted) {
-    this._teardown();
+    this._teardownUnlocked();
     const bin = await whichPi(wanted.piPath);
     if (!bin) {
       const err = new Error("pi non installato");
@@ -111,7 +135,7 @@ class PiRuntime {
         await client.call({ type: "switch_session", sessionPath: wanted.sessionPath });
         this.currentSessionFile = wanted.sessionPath;
       } catch (err) {
-        this._teardown();
+        this._teardownUnlocked();
         throw err;
       }
     }
@@ -119,7 +143,7 @@ class PiRuntime {
     return client;
   }
 
-  _teardown() {
+  _teardownUnlocked() {
     if (this.client) {
       this.client.removeAllListeners();
       this.client.expectedExit = true;
@@ -127,6 +151,12 @@ class PiRuntime {
       this.client = null;
     }
     this.startOpts = null;
+  }
+
+  _teardown() {
+    return this._withLock(() => {
+      this._teardownUnlocked();
+    });
   }
 
   _onMessage(msg) {
@@ -288,6 +318,7 @@ class PiRuntime {
   }
 
   async forceStopAndRecover() {
+    return this._withLock(async () => {
     const snapshot = { ...(this.startOpts || {}) };
     const sessionPath = this.currentSessionFile || snapshot.sessionPath || null;
     const client = this.client;
@@ -314,58 +345,80 @@ class PiRuntime {
       sessionPath,
     });
     return { restarted: true, sessionPath };
+    });
   }
 
   async newSession(opts = {}) {
-    // Blank chat: restart as ephemeral (--no-session) so launching a new chat
-    // never creates empty session files; persistence kicks in on first prompt.
+    return this._withLock(async () => {
+    const wantedCwd = opts.cwd !== undefined ? opts.cwd : this.startOpts?.cwd;
+    const wantedSessionDir = opts.sessionDir !== undefined ? opts.sessionDir : this.startOpts?.sessionDir;
+    const rpcPayload = {
+      type: "new_session",
+      ...(opts.parentSession ? { parentSession: opts.parentSession } : {}),
+    };
+
+    // Reuse the live pi process when cwd/sessionDir are unchanged: calling
+    // new_session over RPC avoids SIGTERM (exit 143) from an unnecessary
+    // persist:true -> persist:false respawn while another request is in flight.
+    if (this.client && !this.exitInfo && this.startOpts) {
+      const cwdOk = (wantedCwd || null) === (this.startOpts.cwd || null);
+      const dirOk = (wantedSessionDir || undefined) === this.startOpts.sessionDir;
+      if (cwdOk && dirOk) {
+        const res = await this.client.request(rpcPayload);
+        if (!res.success) throw new Error(res.error || "new_session fallito");
+        this.startOpts = {
+          ...this.startOpts,
+          cwd: wantedCwd,
+          sessionDir: wantedSessionDir,
+          persist: false,
+          sessionPath: null,
+        };
+        this.currentSessionFile = null;
+        await this._applySessionOptions(opts);
+        return res.data;
+      }
+    }
+
     const client = await this.ensureStarted({
-      ...(this.startOpts || {}),
-      cwd: opts.cwd || this.startOpts?.cwd,
-      piPath: opts.piPath || this.startOpts?.piPath,
-      provider: opts.provider || this.startOpts?.provider,
-      model: opts.model || this.startOpts?.model,
-      sessionDir: opts.sessionDir || this.startOpts?.sessionDir,
+      cwd: wantedCwd,
+      piPath: opts.piPath,
+      provider: opts.provider,
+      model: opts.model,
+      sessionDir: wantedSessionDir,
       persist: false,
       sessionPath: null,
-    });
-    const res = await client.request({ type: "new_session", ...(opts.parentSession ? { parentSession: opts.parentSession } : {}) });
+    }, { nested: true });
+    const res = await client.request(rpcPayload);
     if (!res.success) throw new Error(res.error || "new_session fallito");
-    await Promise.all([
-      opts.provider && opts.model ? this.setModel(opts.provider, opts.model) : Promise.resolve(),
-      opts.thinkingLevel ? this.setThinkingLevel(opts.thinkingLevel) : Promise.resolve(),
-    ]);
+    await this._applySessionOptions(opts);
     this.currentSessionFile = null;
     return res.data;
+  });
   }
 
   /** Open an existing chat from history. */
   async openSession(sessionPath, opts = {}) {
-    if (!this.running || !this.startOpts?.persist) {
-      await this._start({
-        cwd: opts.cwd,
-        persist: true,
-        sessionPath,
-        piPath: opts.piPath,
-        provider: opts.provider,
-        model: opts.model,
-        sessionDir: opts.sessionDir,
-      });
-      await Promise.all([
-        opts.provider && opts.model ? this.setModel(opts.provider, opts.model) : Promise.resolve(),
-        opts.thinkingLevel ? this.setThinkingLevel(opts.thinkingLevel) : Promise.resolve(),
-      ]);
-      return { ok: true };
-    }
-    const res = await this._request({ type: "switch_session", sessionPath });
-    this.currentSessionFile = sessionPath;
-    const st = this.startOpts;
-    this.startOpts = { ...st, persist: true, sessionPath };
-    await Promise.all([
-      opts.provider && opts.model ? this.setModel(opts.provider, opts.model) : Promise.resolve(),
-      opts.thinkingLevel ? this.setThinkingLevel(opts.thinkingLevel) : Promise.resolve(),
-    ]);
-    return res;
+    return this._withLock(async () => {
+      if (!this.running || !this.startOpts?.persist) {
+        await this._start({
+          cwd: opts.cwd,
+          persist: true,
+          sessionPath,
+          piPath: opts.piPath,
+          provider: opts.provider,
+          model: opts.model,
+          sessionDir: opts.sessionDir,
+        });
+        await this._applySessionOptions(opts);
+        return { ok: true };
+      }
+      const res = await this._requestUnlocked({ type: "switch_session", sessionPath });
+      this.currentSessionFile = sessionPath;
+      const st = this.startOpts;
+      this.startOpts = { ...st, persist: true, sessionPath };
+      await this._applySessionOptions(opts);
+      return res;
+    });
   }
 
   uiRespond(id, payload) {
@@ -373,24 +426,29 @@ class PiRuntime {
   }
 
   async restart(overrides = {}) {
-    if (!this.running) return;
-    const opts = { ...(this.startOpts || {}) };
-    let sessionPath = opts.sessionPath || this.currentSessionFile || null;
-    try {
-      const state = await this.client.call({ type: "get_state" });
-      sessionPath = state.sessionFile || sessionPath;
-    } catch {}
-    await this._start({
-      ...opts,
-      ...overrides,
-      persist: Boolean(sessionPath || opts.persist),
-      sessionPath,
+    return this._withLock(async () => {
+      if (!this.running) return;
+      const opts = { ...(this.startOpts || {}) };
+      let sessionPath = opts.sessionPath || this.currentSessionFile || null;
+      try {
+        const state = await this.client.call({ type: "get_state" });
+        sessionPath = state.sessionFile || sessionPath;
+      } catch {}
+      await this._start({
+        ...opts,
+        ...overrides,
+        persist: Boolean(sessionPath || opts.persist),
+        sessionPath,
+      });
     });
   }
 
-  async _request(command, timeoutMs) {
-    const client = await this.ensureStarted(this.startOpts || {});
-    const res = await client.request(command, timeoutMs);
+  async _requestUnlocked(command, timeoutMs) {
+    if (this.starting) await this.starting;
+    if (!this.client || this.exitInfo) {
+      await this.ensureStarted(this.startOpts || {}, { nested: true });
+    }
+    const res = await this.client.request(command, timeoutMs);
     if (!res.success) {
       const err = new Error(res.error || `Comando ${command.type} fallito`);
       err.response = res;
@@ -399,8 +457,14 @@ class PiRuntime {
     return res.data;
   }
 
+  async _request(command, timeoutMs) {
+    return this._withLock(() => this._requestUnlocked(command, timeoutMs));
+  }
+
   stop() {
-    this._teardown();
+    return this._withLock(() => {
+      this._teardownUnlocked();
+    });
   }
 }
 

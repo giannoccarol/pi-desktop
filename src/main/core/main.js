@@ -706,13 +706,29 @@ ipcMain.handle("sessions:preview", (_e, file) => {
 
 // Endpoint paginato per la cronologia progressiva: restituisce gli ultimi N messaggi
 // bypassando il limite di 100 del preview standard.
-ipcMain.handle("sessions:messagesPage", (_e, { file, limit = 2000 }) => {
+function resolveSessionFile(file) {
   const resolvedRoot = path.resolve(sessionsDir());
   const resolvedFile = path.resolve(file);
   if (!resolvedFile.startsWith(resolvedRoot + path.sep) || !resolvedFile.endsWith(".jsonl")) {
     throw new Error("Percorso sessione non valido");
   }
+  return resolvedFile;
+}
+
+ipcMain.handle("sessions:messagesPage", (_e, { file, limit = 2000 }) => {
+  const resolvedFile = resolveSessionFile(file);
   return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile), Math.min(limit, 3000), 2_000_000);
+});
+
+ipcMain.handle("sessions:messageCount", (_e, { file }) => {
+  const resolvedFile = resolveSessionFile(file);
+  return { count: sessionsStore.countSessionMessages(resolvedFile) };
+});
+
+ipcMain.handle("sessions:messagesRange", (_e, { file, start, end }) => {
+  const resolvedFile = resolveSessionFile(file);
+  const messages = sessionsStore.readSessionMessagesSlice(resolvedFile, start, end);
+  return ipcSanitize.sanitizeMessagesPayload({ messages }, messages.length, 2_000_000);
 });
 
 ipcMain.handle("sessions:delete", async (_e, file) => {

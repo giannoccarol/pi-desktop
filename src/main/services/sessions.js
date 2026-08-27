@@ -195,4 +195,24 @@ function readSessionMessages(file) {
   return { messages };
 }
 
-module.exports = { defaultSessionsDir, listSessions, parseSessionFile, readSessionMessages, deleteSession };
+function readSessionMessagesSlice(file, start, end) {
+  const { messages } = readSessionMessages(file);
+  const from = Math.max(0, start | 0);
+  const to = Math.min(messages.length, end | 0);
+  if (to <= from) return [];
+  return messages.slice(from, to);
+}
+
+function countSessionMessages(file) {
+  return readSessionMessages(file).messages.length;
+}
+
+module.exports = {
+  defaultSessionsDir,
+  listSessions,
+  parseSessionFile,
+  readSessionMessages,
+  readSessionMessagesSlice,
+  countSessionMessages,
+  deleteSession,
+};

@@ -174,19 +174,19 @@
       return false;
     }
     const displayMessages=window.piChatUtils.collapseRetryAttempts(msgs.messages||[]);
+    const rawVisibleCount=(msgs.messages||[]).length;
     const shouldExpandHistory = Boolean(msgs.truncated && msgs.hiddenCount);
     if(shouldExpandHistory){
       window.piUi?.toast?.(t("toast.sessionTruncated", { shown: displayMessages.length, hidden: msgs.hiddenCount }), "info", 5200);
     }
     state.activeSessionFile=current.sessionFile||null;
     state.activeTabId=current.tabId||state.activeTabId;
-    const identical = Array.isArray(paintedCache) && messagesEqual(paintedCache, displayMessages);
+    resetHistoryState(state.activeSessionFile, rawVisibleCount, shouldExpandHistory ? msgs.hiddenCount : 0);
+    const domEmpty = !el.messages?.childNodes?.length || Boolean(el.messages?.querySelector?.(".chat-loading"));
+    const identical = Array.isArray(paintedCache) && messagesEqual(paintedCache, displayMessages) && !domEmpty;
     if(!identical){
       const painted=await renderConversation(displayMessages,isCurrent);
       if(painted===false||!isCurrent()) return false;
-    }
-    if(shouldExpandHistory && state.activeSessionFile){
-      void expandTruncatedHistory(state.activeSessionFile, msgs.hiddenCount, switchGeneration);
     }
     cacheSessionMessages(state.activeSessionFile, displayMessages, state.activeTabId);
     cacheSessionDom(state.activeSessionFile, state.activeTabId);
@@ -273,35 +273,27 @@
       if(generation===state.switchGeneration) clearSessionLoading();
     }
   }
-  // --- Cronologia progressiva (#perf): le chat lunghissime aprono con la
-  // finestra di contesto del runtime (ultimi ~100 messaggi). Scrollando in cima,
-  // i messaggi piu' vecchi vengono precaricati a chunk dal file JSONL completo
-  // (gia' letto da sessions:preview), mantenendo l'ancora di scroll.
-  const historyState = { file: null, full: null, start: -1, loading: false };
+  // --- Cronologia progressiva (#perf): le chat lunghe aprono con la finestra
+  // runtime (~100 messaggi). Scorrendo verso l'alto si caricano chunk dal file
+  // JSONL completo, senza materializzare migliaia di nodi DOM all'apertura.
+  const historyState = { file: null, start: -1, visibleCount: 0, loading: false };
   const HISTORY_CHUNK = 150;
 
-  async function ensureFullHistory(file) {
-    if (historyState.file === file && historyState.full) return historyState.full;
-    const preview = await api.messagesPage(file, 6000).catch(() => null);
-    const raw = preview?.messages || [];
-    const full = (window.piChatUtils?.collapseRetryAttempts ?? ((m) => m))(raw);
-    historyState.file = file;
-    historyState.full = full;
+  function resetHistoryState(file, visibleCount = 0, hiddenCount = 0) {
+    historyState.file = file || null;
     historyState.start = -1;
-    return full;
+    historyState.visibleCount = visibleCount;
+    historyState.hiddenRemaining = hiddenCount;
+    historyState.loading = false;
   }
 
-  async function expandTruncatedHistory(file, hiddenCount, switchGeneration) {
-    if (!file || !hiddenCount) return;
-    let remaining = hiddenCount;
-    for (let guard = 0; remaining > 0 && guard < 40; guard += 1) {
-      if (switchGeneration != null && switchGeneration !== state.switchGeneration) return;
-      if (state.activeSessionFile !== file) return;
-      const loaded = await loadOlderHistory();
-      if (!loaded || loaded <= 0) break;
-      remaining -= loaded;
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+  async function ensureHistoryStart(file) {
+    if (!file || historyState.start >= 0) return historyState.start;
+    const countRes = await api.sessionMessageCount?.(file).catch(() => null);
+    const total = Number(countRes?.count) || 0;
+    if (!total) return -1;
+    historyState.start = Math.max(0, total - historyState.visibleCount);
+    return historyState.start;
   }
 
   async function loadOlderHistory() {
@@ -309,42 +301,44 @@
     const file = s.activeSessionFile;
     const c = el.chat || document.querySelector("#chat");
     if (!file || !c || historyState.loading) return null;
-    // Guardia sul DOM reale: serve una conversazione gia' renderizzata
     const msgsElNow = el.messages || document.querySelector("#messages");
     if (!msgsElNow || msgsElNow.children.length === 0) return null;
+    if (historyState.file !== file) resetHistoryState(file, historyState.visibleCount, historyState.hiddenRemaining || 0);
     const g0 = s.switchGeneration;
     historyState.loading = true;
     try {
-      const full = await ensureFullHistory(file);
-      if (g0 !== s.switchGeneration || !full.length) return null;
-      if (historyState.start < 0) {
-        // Allinea la finestra: quello che mostra il runtime sono gli ultimi N
-        const gm = await api.getMessages(s.activeTabId);
-        if (g0 !== s.switchGeneration) return null;
-        const cur = gm && gm.messages ? gm.messages : (Array.isArray(gm) ? gm : []);
-        historyState.start = Math.max(0, full.length - cur.length);
-        if (historyState.start === 0) return null; // gia' a inizio file
-      }
-      const from = Math.max(0, historyState.start - HISTORY_CHUNK);
-      const count = historyState.start - from;
+      const start = await ensureHistoryStart(file);
+      if (g0 !== s.switchGeneration || start <= 0) return null;
+      const from = Math.max(0, start - HISTORY_CHUNK);
+      const count = start - from;
       if (count <= 0) return null;
 
-      // Pairing tool-call/result sull'intero storico, render su staging
+      const page = await api.messagesRange?.(file, from, start).catch(() => null);
+      if (g0 !== s.switchGeneration) return null;
+      const collapse = window.piChatUtils?.collapseRetryAttempts ?? ((messages) => messages);
+      const chunk = collapse(page?.messages || []);
+      if (!chunk.length) {
+        historyState.start = from;
+        return count;
+      }
+
       const results = new Map();
-      for (const m of full) if (m.role === "toolResult" && m.toolCallId) results.set(m.toolCallId, m);
+      for (const m of chunk) if (m.role === "toolResult" && m.toolCallId) results.set(m.toolCallId, m);
       const consumed = new Set();
       const renderFn = window.piChat?.renderFinalMessage || window.renderFinalMessage;
       const staging = document.createElement("div");
       const savedMsgs = el.messages;
       el.messages = staging;
       try {
-        for (let i = from; i < historyState.start; i++) {
-          try { renderFn(full[i], { results, consumed }); } catch { /* salta messaggi problematici */ }
+        for (let i = 0; i < chunk.length; i++) {
+          try { renderFn(chunk[i], { results, consumed }); } catch { /* salta messaggi problematici */ }
         }
       } finally { el.messages = savedMsgs; }
-      if (!staging.firstChild) { historyState.start = from; return count; }
+      if (!staging.firstChild) {
+        historyState.start = from;
+        return count;
+      }
 
-      // Ancora di scroll: aggiungi sopra senza far saltare la viewport
       const prevSH = c.scrollHeight, prevST = c.scrollTop;
       const wasStick = s.chatStickToBottom;
       s.chatStickToBottom = false;
@@ -354,6 +348,7 @@
       c.scrollTop = c.scrollHeight - prevSH + prevST;
       s.chatStickToBottom = wasStick;
       historyState.start = from;
+      historyState.hiddenRemaining = Math.max(0, from);
       window.piUi?.refreshIcons?.();
       window.piUi?.updateScrollBottomVisibility?.();
       return count;

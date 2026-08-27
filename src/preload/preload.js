@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("piDesktop", {
   listSessions: () => ipcRenderer.invoke("sessions:list"),
   previewSession: (file) => ipcRenderer.invoke("sessions:preview", file),
   messagesPage: (file, limit) => ipcRenderer.invoke("sessions:messagesPage", { file, limit }),
+  sessionMessageCount: (file) => ipcRenderer.invoke("sessions:messageCount", { file }),
+  messagesRange: (file, start, end) => ipcRenderer.invoke("sessions:messagesRange", { file, start, end }),
   deleteSession: (file) => ipcRenderer.invoke("sessions:delete", file),
 
   // agent lifecycle & commands

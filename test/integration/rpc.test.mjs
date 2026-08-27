@@ -65,6 +65,52 @@ test("runtime tabs: switching keeps other chat runtimes alive", async () => {
   pool.stop();
 });
 
+test("runtime tabs: newSession creates tab when cwd changes on empty chat", async () => {
+  const fakes = [];
+  const pool = new RuntimeTabs(() => {}, (send) => {
+    const fake = {
+      running: true,
+      state: { sessionFile: null, isStreaming: false },
+      async ensureStarted() { this.running = true; },
+      async newSession(opts) { this.cwd = opts.cwd; return { ok: true }; },
+      async getState() { return this.state; },
+      stop() { this.running = false; },
+    };
+    fakes.push(fake);
+    return fake;
+  });
+
+  const first = await pool.start({ cwd: "/project-a", persist: false });
+  const second = await pool.newSession({ cwd: "/project-b" });
+
+  assert.notEqual(first.tabId, second.tabId);
+  assert.equal(fakes.length, 2);
+  assert.equal(fakes[1].cwd, "/project-b");
+  pool.stop();
+});
+
+test("runtime tabs: newSession reuses empty tab when cwd unchanged", async () => {
+  const fakes = [];
+  const pool = new RuntimeTabs(() => {}, () => {
+    const fake = {
+      running: true,
+      state: { sessionFile: null, isStreaming: false },
+      async newSession() { return { ok: true }; },
+      async getState() { return this.state; },
+      stop() {},
+    };
+    fakes.push(fake);
+    return fake;
+  });
+
+  const first = await pool.start({ cwd: "/project-a", persist: false });
+  const second = await pool.newSession({ cwd: "/project-a" });
+
+  assert.equal(first.tabId, second.tabId);
+  assert.equal(fakes.length, 1);
+  pool.stop();
+});
+
 test("runtime tabs: coalesces active deltas and suppresses inactive transcript IPC", async () => {
   const events = [];
   const fakes = [];
@@ -397,6 +443,11 @@ test("sessions: parse fixture files and list newest-first", () => {
   const preview = sessionsStore.readSessionMessages(newer);
   assert.deepEqual(preview.messages.map((message) => message.role), ["user", "assistant"]);
   assert.equal(preview.messages[0].content, "primo messaggio di prova");
+  assert.equal(sessionsStore.countSessionMessages(newer), 2);
+  assert.deepEqual(
+    sessionsStore.readSessionMessagesSlice(newer, 0, 1).map((message) => message.role),
+    ["user"],
+  );
 
   sessionsStore.deleteSession(older);
   assert.equal(sessionsStore.listSessions(dir).length, 1);

@@ -162,6 +162,7 @@ class RuntimeTabs {
 
   async start(opts = {}) {
     const tab = this._active();
+    if (opts.cwd) tab.cwd = opts.cwd;
     if (!tab.runtime.running) await this.ensureStarted(opts);
     return { ok: true, tabId: this.activeId };
   }
@@ -215,8 +216,13 @@ class RuntimeTabs {
 
   async newSession(opts = {}) {
     let tab = this._active();
-    if (tab.hasContent || tab.sessionFile || tab.busy) tab = this._create({ cwd: opts.cwd });
-    tab.cwd = opts.cwd || tab.cwd;
+    const targetCwd = opts.cwd || tab.cwd || null;
+    const cwdChanged = Boolean(targetCwd && tab.cwd && targetCwd !== tab.cwd);
+    if (tab.hasContent || tab.sessionFile || tab.busy || cwdChanged) {
+      tab = this._create({ cwd: targetCwd });
+    } else if (targetCwd) {
+      tab.cwd = targetCwd;
+    }
     tab.sessionFile = null;
     tab.title = "Nuova chat";
     tab.hasContent = false;
