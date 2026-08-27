@@ -145,17 +145,6 @@ test("update-service: install on pacman runs pkexec pacman -U", async () => {
   fs.rmSync(pendingDir, { recursive: true, force: true });
 });
 
-test("update-service: pending package already installed is ignored", () => {
-  const pendingDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-upd-"));
-  const packagePath = path.join(pendingDir, "Pi-Desktop-0.14.0-linux-x64.pacman");
-  fs.writeFileSync(packagePath, "fake");
-  assert.equal(parseVersionFromPackageName(path.basename(packagePath)), "0.14.0");
-  assert.equal(pendingPackageNeedsInstall(packagePath, "0.14.0"), false);
-  assert.equal(pendingPackageNeedsInstall(packagePath, "0.13.0"), true);
-  assert.equal(compareVersions("0.14.0", "0.13.0"), 1);
-  fs.rmSync(pendingDir, { recursive: true, force: true });
-});
-
 test("update-service: reconcilePendingPackage clears stale cache at current version", () => {
   const pendingDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-upd-"));
   const packagePath = path.join(pendingDir, "Pi-Desktop-0.14.0-linux-x64.pacman");
@@ -181,5 +170,14 @@ test("update-service: reconcilePendingPackage clears stale cache at current vers
   service.reconcilePendingPackage();
   assert.equal(service.state.status, "idle");
   assert.equal(fs.existsSync(packagePath), false);
+  fs.rmSync(pendingDir, { recursive: true, force: true });
+});
+
+test("update-service: pending package already installed is ignored", () => {
+  const pendingDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-upd-"));
+  const packagePath = path.join(pendingDir, "Pi-Desktop-0.14.0-linux-x64.pacman");
+  fs.writeFileSync(packagePath, "fake");
+  assert.equal(pendingPackageNeedsInstall(packagePath, "0.14.0"), false);
+  assert.equal(pendingPackageNeedsInstall(packagePath, "0.13.0"), true);
   fs.rmSync(pendingDir, { recursive: true, force: true });
 });

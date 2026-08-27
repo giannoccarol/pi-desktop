@@ -186,9 +186,6 @@
     const displayMessages=window.piChatUtils.collapseRetryAttempts(msgs.messages||[]);
     const rawVisibleCount=(msgs.messages||[]).length;
     const shouldExpandHistory = Boolean(msgs.truncated && msgs.hiddenCount);
-    if(shouldExpandHistory){
-      window.piUi?.toast?.(t("toast.sessionTruncated", { shown: displayMessages.length, hidden: msgs.hiddenCount }), "info", 5200);
-    }
     state.activeSessionFile=current.sessionFile||null;
     state.activeTabId=current.tabId||state.activeTabId;
     resetHistoryState(state.activeSessionFile, rawVisibleCount, shouldExpandHistory ? msgs.hiddenCount : 0);

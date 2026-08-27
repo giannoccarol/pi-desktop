@@ -270,14 +270,30 @@ class UpdateService {
       this.pendingPackagePath = null;
       if (["available", "downloaded", "downloading"].includes(this.state.status)) {
         this.setState({
-          status: "idle",
-          availableVersion: null,
+          status: this.state.availableVersion && compareVersions(this.state.availableVersion, this.app.getVersion()) > 0
+            ? "available"
+            : "idle",
           progress: 0,
           error: null,
           pendingPackagePath: null,
         });
       }
       return;
+    }
+
+    if (rawPending && this.state.availableVersion) {
+      const pendingVersion = parseVersionFromPackageName(path.basename(rawPending));
+      if (pendingVersion && compareVersions(pendingVersion, this.state.availableVersion) < 0) {
+        clearPendingPackages(pendingDir);
+        this.pendingPackagePath = null;
+        this.setState({
+          status: "available",
+          progress: 0,
+          error: null,
+          pendingPackagePath: null,
+        });
+        return;
+      }
     }
 
     const pending = rawPending && pendingPackageNeedsInstall(rawPending, this.app.getVersion())
@@ -321,8 +337,28 @@ class UpdateService {
     if (!this.autoUpdater) {
       return { success: false, error: "Updater not available", state: this.getState() };
     }
-    if (["downloading", "downloaded"].includes(this.state.status)) {
+    if (this.state.status === "downloading") {
       return { success: false, skipped: true, state: this.getState() };
+    }
+    if (this.state.status === "downloaded") {
+      this.syncPendingPackageState();
+      const pending = this.pendingPackagePath;
+      const canInstall = pending && pendingPackageNeedsInstall(pending, this.app.getVersion());
+      const pendingVersion = pending ? parseVersionFromPackageName(path.basename(pending)) : null;
+      const newerAvailable = this.state.availableVersion
+        && compareVersions(this.state.availableVersion, this.app.getVersion()) > 0;
+      const pendingOlderThanAvailable = pendingVersion && this.state.availableVersion
+        && compareVersions(pendingVersion, this.state.availableVersion) < 0;
+      if (canInstall && !pendingOlderThanAvailable) {
+        return { success: false, skipped: true, state: this.getState() };
+      }
+      if (!canInstall || pendingOlderThanAvailable) {
+        if (newerAvailable) {
+          this.setState({ status: "available", progress: 0, pendingPackagePath: null });
+        } else {
+          this.setState({ status: "idle", availableVersion: null, progress: 0, pendingPackagePath: null });
+        }
+      }
     }
     try {
       await this.autoUpdater.checkForUpdates();
@@ -337,8 +373,14 @@ class UpdateService {
   }
 
   async download() {
-    if (this.state.status !== "available") {
+    this.syncPendingPackageState();
+    const newerAvailable = this.state.availableVersion
+      && compareVersions(this.state.availableVersion, this.app.getVersion()) > 0;
+    if (this.state.status !== "available" && !newerAvailable) {
       return { success: false, error: "No update is ready to download", state: this.getState() };
+    }
+    if (this.state.status !== "available" && newerAvailable) {
+      this.setState({ status: "available", progress: 0, error: null });
     }
     if (!this.cachedInstall && !this.autoInstall) {
       await this.shell.openExternal(RELEASE_URL).catch(() => {});
