@@ -1,3 +1,10 @@
+## [0.11.1](https://github.com/giannoccarol/pi-desktop/compare/v0.11.0...v0.11.1) (2026-08-27)
+
+
+### Performance Improvements
+
+* **renderer:** sidebar memo-skip + polling hidden + cronologia progressiva + nome configurabile ([8365376](https://github.com/giannoccarol/pi-desktop/commit/8365376ddfbf3404307c21f6d896cbd1d027d18b))
+
 # [0.11.0](https://github.com/giannoccarol/pi-desktop/compare/v0.10.0...v0.11.0) (2026-08-27)
 
 
