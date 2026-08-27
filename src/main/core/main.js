@@ -1141,7 +1141,7 @@ ipcMain.handle("packages:update", async (_e, target) => {
 ipcMain.handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null, autoInstall: true, packageType: "" }));
 ipcMain.handle("update:check", async () => (appUpdateService ? appUpdateService.check(true) : { success: false, error: "Updater not initialized" }));
 ipcMain.handle("update:download", async () => (appUpdateService ? appUpdateService.download() : { success: false, error: "Updater not initialized" }));
-ipcMain.handle("update:install", () => (appUpdateService ? appUpdateService.install() : { success: false, error: "Updater not initialized" }));
+ipcMain.handle("update:install", async () => (appUpdateService ? appUpdateService.install() : { success: false, error: "Updater not initialized" }));
 ipcMain.handle("app:relaunch", () => {
   relaunchInstalledApp();
   return { success: true };

@@ -1,7 +1,7 @@
 {
   "name": "pi-desktop",
   "productName": "Pi Desktop",
-  "version": "0.14.0",
+  "version": "0.13.0",
   "description": "Desktop companion for the Pi coding agent: chat history, provider/model switching, and self-updating pi independent of the app.",
   "main": "src/main/core/main.js",
   "license": "MIT",
@@ -10,36 +10,6 @@
     "email": "lorenzo@pi.dev"
   },
   "homepage": "https://pi.dev",
-  "scripts": {
-    "start": "node scripts/build/prepare-build-assets.js && node scripts/run-electron.js",
-    "check": "node scripts/verify/check.js",
-    "verify": "node scripts/verify/verify.js",
-    "verify:quick": "node scripts/verify/verify.js --quick",
-    "verify:smoke": "node scripts/verify/smoke-electron.js",
-    "prepare": "node scripts/hooks/install-hooks.js && node scripts/build/prepare-build-assets.js",
-    "test": "node --test \"test/**/*.test.mjs\"",
-    "test:e2e": "playwright test -c e2e/playwright.config.mjs",
-    "test:e2e:perf": "playwright test -c e2e/playwright.config.mjs --grep @perf",
-    "test:legacy": "node test/rpc.test.mjs",
-    "lint": "eslint src --ext .js,.mjs",
-    "lint:fix": "eslint src --ext .js,.mjs --fix",
-    "dist": "electron-builder",
-    "bump": "node scripts/build/set-version.js",
-    "release:check": "node scripts/build/check-release-version.js",
-    "release:assets": "node scripts/build/release-assets.js"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.62.1",
-    "@semantic-release/changelog": "^7.0.0",
-    "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/npm": "^12.0.1",
-    "@semantic-release/release-notes-generator": "^14.0.3",
-    "electron": "^43.4.1",
-    "electron-builder": "^26.15.3",
-    "eslint": "^8.57.0",
-    "semantic-release": "^24.2.3"
-  },
   "dependencies": {
     "electron-updater": "^6.8.9",
     "lucide": "^1.34.0"
