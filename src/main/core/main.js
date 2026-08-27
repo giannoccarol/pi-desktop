@@ -1138,7 +1138,7 @@ ipcMain.handle("packages:update", async (_e, target) => {
 
 // --- app OTA (electron-updater, GitHub Releases) ----------------------------
 
-ipcMain.handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null, autoInstall: true, packageType: "" }));
+ipcMain.handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null, autoInstall: true, cachedInstall: false, packageType: "", pendingPackagePath: null }));
 ipcMain.handle("update:check", async () => (appUpdateService ? appUpdateService.check(true) : { success: false, error: "Updater not initialized" }));
 ipcMain.handle("update:download", async () => (appUpdateService ? appUpdateService.download() : { success: false, error: "Updater not initialized" }));
 ipcMain.handle("update:install", async () => (appUpdateService ? appUpdateService.install() : { success: false, error: "Updater not initialized" }));
