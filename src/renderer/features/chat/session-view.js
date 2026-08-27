@@ -8,6 +8,8 @@
 
   const sessionMessageCache = new Map();
   const SESSION_CACHE_MAX = 60;
+  let openingSessionTimer = null;
+  const OPENING_SESSION_TIMEOUT_MS = 120_000;
 
   function cacheKeysFor(file, tabId){
     return [...new Set([
@@ -95,6 +97,10 @@
   }
   function setSessionLoading(file, {showSkeleton=true}={}){
     state.openingSessionFile=file;
+    if (openingSessionTimer) clearTimeout(openingSessionTimer);
+    openingSessionTimer = setTimeout(() => {
+      if (state.openingSessionFile === file) clearSessionLoading();
+    }, OPENING_SESSION_TIMEOUT_MS);
     document.body.classList.add("session-loading");
     if(el.chat) {
       el.chat.classList.add("session-loading");
@@ -113,6 +119,10 @@
     if(window.piSidebar?.renderProjects) window.piSidebar.renderProjects();
   }
   function clearSessionLoading(){
+    if (openingSessionTimer) {
+      clearTimeout(openingSessionTimer);
+      openingSessionTimer = null;
+    }
     state.openingSessionFile=null;
     document.body.classList.remove("session-loading");
     if(el.chat) el.chat.classList.remove("session-loading", "session-preview-ready");
@@ -235,6 +245,7 @@
         stage="preview";
         const preview=await api.previewSession(session.file).catch(()=>null);
         if(generation!==state.switchGeneration) return;
+        if (preview?.loadError) window.piUi?.toast?.(t("toast.sessionLoadError"), "error", 6500);
         const previewMessages=window.piChatUtils.collapseRetryAttempts(preview?.messages||[]);
         if(previewMessages.length){
           await renderConversation(previewMessages,()=>generation===state.switchGeneration);
@@ -315,6 +326,10 @@
 
       const page = await api.messagesRange?.(file, from, start).catch(() => null);
       if (g0 !== s.switchGeneration) return null;
+      if (page?.loadError) {
+        window.piUi?.toast?.(t("toast.sessionLoadError"), "error", 6500);
+        return null;
+      }
       const collapse = window.piChatUtils?.collapseRetryAttempts ?? ((messages) => messages);
       const chunk = collapse(page?.messages || []);
       if (!chunk.length) {

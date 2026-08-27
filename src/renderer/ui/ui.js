@@ -275,22 +275,32 @@
     if (el.thinkingMenu) el.thinkingMenu.classList.add("hidden");
   }
 
-  function setSidebarVisible(visible) {
-    const el = getEl();
-    if (el.sidebar) el.sidebar.classList.toggle("collapsed", !visible);
-    if (root.piDesktop && root.piDesktop.setSettings) root.piDesktop.setSettings({ sidebarVisible: visible }).catch(() => {});
-  }
-
   function applyTheme(theme) {
     const resolved = theme === "dark" ? "dark" : "light";
     document.documentElement.dataset.theme = resolved;
-    try { localStorage.setItem("pi-desktop-theme", resolved); } catch {}
+    if (root.piUiSettings?.persistTheme && root.piDesktop?.setSettings) {
+      root.piUiSettings.persistTheme(root.piDesktop, resolved).catch((err) => {
+        console.warn("[theme] persist failed:", err);
+      });
+    } else {
+      try { localStorage.setItem("pi-desktop-theme", resolved); } catch {}
+    }
     const el = getEl();
     if (el.themeBtn) {
       el.themeBtn.innerHTML = icon(resolved === "dark" ? "moon" : "sun");
       el.themeBtn.title = resolved === "dark" ? "Passa al tema chiaro" : "Passa al tema scuro";
     }
     refreshIcons();
+  }
+
+  function setSidebarVisible(visible) {
+    const el = getEl();
+    if (el.sidebar) el.sidebar.classList.toggle("collapsed", !visible);
+    if (root.piDesktop?.setSettings) {
+      root.piDesktop.setSettings({ sidebarVisible: visible }).then((res) => {
+        if (res?.saveOk === false) console.warn("[sidebar] visibility save failed");
+      }).catch((err) => console.warn("[sidebar]", err));
+    }
   }
 
   const api = {
