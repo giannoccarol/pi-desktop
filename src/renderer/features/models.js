@@ -105,8 +105,16 @@ async function refreshHeaderFromState() {
     updateModelLabel();
     if (st.sessionFile) state.activeSessionFile = st.sessionFile;
     if (st.thinkingLevel) el.thinkingLabel.textContent = st.thinkingLevel;
+    if (typeof st.autoRetryEnabled === "boolean") {
+      state.autoRetryEnabled = st.autoRetryEnabled;
+    } else if (state.settings?.composerAutoRetry !== undefined) {
+      state.autoRetryEnabled = state.settings.composerAutoRetry !== false;
+    }
+    if (el.autoRetry) el.autoRetry.checked = state.autoRetryEnabled !== false;
     await refreshThinkingLevels();
-  } catch {}
+  } catch (err) {
+    console.warn("[refreshHeaderFromState]", err);
+  }
 }
 
 async function refreshThinkingLevels() {

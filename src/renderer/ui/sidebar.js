@@ -101,6 +101,12 @@ function createTabButton() {
   button.addEventListener("click", (event) => {
     if (!event.target.closest(".chat-tab-close")) switchToTab(button.dataset.tabId);
   });
+  button.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    const tabId = button.dataset.tabId;
+    if (!tabId || !api.popOutTab) return;
+    api.popOutTab(tabId).catch((err) => toast(`Pop-out fallito: ${err.message}`, "error"));
+  });
   button.addEventListener("auxclick", (event) => {
     if (event.button === 1) {
       event.preventDefault();
@@ -368,6 +374,7 @@ function renderProjects() {
       if (event.target.closest(".project-menu")) return;
       if (state.expandedProjects.has(project.path)) state.expandedProjects.delete(project.path);
       else state.expandedProjects.add(project.path);
+      window.piUiSettings?.persistExpandedProjects?.(api, state.expandedProjects).catch(() => {});
       renderProjects();
     });
     row.querySelector(".project-new").addEventListener("click", (e) => {
@@ -546,15 +553,13 @@ function updateNavigationStatus(tabId) {
 }
 
 function initSidebarResize() {
-  const key = "pi-desktop-sidebar-width";
   const minW = 210;
   const maxW = 520;
   const defaultW = 268;
   const sidebar = el.sidebar;
   const resizer = el.sidebarResizer;
   if (!sidebar || !resizer) return;
-  let saved = null;
-  try { saved = parseInt(localStorage.getItem(key), 10); } catch {}
+  const saved = window.piUiSettings?.sidebarWidth?.(state.settings);
   if (Number.isFinite(saved) && saved >= minW && saved <= maxW) {
     sidebar.style.setProperty("--sidebar-w", `${saved}px`);
   }
@@ -575,7 +580,7 @@ function initSidebarResize() {
     sidebar.classList.remove("resizing");
     document.body.classList.remove("is-resizing");
     const cur = parseInt(getComputedStyle(sidebar).getPropertyValue("--sidebar-w"), 10) || sidebar.getBoundingClientRect().width;
-    try { localStorage.setItem(key, String(cur)); } catch {}
+    window.piUiSettings?.persistSidebarWidth?.(api, cur).catch(() => {});
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("mouseup", onUp);
   };
@@ -594,7 +599,7 @@ function initSidebarResize() {
   resizer.addEventListener("dblclick", (e) => {
     e.preventDefault();
     sidebar.style.setProperty("--sidebar-w", `${defaultW}px`);
-    try { localStorage.setItem(key, String(defaultW)); } catch {}
+    window.piUiSettings?.persistSidebarWidth?.(api, defaultW).catch(() => {});
   });
 }
 

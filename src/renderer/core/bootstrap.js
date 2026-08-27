@@ -270,6 +270,7 @@
       try {
         await api.setAutoRetry(el.autoRetry.checked);
         state.autoRetryEnabled = el.autoRetry.checked;
+        await window.piUiSettings?.persistComposerAutoRetry?.(api, el.autoRetry.checked);
       } catch (err) { toast(err.message, "error"); }
     });
     el.compactBtn.addEventListener("click", () => (window.compactSession||window.piSession?.compactSession)?.());
@@ -384,25 +385,36 @@
         (window.renderProviderSettings||window.piAuth?.renderProviderSettings)?.();
         (window.renderPackageStore||window.piPackageView?.renderPackageStore)?.();
         (window.updateModelLabel||window.piModels?.updateModelLabel)?.();
-        try { await api.setSettings({ language: lang }); state.settings.language = lang; } catch {}
+        try {
+          const res = await api.setSettings({ language: lang });
+          state.settings.language = lang;
+          if (res?.saveOk === false) toast(t("toast.settingsSaveFailed") || "Salvataggio impostazioni fallito", "error");
+        } catch (err) { toast(err.message || "Salvataggio lingua fallito", "error"); }
         toast(lang === "en" ? "Language: English" : "Lingua: Italiano");
       });
     }
     // Notification toggles in General settings
     if (el.settingNotificationsEnabled) {
-      const isEnabled = (() => { try { const v = localStorage.getItem("pi-desktop-notifications-enabled"); return v === null ? true : v !== "false" && v !== "0"; } catch { return true; } })();
-      const isSound = (() => { try { return localStorage.getItem("pi-desktop-notifications-sound") === "true"; } catch { return false; } })();
+      const uiPrefs = window.piUiSettings;
+      const isEnabled = uiPrefs ? uiPrefs.notificationsEnabled(state.settings) : true;
+      const isSound = uiPrefs ? uiPrefs.notificationsSound(state.settings) : false;
       el.settingNotificationsEnabled.checked = isEnabled;
       if (el.settingNotificationsSound) el.settingNotificationsSound.checked = isSound;
-      el.settingNotificationsEnabled.addEventListener("change", () => {
-        try { localStorage.setItem("pi-desktop-notifications-enabled", String(el.settingNotificationsEnabled.checked)); } catch {}
+      el.settingNotificationsEnabled.addEventListener("change", async () => {
+        try {
+          await uiPrefs?.persistNotifications?.(api, { enabled: el.settingNotificationsEnabled.checked });
+          state.settings.notificationsEnabled = el.settingNotificationsEnabled.checked;
+        } catch (err) { toast(err.message, "error"); }
         if (el.settingNotificationsEnabled.checked && typeof Notification !== "undefined" && Notification.permission === "default") {
           try { Notification.requestPermission().catch(() => {}); } catch {}
         }
       });
       if (el.settingNotificationsSound) {
-        el.settingNotificationsSound.addEventListener("change", () => {
-          try { localStorage.setItem("pi-desktop-notifications-sound", String(el.settingNotificationsSound.checked)); } catch {}
+        el.settingNotificationsSound.addEventListener("change", async () => {
+          try {
+            await uiPrefs?.persistNotifications?.(api, { sound: el.settingNotificationsSound.checked });
+            state.settings.notificationsSound = el.settingNotificationsSound.checked;
+          } catch (err) { toast(err.message, "error"); }
         });
       }
     }
@@ -414,10 +426,10 @@
       if (el.settingLanguage) el.settingLanguage.value = (i18n && i18n.getLang()) || state.settings.language || "it";
       if (el.settingUserName) el.settingUserName.value = state.settings.userName || "";
       if (el.settingNotificationsEnabled) {
-        try { const v = localStorage.getItem("pi-desktop-notifications-enabled"); el.settingNotificationsEnabled.checked = v === null ? true : v !== "false" && v !== "0"; } catch { el.settingNotificationsEnabled.checked = true; }
+        el.settingNotificationsEnabled.checked = window.piUiSettings?.notificationsEnabled?.(state.settings) ?? true;
       }
       if (el.settingNotificationsSound) {
-        try { el.settingNotificationsSound.checked = localStorage.getItem("pi-desktop-notifications-sound") === "true"; } catch { el.settingNotificationsSound.checked = false; }
+        el.settingNotificationsSound.checked = window.piUiSettings?.notificationsSound?.(state.settings) ?? false;
       }
       (window.switchSettingsTab||window.piAuth?.switchSettingsTab)?.("general");
       el.modalSettings.showModal();
@@ -556,37 +568,63 @@
       if (!document.hidden) pollTick();
     });
     state.settings = await api.getSettings();
+    if (window.piUiSettings?.migrateLocalStorageToSettings) {
+      state.settings = await window.piUiSettings.migrateLocalStorageToSettings(api, state.settings);
+    }
     const initialLang = state.settings.language === "en" || state.settings.language === "it" ? state.settings.language : (i18n ? i18n.getLang() : "it");
     if (i18n && initialLang !== i18n.getLang()) i18n.setLang(initialLang);
     else if (i18n) i18n.applyI18n();
     if (state.settings.sidebarVisible === false) el.sidebar.classList.add("collapsed");
     el.statusCwd.textContent = state.settings.cwd || "";
-    // Applica il nome utente alla UI (profile sidebar + saluto)
     applyUserName(state.settings.userName);
+    for (const path of window.piUiSettings?.expandedProjectsList?.(state.settings) || []) {
+      state.expandedProjects.add(path);
+    }
     state.expandedProjects.add(state.settings.cwd);
+    state.autoRetryEnabled = state.settings.composerAutoRetry !== false;
     setConversationMode(false, false);
 
     wireUi();
     // setupAppUpdates via piStatus
     (window.setupAppUpdates||window.piStatus?.setupAppUpdates)?.();
     setupStaleInstallWatch();
-    // Explicit permission request for notifications if enabled
-    try {
-      const v = localStorage.getItem("pi-desktop-notifications-enabled");
-      const enabled = v === null ? true : v !== "false" && v !== "0";
-      if (enabled && typeof Notification !== "undefined" && Notification.permission === "default" && typeof Notification.requestPermission === "function") {
-        Notification.requestPermission().catch(() => {});
-      }
-    } catch {}
-    const savedTheme = localStorage.getItem("pi-desktop-theme");
-    const preferredTheme = savedTheme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const notifEnabled = window.piUiSettings?.notificationsEnabled?.(state.settings) ?? true;
+    if (notifEnabled && typeof Notification !== "undefined" && Notification.permission === "default" && typeof Notification.requestPermission === "function") {
+      Notification.requestPermission().catch(() => {});
+    }
+    const preferredTheme = window.piUiSettings?.resolvedTheme?.(state.settings) || "light";
     applyTheme(preferredTheme);
+    const sidebarW = window.piUiSettings?.sidebarWidth?.(state.settings);
+    if (Number.isFinite(sidebarW) && el.sidebar) el.sidebar.style.setProperty("--sidebar-w", `${sidebarW}px`);
     refreshIcons();
+
+    const popOutTabId = new URLSearchParams(window.location.search).get("popOutTabId");
+    if (popOutTabId) {
+      try {
+        await api.activateTab(popOutTabId);
+        state.activeTabId = popOutTabId;
+        const tab = (await (window.refreshTabs || window.piSidebar?.refreshTabs)?.())?.find?.((candidate) => candidate.id === popOutTabId)
+          || state.tabs.find((candidate) => candidate.id === popOutTabId);
+        if (tab) {
+          state.activeSessionFile = tab.sessionFile || null;
+          el.statusCwd.textContent = tab.cwd || state.settings?.cwd || "";
+          await (window.reloadConversationFromRuntime || window.piSessionView?.reloadConversationFromRuntime)?.({
+            restoreTab: true,
+            pinToBottom: true,
+          });
+        }
+      } catch (err) {
+        console.warn("[popOutTab]", err);
+      }
+    }
 
     try {
       const started = await api.start({ persist: false });
       state.activeTabId = started.tabId || state.activeTabId;
       await (window.refreshTabs||window.piSidebar?.refreshTabs)?.();
+      state.autoRetryEnabled = state.settings.composerAutoRetry !== false;
+      if (el.autoRetry) el.autoRetry.checked = state.autoRetryEnabled !== false;
+      await api.setAutoRetry(state.autoRetryEnabled !== false).catch(() => {});
       await (window.refreshHeaderFromState||window.piModels?.refreshHeaderFromState)?.();
       console.info("[pi-desktop] agente avviato");
     } catch (err) {

@@ -26,10 +26,15 @@ function flattenTree(nodes, depth = 0, output = []) {
 async function loadSessionTree() {
   el.treeList.innerHTML = `<div class="menu-empty">Caricamento albero…</div>`;
   try {
-    const [data, forkData] = await Promise.all([api.getTree(), api.getForkMessages()]);
+    const [data, forkData, entriesData] = await Promise.all([
+      api.getTree(),
+      api.getForkMessages(),
+      api.getEntries().catch(() => ({ entries: [] })),
+    ]);
     const forkIds = new Set((forkData.messages || []).map((message) => message.entryId));
     const flat = flattenTree(data.tree || []);
-    el.treeSummary.textContent = `${flat.length} voci · ${forkIds.size} punti di fork`;
+    const entryCount = Array.isArray(entriesData?.entries) ? entriesData.entries.length : 0;
+    el.treeSummary.textContent = `${flat.length} voci · ${forkIds.size} punti di fork${entryCount ? ` · ${entryCount} eventi` : ""}`;
     el.treeList.innerHTML = "";
     if (!flat.length) {
       el.treeList.innerHTML = `<div class="menu-empty">La sessione è ancora vuota.</div>`;
@@ -112,7 +117,9 @@ async function openSessionTools() {
     el.steeringMode.value = current.steeringMode || "one-at-a-time";
     el.followUpMode.value = current.followUpMode || "one-at-a-time";
     el.autoCompaction.checked = current.autoCompactionEnabled !== false;
-    el.autoRetry.checked = state.autoRetryEnabled;
+    el.autoRetry.checked = typeof current.autoRetryEnabled === "boolean"
+      ? current.autoRetryEnabled
+      : state.autoRetryEnabled !== false;
     el.modalSessionTools.showModal();
   } catch (err) {
     toast(`Stato sessione non disponibile: ${err.message}`, "error");

@@ -82,7 +82,7 @@ test("regression: stateful renderer modules keep helpers out of the shared globa
 
 test("regression: index.html loads modules in correct order (store → composer → chat → sidebar → app)", () => {
   const html = fs.readFileSync(path.join(root, "src/renderer/index.html"), "utf8");
-  const order = ["lib/utils.js", "ui/ui.js", "ui/message-view.js", "lib/package-helpers.js", "lib/navigation.js", "lib/persistence.js", "core/store.js", "features/chat/composer.js", "features/chat/chat.js", "ui/sidebar.js", "features/session/palette.js", "features/chat/mentions.js", "features/chat/diff-view.js", "features/chat/dragdrop.js", "features/chat/session-view.js", "ui/status.js", "features/models.js", "features/package-view.js", "lib/forms.js", "features/runtime-events.js", "features/auth.js", "features/extension-bridge.js", "ui/media.js", "lib/i18n.js", "core/bootstrap.js", "core/app.js"];
+  const order = ["lib/utils.js", "ui/ui.js", "ui/message-view.js", "lib/package-helpers.js", "lib/navigation.js", "lib/persistence.js", "lib/ui-settings.js", "core/store.js", "features/chat/composer.js", "features/chat/chat.js", "ui/sidebar.js", "features/session/palette.js", "features/chat/mentions.js", "features/chat/diff-view.js", "features/chat/dragdrop.js", "features/chat/session-view.js", "ui/status.js", "features/models.js", "features/package-view.js", "lib/forms.js", "features/runtime-events.js", "features/auth.js", "features/extension-bridge.js", "ui/media.js", "lib/i18n.js", "core/bootstrap.js", "core/app.js"];
   let lastIdx = -1;
   for (const file of order) {
     const idx = html.indexOf(`src="${file}"`);
@@ -148,7 +148,7 @@ test("regression: eslint + check still cover new modules", () => {
   assert.ok(pkg.scripts.lint, "lint script should exist");
   assert.ok(pkg.scripts.check, "check script should exist");
   // Verify new modules are present on disk and will be packaged via src/**/*
-  for (const mod of ["lib/utils.js", "ui/ui.js", "ui/message-view.js", "lib/package-helpers.js", "lib/navigation.js", "lib/persistence.js", "core/store.js", "features/chat/composer.js", "features/chat/chat.js", "ui/sidebar.js", "features/session/palette.js", "features/chat/mentions.js", "features/chat/diff-view.js", "features/chat/dragdrop.js", "features/chat/session-view.js", "ui/status.js", "features/models.js", "features/package-view.js", "lib/forms.js", "features/runtime-events.js", "features/auth.js", "features/extension-bridge.js", "ui/media.js", "core/bootstrap.js"]) {
+  for (const mod of ["lib/utils.js", "ui/ui.js", "ui/message-view.js", "lib/package-helpers.js", "lib/navigation.js", "lib/persistence.js", "lib/ui-settings.js", "core/store.js", "features/chat/composer.js", "features/chat/chat.js", "ui/sidebar.js", "features/session/palette.js", "features/chat/mentions.js", "features/chat/diff-view.js", "features/chat/dragdrop.js", "features/chat/session-view.js", "ui/status.js", "features/models.js", "features/package-view.js", "lib/forms.js", "features/runtime-events.js", "features/auth.js", "features/extension-bridge.js", "ui/media.js", "core/bootstrap.js"]) {
     assert.ok(fs.existsSync(path.join(root, "src/renderer", mod)), `${mod} should exist`);
   }
 });

@@ -3,6 +3,8 @@
   const NOTIF_ENABLED_KEY = "pi-desktop-notifications-enabled";
   const NOTIF_SOUND_KEY = "pi-desktop-notifications-sound";
   function isNotificationsEnabled(storage) {
+    const settings = typeof window !== "undefined" ? window.piStore?.state?.settings : null;
+    if (settings && settings.notificationsEnabled !== undefined) return Boolean(settings.notificationsEnabled);
     try {
       const s = storage || (typeof localStorage !== "undefined" ? localStorage : null);
       if (!s) return true;
@@ -12,6 +14,8 @@
     } catch { return true; }
   }
   function isSoundEnabled(storage) {
+    const settings = typeof window !== "undefined" ? window.piStore?.state?.settings : null;
+    if (settings && settings.notificationsSound !== undefined) return Boolean(settings.notificationsSound);
     try {
       const s = storage || (typeof localStorage !== "undefined" ? localStorage : null);
       if (!s) return false;
