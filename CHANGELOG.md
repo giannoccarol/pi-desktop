@@ -1,3 +1,11 @@
+## [0.14.1](https://github.com/giannoccarol/pi-desktop/compare/v0.14.0...v0.14.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* downgrade version to 0.13.0 and enhance update service for Linux package installations ([a8e0478](https://github.com/giannoccarol/pi-desktop/commit/a8e04780f7567e7f7004faa330e074c6aa7b0658))
+* **updates:** clear stale pacman cache after install ([917569e](https://github.com/giannoccarol/pi-desktop/commit/917569ee67cb23656080666d2e32e44ef63f9ac0))
+
 # [0.14.0](https://github.com/giannoccarol/pi-desktop/compare/v0.13.1...v0.14.0) (2026-08-27)
 
 
