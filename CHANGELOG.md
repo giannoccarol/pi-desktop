@@ -1,3 +1,10 @@
+## [0.13.1](https://github.com/giannoccarol/pi-desktop/compare/v0.13.0...v0.13.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* **win32:** detect e spawn del pi agent su Windows ([031f515](https://github.com/giannoccarol/pi-desktop/commit/031f5152aa8ee666044453ab27801a0ae5947f21))
+
 # [0.13.0](https://github.com/giannoccarol/pi-desktop/compare/v0.12.0...v0.13.0) (2026-08-27)
 
 
