@@ -45,10 +45,15 @@ class PiRpcClient extends EventEmitter {
       : ["--mode", "rpc", ...(this.opts.args || [])];
     const env = { ...process.env, ...(this.opts.env || {}) };
     this.exitInfo = null;
+    // On Windows npm global installs expose `pi` as a .cmd shim, which cannot
+    // be spawned directly; route it through the shell (cmd.exe).
+    const needsShell = process.platform === "win32" && /\.(cmd|bat)$/i.test(this.bin);
     this.proc = spawn(this.bin, args, {
       cwd: this.opts.cwd || undefined,
       env,
       stdio: ["pipe", "pipe", "pipe"],
+      shell: needsShell,
+      windowsHide: true,
     });
     this.started = true;
 
@@ -166,6 +171,14 @@ class PiRpcClient extends EventEmitter {
     if (!this.proc) return;
     const p = this.proc;
     this.proc = null;
+    if (process.platform === "win32") {
+      // With shell:true the child is cmd.exe; kill the whole tree so the real
+      // pi process does not linger.
+      try {
+        spawn("taskkill", ["/pid", String(p.pid), "/T", "/F"], { windowsHide: true });
+      } catch {}
+      return;
+    }
     try {
       p.kill("SIGTERM");
     } catch {}
