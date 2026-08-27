@@ -1,3 +1,16 @@
+# [0.11.0](https://github.com/giannoccarol/pi-desktop/compare/v0.10.0...v0.11.0) (2026-08-27)
+
+
+### Bug Fixes
+
+* **ipc-sanitize:** remove redundant parameter from capSerializedSize function call ([ddfb45c](https://github.com/giannoccarol/pi-desktop/commit/ddfb45c6de9b41e3dbee3276a70c542d459dfe11))
+
+
+### Features
+
+* **performance:** optimize performance budgets and enhance chat history loading ([0abf5bf](https://github.com/giannoccarol/pi-desktop/commit/0abf5bf11c8fc3f31b5de66cb07c7ff066176af6))
+* **user-settings:** add user name feature and enhance chat history loading ([706c492](https://github.com/giannoccarol/pi-desktop/commit/706c492a418c795742a17c910377721dfa9959ef))
+
 # [0.10.0](https://github.com/giannoccarol/pi-desktop/compare/v0.9.3...v0.10.0) (2026-08-26)
 
 
