@@ -44,8 +44,8 @@
 
       <div class="side-foot">
         <div class="profile">
-          <span class="avatar">L</span>
-          <span>Lorenzo</span>
+          <span class="avatar" data-profile-avatar>L</span>
+          <span data-profile-name>Lorenzo</span>
         </div>
         <span id="sessions-count" class="muted small"></span>
         <button id="btn-settings" class="icon-btn borderless tiny" data-i18n-title="sideFoot.settings.title" data-i18n-aria-label="sideFoot.settings.title">
@@ -95,7 +95,7 @@
               <img class="hero-img hero-img--light" src="img/pi-logo-on-light.svg" alt="" />
               <img class="hero-img hero-img--dark" src="img/pi-logo-on-dark.svg" alt="" />
             </div>
-            <h1 data-i18n="hero.greeting">Ciao Lorenzo,</h1>
+            <h1 data-greeting>Ciao Lorenzo,</h1>
             <p data-i18n="hero.subtitle">come posso aiutarti oggi?</p>
             <div id="empty-hint" class="hint hidden"></div>
           </div>
@@ -244,6 +244,10 @@
             <option value="it" data-i18n="settings.language.it">Italiano</option>
             <option value="en" data-i18n="settings.language.en">English</option>
           </select>
+        </label>
+        <label class="field">
+          <span data-i18n="settings.userName.label">Il tuo nome</span>
+          <input id="setting-username" type="text" data-i18n-placeholder="settings.userName.placeholder" spellcheck="false" maxlength="40" />
         </label>
         <div class="field notification-row">
           <span data-i18n="settings.notifications.title">Notifiche desktop</span>

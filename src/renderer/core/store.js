@@ -84,6 +84,7 @@
     settingPiPath: $("#setting-pipath"),
     settingSessionsDir: $("#setting-sessionsdir"),
     settingLanguage: $("#setting-language"),
+    settingUserName: $("#setting-username"),
     settingNotificationsEnabled: $("#setting-notifications-enabled"),
     settingNotificationsSound: $("#setting-notifications-sound"),
     appVersion: $("#app-version"),

@@ -54,6 +54,7 @@ function loadSettings() {
     sessionsDir: "",
     sidebarVisible: true,
     language: "it",
+    userName: "Lorenzo",
     lastModel: null,
     lastThinkingLevel: null,
     sessionPreferences: {},
@@ -671,6 +672,17 @@ ipcMain.handle("sessions:preview", (_e, file) => {
     throw new Error("Percorso sessione non valido");
   }
   return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile));
+});
+
+// Endpoint paginato per la cronologia progressiva: restituisce gli ultimi N messaggi
+// bypassando il limite di 100 del preview standard.
+ipcMain.handle("sessions:messagesPage", (_e, { file, limit = 2000 }) => {
+  const resolvedRoot = path.resolve(sessionsDir());
+  const resolvedFile = path.resolve(file);
+  if (!resolvedFile.startsWith(resolvedRoot + path.sep) || !resolvedFile.endsWith(".jsonl")) {
+    throw new Error("Percorso sessione non valido");
+  }
+  return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile), Math.min(limit, 3000), 10_000_000);
 });
 
 ipcMain.handle("sessions:delete", async (_e, file) => {

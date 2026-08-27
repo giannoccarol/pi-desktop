@@ -20,6 +20,15 @@
   function closeMenus(){ return (window.piUi ? window.piUi.closeMenus : window.closeMenus)?.apply(null, arguments); }
   function setSidebarVisible(v){ return (window.piUi ? window.piUi.setSidebarVisible : window.setSidebarVisible)?.apply(null, arguments); }
   function applyTheme(th){ return (window.piUi ? window.piUi.applyTheme : window.applyTheme)?.apply(null, arguments); }
+  function applyUserName(name) {
+    const n = (name || "").trim() || "Lorenzo";
+    const profileName = document.querySelector("[data-profile-name]");
+    const profileAvatar = document.querySelector("[data-profile-avatar]");
+    const greeting = document.querySelector("[data-greeting]");
+    if (profileName) profileName.textContent = n;
+    if (profileAvatar) profileAvatar.textContent = (n || "L")[0].toUpperCase();
+    if (greeting) greeting.textContent = `Ciao ${n},`;
+  }
 
   function getUiRequest() {
     if (window.piExtensionBridge && window.piExtensionBridge.getUiRequest) return window.piExtensionBridge.getUiRequest();
@@ -386,6 +395,7 @@
       el.settingPiPath.value = state.settings.piPath || "";
       el.settingSessionsDir.value = state.settings.sessionsDir || "";
       if (el.settingLanguage) el.settingLanguage.value = (i18n && i18n.getLang()) || state.settings.language || "it";
+      if (el.settingUserName) el.settingUserName.value = state.settings.userName || "";
       if (el.settingNotificationsEnabled) {
         try { const v = localStorage.getItem("pi-desktop-notifications-enabled"); el.settingNotificationsEnabled.checked = v === null ? true : v !== "false" && v !== "0"; } catch { el.settingNotificationsEnabled.checked = true; }
       }
@@ -466,10 +476,12 @@
         cwd: el.settingCwd.textContent.trim(),
         piPath: el.settingPiPath.value.trim(),
         sessionsDir: el.settingSessionsDir.value.trim(),
+        userName: el.settingUserName ? el.settingUserName.value.trim() : state.settings.userName || "",
         language: lang,
       };
       try {
         state.settings = await api.setSettings(patch);
+        applyUserName(state.settings.userName);
         if (i18n && lang !== i18n.getLang()) i18n.setLang(lang);
         state.expandedProjects.add(state.settings.cwd);
         el.statusCwd.textContent = state.settings.cwd || "";
@@ -510,12 +522,30 @@
   }
 
   async function boot() {
+    // Polling di stato: registrato SUBITO all'inizio di boot() perche' i test
+    // possono osservare il recapito delle sessioni prima che il tail sincrono
+    // di boot() arrivi alla fine. In pausa quando la finestra e' nascosta.
+    async function pollTick() {
+      if (document.hidden) return;
+      await Promise.allSettled([
+        (window.refreshSessions || window.piSidebar?.refreshSessions)?.(),
+        (window.refreshPiStatus || window.piStatus?.refreshPiStatus)?.(),
+        (window.refreshGitStatus || window.piStatus?.refreshGitStatus)?.(),
+      ]);
+    }
+    window.__piPollTick = pollTick;
+    setInterval(pollTick, 10000);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) pollTick();
+    });
     state.settings = await api.getSettings();
     const initialLang = state.settings.language === "en" || state.settings.language === "it" ? state.settings.language : (i18n ? i18n.getLang() : "it");
     if (i18n && initialLang !== i18n.getLang()) i18n.setLang(initialLang);
     else if (i18n) i18n.applyI18n();
     if (state.settings.sidebarVisible === false) el.sidebar.classList.add("collapsed");
     el.statusCwd.textContent = state.settings.cwd || "";
+    // Applica il nome utente alla UI (profile sidebar + saluto)
+    applyUserName(state.settings.userName);
     state.expandedProjects.add(state.settings.cwd);
     setConversationMode(false, false);
 
@@ -557,28 +587,59 @@
     ]);
     el.emptyState.classList.remove("hidden");
     el.input.focus();
+
+    // Primo avvio: se il nome non e' mai stato impostato dall'utente, chiedilo
+    const savedName = (state.settings.userName || "").trim();
+    if (!savedName || savedName === "Lorenzo") {
+      setTimeout(() => showNameDialog(savedName === "Lorenzo"), 1500);
+    }
+  }
+
+  // Modale di primo avvio: usa lo stesso schema <dialog> dei settings
+  function showNameDialog(hasDefault) {
+    const dlg = document.createElement("dialog");
+    dlg.id = "modal-welcome-name";
+    dlg.innerHTML = `
+      <div class="modal-body">
+        <div class="modal-title-row">
+          <span class="modal-icon"><i data-lucide="user"></i></span>
+          <div>
+            <h2>Come ti chiami?</h2>
+            <p class="muted small">${hasDefault ? "Vuoi cambiare il nome predefinito?" : "Scegli un nome per personalizzare l'esperienza."}</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>Il tuo nome</span>
+          <input id="welcome-name-input" type="text" maxlength="40" spellcheck="false"
+            placeholder="es. Mario, Anna, ..." />
+        </label>
+        <div class="modal-actions" style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="welcome-skip" class="btn ghost">${hasDefault ? "Mantieni" : "Salta"}</button>
+          <button id="welcome-ok" class="btn primary">Conferma</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    window.piUi?.refreshIcons?.(dlg);
+    const inp = dlg.querySelector("#welcome-name-input");
+    inp.focus();
+    const save = async () => {
+      const name = inp.value.trim();
+      if (name && name !== state.settings.userName) {
+        const s = await api.setSettings({ userName: name });
+        state.settings = s;
+        applyUserName(name);
+      }
+      dlg.close();
+      dlg.remove();
+    };
+    dlg.querySelector("#welcome-ok").addEventListener("click", save);
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
+    dlg.querySelector("#welcome-skip").addEventListener("click", () => { dlg.close(); dlg.remove(); });
   }
 
   window.piBootstrap = { wireUi, boot };
   window.wireUi = wireUi;
   window.boot = boot;
-
-  // Polling di stato: in pausa quando la finestra e' nascosta (CPU/batteria),
-  // con refresh immediato al ritorno in primo piano. Registrato a module scope
-  // cosi' esiste subito, indipendentemente dal completamento di boot().
-  // Esposto come __piPollTick per i test e2e.
-  async function pollTick() {
-    if (document.hidden) return;
-    await Promise.allSettled([
-      (window.refreshSessions || window.piSidebar?.refreshSessions)?.(),
-      (window.refreshPiStatus || window.piStatus?.refreshPiStatus)?.(),
-      (window.refreshGitStatus || window.piStatus?.refreshGitStatus)?.(),
-    ]);
-  }
-  window.__piPollTick = pollTick;
-  setInterval(pollTick, 10000);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) pollTick();
-  });
   if (typeof module !== "undefined" && module.exports) module.exports = { wireUi, boot };
 })();
