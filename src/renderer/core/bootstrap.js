@@ -498,6 +498,11 @@
       if (dir) el.settingCwd.textContent = dir;
     });
     el.btnSettingsClose.addEventListener("click", () => el.modalSettings.close());
+    el.modalSettings.addEventListener("close", () => {
+      if (!state.providersDirty) return;
+      state.providersDirty = false;
+      (window.refreshHeaderFromState || window.piModels?.refreshHeaderFromState)?.(true).catch(() => {});
+    });
     el.btnSettingsSave.addEventListener("click", async () => {
       const previousCwd = state.settings.cwd;
       const lang = el.settingLanguage ? (el.settingLanguage.value === "en" ? "en" : "it") : (state.settings.language || "it");

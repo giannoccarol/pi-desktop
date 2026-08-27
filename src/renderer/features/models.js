@@ -60,28 +60,37 @@ function renderProviderMenu() {
     if (!providers.has(model.provider)) providers.set(model.provider, []);
     providers.get(model.provider).push(model);
   }
+  for (const provider of state.providers || []) {
+    if (provider.configured && !providers.has(provider.id)) providers.set(provider.id, []);
+  }
   el.providerList.innerHTML = "";
   if (!providers.size) {
     el.providerList.innerHTML = `<div class="menu-empty">Nessun provider configurato.</div>`;
     return;
   }
   for (const [provider, models] of providers) {
+    const configured = (state.providers || []).find((candidate) => candidate.id === provider);
+    const label = configured?.name || provider;
     const item = document.createElement("div");
     item.className = "menu-item" + (state.currentModel?.provider === provider ? " selected" : "");
-    item.innerHTML = `<span class="mi-name">${escapeHtml(provider)}</span><span class="mi-sub">${models.length} modelli</span>`;
+    item.innerHTML = `<span class="mi-name">${escapeHtml(label)}</span><span class="mi-sub">${models.length} modelli</span>`;
     item.addEventListener("click", async () => {
       if (state.currentModel?.provider === provider) {
         closeMenus();
         return;
       }
       const target = models[0];
+      if (!target) {
+        toast(`Nessun modello disponibile per ${label}.`, "warn");
+        return;
+      }
       try {
         await api.setModel(target.provider, target.id);
         state.currentModel = { provider: target.provider, id: target.id };
         updateModelLabel();
         renderProviderMenu();
         closeMenus();
-        toast(`Provider: ${provider} · ${target.name || target.id}`);
+        toast(`Provider: ${label} · ${target.name || target.id}`);
       } catch (err) {
         toast(`Cambio provider fallito: ${err.message}`, "error");
       }
@@ -97,11 +106,11 @@ function updateModelLabel() {
   el.modelLabel.textContent = m ? (details?.name || m.id) : "scegli modello";
 }
 
-async function refreshHeaderFromState() {
+async function refreshHeaderFromState(forceModels = false) {
   try {
     const st = await api.getState();
     state.currentModel = st.model ? { provider: st.model.provider, id: st.model.id } : null;
-    await loadModels().catch(() => []);
+    await loadModels(forceModels).catch(() => []);
     updateModelLabel();
     if (st.sessionFile) state.activeSessionFile = st.sessionFile;
     if (st.thinkingLevel) el.thinkingLabel.textContent = st.thinkingLevel;

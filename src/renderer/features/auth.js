@@ -33,7 +33,10 @@
     try {
       state.providers = await api.loginProvider(provider.id, authType);
       state.modelsCache = null;
+      state.providersDirty = true;
       renderProviderSettings();
+      await refreshHeaderFromState(true);
+      state.providersDirty = false;
       toast(`${provider.name} configurato.`);
       el.modalAuth.close();
     } catch (err) {
@@ -171,7 +174,7 @@
       state.modelsCache = null;
       state.commands = [];
       toast("Impostazioni native Pi salvate; runtime ricaricato.");
-      await refreshHeaderFromState();
+      await refreshHeaderFromState(true);
       await loadNativePiSettings();
     } catch (err) {
       toast(`Salvataggio impostazioni Pi fallito: ${err.message}`, "error", 8000);
@@ -247,8 +250,11 @@
         try {
           state.providers = await api.setProviderKey(provider.id, keyInput.value);
           state.modelsCache = null;
+          state.providersDirty = true;
           toast(`${provider.name} configurato. Runtime di pi aggiornato.`);
           renderProviderSettings();
+          await refreshHeaderFromState(true);
+          state.providersDirty = false;
         } catch (err) {
           toast(`Configurazione fallita: ${err.message}`, "error");
         } finally {
@@ -263,8 +269,11 @@
         try {
           state.providers = await api.removeProvider(provider.id);
           state.modelsCache = null;
+          state.providersDirty = true;
           toast(`${provider.name} disconnesso.`);
           renderProviderSettings();
+          await refreshHeaderFromState(true);
+          state.providersDirty = false;
         } catch (err) {
           toast(`Disconnessione fallita: ${err.message}`, "error");
         }
