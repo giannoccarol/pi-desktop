@@ -60,12 +60,27 @@ function loadSettings() {
     lastModel: null,
     lastThinkingLevel: null,
     sessionPreferences: {},
+    theme: "",
+    notificationsEnabled: true,
+    notificationsSound: false,
+    sidebarWidth: null,
+    diffMode: "unified",
+    expandedProjects: [],
+    composerAutoRetry: true,
   };
   try {
     const loaded = { ...defaults, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) };
     const projects = Array.isArray(loaded.projects) ? loaded.projects : [loaded.cwd];
     loaded.projects = [...new Set([loaded.cwd, ...projects].filter((value) => typeof value === "string" && value.trim()))];
     loaded.sessionPreferences = loaded.sessionPreferences && typeof loaded.sessionPreferences === "object" ? loaded.sessionPreferences : {};
+    loaded.expandedProjects = Array.isArray(loaded.expandedProjects)
+      ? [...new Set(loaded.expandedProjects.filter((value) => typeof value === "string" && value.trim()))]
+      : [];
+    if (loaded.notificationsEnabled === undefined) loaded.notificationsEnabled = true;
+    if (loaded.notificationsSound === undefined) loaded.notificationsSound = false;
+    if (loaded.composerAutoRetry === undefined) loaded.composerAutoRetry = true;
+    if (loaded.diffMode !== "split") loaded.diffMode = "unified";
+    if (typeof loaded.theme !== "string") loaded.theme = "";
     if (loaded.userNamePromptSeen === undefined && String(loaded.userName || "").trim()) {
       loaded.userNamePromptSeen = true;
     }
@@ -78,8 +93,21 @@ function loadSettings() {
 function saveSettings() {
   try {
     fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
-    fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2));
-  } catch {}
+    fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2), "utf8");
+    return true;
+  } catch (err) {
+    console.error("[settings] salvataggio fallito:", err);
+    return false;
+  }
+}
+
+function sanitizeMessagesForIpc(payload, maxMessages, maxBytes) {
+  try {
+    return ipcSanitize.sanitizeMessagesPayload(payload, maxMessages, maxBytes);
+  } catch (err) {
+    console.error("[sanitize messages] fallita:", err);
+    return { messages: [], truncated: false, hiddenCount: 0, loadError: "sanitize_failed" };
+  }
 }
 
 function sessionsDir() {
@@ -506,7 +534,9 @@ async function rememberCurrentPreference() {
       settings.sessionPreferences[current.sessionFile] = preference;
     }
     saveSettings();
-  } catch {}
+  } catch (err) {
+    console.warn("[preference] remember failed:", err?.message || err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +546,11 @@ async function rememberCurrentPreference() {
 ipcMain.handle("settings:get", () => publicSettings());
 
 ipcMain.handle("settings:set", async (_e, patch) => {
-  const allowed = ["cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language", "userName", "userNamePromptSeen"];
+  const allowed = [
+    "cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language",
+    "userName", "userNamePromptSeen", "theme", "notificationsEnabled", "notificationsSound",
+    "sidebarWidth", "diffMode", "expandedProjects", "composerAutoRetry",
+  ];
   const previousCwd = settings.cwd;
   const previousPiPath = settings.piPath;
   const previousSessionsDir = settings.sessionsDir;
@@ -530,16 +564,30 @@ ipcMain.handle("settings:set", async (_e, patch) => {
       settings[k] = String(patch[k] || "").trim().slice(0, 40);
     } else if (k === "userNamePromptSeen") {
       settings[k] = Boolean(patch[k]);
+    } else if (k === "theme") {
+      const v = String(patch[k] || "").toLowerCase();
+      settings[k] = v === "dark" || v === "light" ? v : "";
+    } else if (k === "notificationsEnabled" || k === "notificationsSound" || k === "composerAutoRetry") {
+      settings[k] = Boolean(patch[k]);
+    } else if (k === "sidebarWidth") {
+      const n = Number(patch[k]);
+      settings[k] = Number.isFinite(n) ? Math.max(210, Math.min(520, Math.round(n))) : null;
+    } else if (k === "diffMode") {
+      settings[k] = patch[k] === "split" ? "split" : "unified";
+    } else if (k === "expandedProjects") {
+      settings[k] = Array.isArray(patch[k])
+        ? [...new Set(patch[k].filter((value) => typeof value === "string" && value.trim()))]
+        : [];
     } else settings[k] = patch[k];
   }
   if ("cwd" in patch) settings.projects = [...new Set([...(settings.projects || []), settings.cwd])];
-  saveSettings();
+  const saveOk = saveSettings();
   if (previousCwd !== settings.cwd) {
     runtime.stop();
   } else if (previousPiPath !== settings.piPath || previousSessionsDir !== settings.sessionsDir) {
     await runtime.restart({ piPath: settings.piPath || undefined }).catch(() => runtime.stop());
   }
-  return publicSettings();
+  return { ...publicSettings(), saveOk };
 });
 
 ipcMain.handle("dialog:pickDirectory", async (_e, title) => {
@@ -701,7 +749,7 @@ ipcMain.handle("sessions:preview", (_e, file) => {
   if (!resolvedFile.startsWith(resolvedRoot + path.sep) || !resolvedFile.endsWith(".jsonl")) {
     throw new Error("Percorso sessione non valido");
   }
-  return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile));
+  return sanitizeMessagesForIpc(sessionsStore.readSessionMessages(resolvedFile));
 });
 
 // Endpoint paginato per la cronologia progressiva: restituisce gli ultimi N messaggi
@@ -717,7 +765,7 @@ function resolveSessionFile(file) {
 
 ipcMain.handle("sessions:messagesPage", (_e, { file, limit = 2000 }) => {
   const resolvedFile = resolveSessionFile(file);
-  return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile), Math.min(limit, 3000), 2_000_000);
+  return sanitizeMessagesForIpc(sessionsStore.readSessionMessages(resolvedFile), Math.min(limit, 3000), 2_000_000);
 });
 
 ipcMain.handle("sessions:messageCount", (_e, { file }) => {
@@ -728,7 +776,7 @@ ipcMain.handle("sessions:messageCount", (_e, { file }) => {
 ipcMain.handle("sessions:messagesRange", (_e, { file, start, end }) => {
   const resolvedFile = resolveSessionFile(file);
   const messages = sessionsStore.readSessionMessagesSlice(resolvedFile, start, end);
-  return ipcSanitize.sanitizeMessagesPayload({ messages }, messages.length, 2_000_000);
+  return sanitizeMessagesForIpc({ messages }, messages.length, 2_000_000);
 });
 
 ipcMain.handle("sessions:delete", async (_e, file) => {

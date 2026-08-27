@@ -33,6 +33,7 @@ class UpdateService {
       if (this.window && !this.window.isDestroyed()) this.window.webContents.send(channel, payload);
     });
     this.app = dependencies.app || app;
+    this.shell = dependencies.shell || shell;
     this.autoUpdater = dependencies.autoUpdater || autoUpdater;
     this.timers = {
       setTimeout: dependencies.setTimeout || setTimeout,
@@ -164,6 +165,10 @@ class UpdateService {
   }
 
   async download() {
+    if (!this.autoInstall) {
+      await this.shell.openExternal(RELEASE_URL).catch(() => {});
+      return { success: true, manual: true, skipped: true, state: this.getState() };
+    }
     if (this.state.status !== "available") {
       return { success: false, error: "No update is ready to download", state: this.getState() };
     }
@@ -187,7 +192,7 @@ class UpdateService {
       return { success: false, error: "Updater not available" };
     }
     if (!this.autoInstall) {
-      shell.openExternal(RELEASE_URL).catch(() => {});
+      this.shell.openExternal(RELEASE_URL).catch(() => {});
       return { success: true, manual: true };
     }
     this.timers.setImmediate(() => this.autoUpdater.quitAndInstall(false, true));

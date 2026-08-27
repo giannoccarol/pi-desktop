@@ -136,9 +136,15 @@ async function setupAppUpdates() {
       }
       const s = appUpdateState?.status;
       if (s === "available") {
-        settingsBtn.disabled = true;
-        const res = await api.downloadAppUpdate();
-        if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+        if (appUpdateState?.autoInstall === false) {
+          const res = await api.installAppUpdate();
+          if (res.manual) toast(t("updates.app.manualOpened"), "info");
+        } else {
+          settingsBtn.disabled = true;
+          const res = await api.downloadAppUpdate();
+          if (res.manual) toast(t("updates.app.manualOpened"), "info");
+          else if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
+        }
       } else if (s === "downloaded") {
         const res = await api.installAppUpdate();
         if (res.manual) toast(t("updates.app.manualOpened"), "info");
@@ -170,9 +176,13 @@ function handleAppUpdateState(state) {
     btn.classList.toggle("hidden", !visible);
     btn.disabled = state.status === "downloading" || state.status === "checking";
     if (state.status === "available") {
-      if (icon) icon.setAttribute("data-lucide", "download");
-      if (label) label.textContent = t("updates.app.availableVersion", { version: state.availableVersion || "" });
-      btn.title = t("updates.app.availableVersion", { version: state.availableVersion || "" });
+      if (state.autoInstall === false) {
+        if (icon) icon.setAttribute("data-lucide", "external-link");
+        if (label) label.textContent = t("updates.app.manualInstall");
+        btn.title = t("updates.app.manualReady");
+      } else if (icon) icon.setAttribute("data-lucide", "download");
+      if (state.autoInstall !== false && label) label.textContent = t("updates.app.availableVersion", { version: state.availableVersion || "" });
+      if (state.autoInstall !== false) btn.title = t("updates.app.availableVersion", { version: state.availableVersion || "" });
       btn.classList.remove("is-downloading");
       if (prev !== "available") toast(t("updates.app.availableVersion", { version: state.availableVersion || "" }), "info");
     } else if (state.status === "downloading") {
@@ -236,42 +246,6 @@ function handleAppUpdateState(state) {
     }
   }
   refreshIcons();
-}
-
-// ---------------------------------------------------------------------------
-// Extension UI bridge (dialogs requested by pi extensions)
-// ---------------------------------------------------------------------------
-
-let uiRequest = null;
-
-function handleUiRequest(msg) {
-  switch (msg.method) {
-    case "notify":
-      toast(msg.message || "", msg.notifyType === "warning" ? "warn" : msg.notifyType === "error" ? "error" : "info");
-      break;
-    case "setTitle":
-      if (msg.title) document.title = `Pi Desktop — ${msg.title}`;
-      break;
-    case "set_editor_text":
-      if (typeof msg.text === "string") {
-        el.input.value = msg.text;
-        autosize();
-        el.input.focus();
-      }
-      break;
-    case "setStatus":
-      updateExtensionStatus(msg.statusKey, msg.statusText);
-      break;
-    case "setWidget":
-      updateExtensionWidget(msg.widgetKey, msg.widgetLines, msg.widgetPlacement);
-      break;
-    case "select":
-    case "confirm":
-    case "input":
-    case "editor":
-      showDialog(msg);
-      break;
-  }
 }
 
 async function refreshGitStatus(){

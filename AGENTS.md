@@ -18,7 +18,7 @@ Cosa verifica `scripts/verify.js`:
 
 1. **Syntax** `npm run check` (`node --check` su tutti i `src/**/*.js`) — `src/renderer/app.js:*`, `src/main/main.js:*`, ecc.
 2. **Renderer integrity** — ogni `src/renderer/*.js` deve avere `<script src="...">` in `src/renderer/index.html:*:`. Ordine obbligatorio:
-   `utils.js -> navigation.js -> persistence.js -> store.js -> composer.js -> chat.js -> sidebar.js -> palette.js -> session.js -> i18n.js -> app.js`
+   `lib/utils.js -> lib/persistence.js -> lib/ui-settings.js -> core/store.js -> features/chat/composer.js -> ... -> core/app.js`
    Se estrai un modulo, aggiungilo qui altrimenti white-screen.
 3. **Lint** `npm run lint` — 0 errori (warnings ok)
 4. **Tests** `npm test` — 55 tests, su Windows i check `0o600` sono skippati (`test/rpc.test.mjs:224`, `320`)
