@@ -202,6 +202,18 @@
   const state = {
     settings: null,
     sessions: [],
+    sessionMeta: {},
+    selectedSessions: new Set(),
+    bulkMode: false,
+    explorerEntries: [],
+    explorerVisible: false,
+    searchMode: "title",
+    searchFullTextResults: [],
+    terminalVisible: false,
+    terminalHistory: [],
+    terminalBusy: false,
+    budgets: {},
+    healthBanner: null,
     providers: [],
     attachments: [],
     packages: [],
@@ -258,6 +270,7 @@
     pendingTabId: null,
     switchGeneration: 0,
     creatingChat: false,
+    onboardingSeen: false,
   };
 
   root.piStore = { el, state, $ };

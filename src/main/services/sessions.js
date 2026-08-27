@@ -175,6 +175,80 @@ function listSessions(sessionsDir = defaultSessionsDir()) {
 function deleteSession(file) {
   fs.unlinkSync(file);
   sessionMetaCache.delete(file);
+  sessionMessagesCache.delete(file);
+}
+
+function searchSessionsFullText(sessionsDirPath, query, maxResults = 80) {
+  const needle = String(query || "").trim().toLowerCase();
+  if (!needle) return [];
+  const sessions = listSessions(sessionsDirPath);
+  const results = [];
+  for (const session of sessions) {
+    if (results.length >= maxResults) break;
+    const nameHit = (session.name || "").toLowerCase().includes(needle);
+    const previewHit = (session.preview || "").toLowerCase().includes(needle);
+    if (nameHit || previewHit) {
+      results.push({ ...session, matchReason: nameHit ? "name" : "preview" });
+      continue;
+    }
+    // scan full content via cached messages, bounded scan
+    try {
+      const msgs = readSessionMessagesCached(session.file);
+      let hitSnippet = null;
+      for (const msg of msgs) {
+        const text = typeof msg.content === "string" ? msg.content : Array.isArray(msg.content) ? msg.content.map((b) => b.text || "").join(" ") : "";
+        const idx = text.toLowerCase().indexOf(needle);
+        if (idx !== -1) {
+          const start = Math.max(0, idx - 60);
+          hitSnippet = truncate(text.slice(start, start + 160).replace(/\s+/g, " ").trim(), 160);
+          break;
+        }
+      }
+      if (hitSnippet) results.push({ ...session, matchReason: "content", snippet: hitSnippet });
+    } catch {}
+  }
+  return results;
+}
+
+function bulkDeleteSessions(files, sessionsDirPath) {
+  let deleted = 0;
+  const errors = [];
+  for (const file of files) {
+    try {
+      const resolved = path.resolve(String(file));
+      const root = path.resolve(sessionsDirPath);
+      if (!resolved.startsWith(root + path.sep) || !resolved.endsWith(".jsonl")) throw new Error("percorso non valido");
+      deleteSession(resolved);
+      deleted++;
+    } catch (err) { errors.push({ file, error: err.message }); }
+  }
+  return { deleted, errors };
+}
+
+function listExplorerTree(cwd, depth = 2, maxEntries = 600) {
+  const out = [];
+  function walk(dir, relBase, currentDepth) {
+    if (currentDepth > depth || out.length >= maxEntries) return;
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    entries.sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    for (const e of entries) {
+      if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "__pycache__") continue;
+      const abs = path.join(dir, e.name);
+      const rel = relBase ? path.join(relBase, e.name) : e.name;
+      let size = 0;
+      let isDir = e.isDirectory();
+      try { const st = fs.statSync(abs); size = st.size; isDir = st.isDirectory(); } catch { continue; }
+      out.push({ name: e.name, path: abs, rel, isDirectory: isDir, size });
+      if (out.length >= maxEntries) return;
+      if (isDir && currentDepth < depth) walk(abs, rel, currentDepth + 1);
+    }
+  }
+  try { if (fs.statSync(cwd).isDirectory()) walk(path.resolve(cwd), "", 0); } catch {}
+  return out.slice(0, maxEntries);
 }
 
 /** Read the currently selected branch directly from a Pi JSONL session. */
@@ -232,4 +306,7 @@ module.exports = {
   readSessionMessagesSlice,
   countSessionMessages,
   deleteSession,
+  searchSessionsFullText,
+  bulkDeleteSessions,
+  listExplorerTree,
 };

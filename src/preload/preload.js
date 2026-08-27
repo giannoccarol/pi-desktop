@@ -24,6 +24,14 @@ contextBridge.exposeInMainWorld("piDesktop", {
   sessionMessageCount: (file) => ipcRenderer.invoke("sessions:messageCount", { file }),
   messagesRange: (file, start, end) => ipcRenderer.invoke("sessions:messagesRange", { file, start, end }),
   deleteSession: (file) => ipcRenderer.invoke("sessions:delete", file),
+  searchFullText: (query) => ipcRenderer.invoke("sessions:searchFullText", query),
+  bulkDeleteSessions: (files) => ipcRenderer.invoke("sessions:bulkDelete", files),
+  bulkExportSessions: (files) => ipcRenderer.invoke("sessions:bulkExport", files),
+  getSessionMeta: () => ipcRenderer.invoke("sessions:getMeta"),
+  setSessionMeta: (file, patch) => ipcRenderer.invoke("sessions:setMeta", { file, patch }),
+  listExplorer: (cwd, depth) => ipcRenderer.invoke("fs:listExplorer", { cwd, depth }),
+  readTextFile: (filePath) => ipcRenderer.invoke("fs:readTextFile", filePath),
+  getPiLogs: () => ipcRenderer.invoke("health:getPiLogs"),
 
   // agent lifecycle & commands
   start: (opts) => ipcRenderer.invoke("pi:start", opts),

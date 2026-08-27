@@ -60,6 +60,9 @@ function loadSettings() {
     lastModel: null,
     lastThinkingLevel: null,
     sessionPreferences: {},
+    sessionMeta: {},
+    budgets: {},
+    notificationPrefs: { perProjectMute: {}, notifyOnToolLong: true, dndUntil: 0 },
     theme: "",
     notificationsEnabled: true,
     notificationsSound: false,
@@ -67,12 +70,18 @@ function loadSettings() {
     diffMode: "unified",
     expandedProjects: [],
     composerAutoRetry: true,
+    onboardingSeen: false,
+    terminalHistory: [],
   };
   try {
     const loaded = { ...defaults, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) };
     const projects = Array.isArray(loaded.projects) ? loaded.projects : [loaded.cwd];
     loaded.projects = [...new Set([loaded.cwd, ...projects].filter((value) => typeof value === "string" && value.trim()))];
     loaded.sessionPreferences = loaded.sessionPreferences && typeof loaded.sessionPreferences === "object" ? loaded.sessionPreferences : {};
+    loaded.sessionMeta = loaded.sessionMeta && typeof loaded.sessionMeta === "object" ? loaded.sessionMeta : {};
+    loaded.budgets = loaded.budgets && typeof loaded.budgets === "object" ? loaded.budgets : {};
+    loaded.notificationPrefs = loaded.notificationPrefs && typeof loaded.notificationPrefs === "object" ? { perProjectMute: {}, notifyOnToolLong: true, dndUntil: 0, ...loaded.notificationPrefs } : { perProjectMute: {}, notifyOnToolLong: true, dndUntil: 0 };
+    if (!loaded.notificationPrefs.perProjectMute || typeof loaded.notificationPrefs.perProjectMute !== "object") loaded.notificationPrefs.perProjectMute = {};
     loaded.expandedProjects = Array.isArray(loaded.expandedProjects)
       ? [...new Set(loaded.expandedProjects.filter((value) => typeof value === "string" && value.trim()))]
       : [];
@@ -84,6 +93,8 @@ function loadSettings() {
     if (loaded.userNamePromptSeen === undefined && String(loaded.userName || "").trim()) {
       loaded.userNamePromptSeen = true;
     }
+    if (loaded.onboardingSeen === undefined) loaded.onboardingSeen = false;
+    if (!Array.isArray(loaded.terminalHistory)) loaded.terminalHistory = [];
     return loaded;
   } catch {
     return defaults;
@@ -547,7 +558,7 @@ ipcMain.handle("settings:get", () => publicSettings());
 
 ipcMain.handle("settings:set", async (_e, patch) => {
   const allowed = [
-    "cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language",
+    "cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language", "sessionMeta", "budgets", "notificationPrefs", "onboardingSeen", "terminalHistory",
     "userName", "userNamePromptSeen", "theme", "notificationsEnabled", "notificationsSound",
     "sidebarWidth", "diffMode", "expandedProjects", "composerAutoRetry",
   ];
@@ -792,8 +803,88 @@ ipcMain.handle("sessions:delete", async (_e, file) => {
   sessionsListCache = null;
   sessionsListCacheAt = 0;
   if (settings.sessionPreferences) delete settings.sessionPreferences[resolvedFile];
+  if (settings.sessionMeta) delete settings.sessionMeta[resolvedFile];
   saveSettings();
   return { ok: true };
+});
+
+ipcMain.handle("sessions:searchFullText", (_e, query) => {
+  const q = String(query || "").trim();
+  if (!q) return [];
+  return sessionsStore.searchSessionsFullText(sessionsDir(), q, 80);
+});
+
+ipcMain.handle("sessions:bulkDelete", async (_e, files) => {
+  const list = Array.isArray(files) ? files : [];
+  if (!list.length) throw new Error("Nessuna sessione selezionata");
+  const root = path.resolve(sessionsDir());
+  const toDelete = list.filter((f) => String(f).startsWith(root + path.sep));
+  for (const f of toDelete) {
+    const openTab = runtime.list().find((tab) => tab.sessionFile === path.resolve(String(f)));
+    if (openTab) runtime.close(openTab.id);
+  }
+  const result = sessionsStore.bulkDeleteSessions(toDelete, sessionsDir());
+  sessionsListCache = null;
+  sessionsListCacheAt = 0;
+  for (const f of toDelete) {
+    if (settings.sessionPreferences) delete settings.sessionPreferences[path.resolve(String(f))];
+    if (settings.sessionMeta) delete settings.sessionMeta[path.resolve(String(f))];
+  }
+  saveSettings();
+  return result;
+});
+
+ipcMain.handle("sessions:setMeta", (_e, { file, patch }) => {
+  const resolvedRoot = path.resolve(sessionsDir());
+  const resolvedFile = file ? path.resolve(String(file)) : null;
+  if (!resolvedFile || !resolvedFile.startsWith(resolvedRoot + path.sep)) throw new Error("Percorso non valido");
+  if (!settings.sessionMeta) settings.sessionMeta = {};
+  const current = settings.sessionMeta[resolvedFile] || {};
+  const next = { ...current };
+  if ("pinned" in (patch||{})) next.pinned = Boolean(patch.pinned);
+  if ("favorite" in (patch||{})) next.favorite = Boolean(patch.favorite);
+  if ("archived" in (patch||{})) next.archived = Boolean(patch.archived);
+  if ("tags" in (patch||{})) {
+    const tags = Array.isArray(patch.tags) ? patch.tags.map((t)=>String(t).trim().toLowerCase()).filter(Boolean).slice(0,8) : [];
+    next.tags = [...new Set(tags)];
+  }
+  if (Object.keys(next).length === 0 || (!next.pinned && !next.favorite && !next.archived && (!next.tags||!next.tags.length))) {
+    delete settings.sessionMeta[resolvedFile];
+  } else {
+    settings.sessionMeta[resolvedFile] = next;
+  }
+  saveSettings();
+  return { ok: true, meta: settings.sessionMeta[resolvedFile] || null };
+});
+
+ipcMain.handle("sessions:getMeta", () => settings.sessionMeta || {});
+
+ipcMain.handle("fs:listExplorer", (_e, { cwd, depth }) => {
+  const target = cwd ? path.resolve(String(cwd)) : path.resolve(settings.cwd || app.getPath("home"));
+  if (!isDirectory(target)) throw new Error("Cartella non disponibile");
+  return sessionsStore.listExplorerTree(target, Math.min(Math.max(Number(depth)||2,1),4), 800);
+});
+
+ipcMain.handle("fs:readTextFile", async (_e, filePath) => {
+  const p = path.resolve(String(filePath||""));
+  const cwd = path.resolve(settings.cwd || app.getPath("home"));
+  if (!p.startsWith(cwd + path.sep) && p !== cwd) throw new Error("File fuori dal progetto");
+  const st = fs.statSync(p);
+  if (!st.isFile() || st.size > 512*1024) throw new Error("File troppo grande o non leggibile");
+  return { content: fs.readFileSync(p, "utf8").slice(0, 20000), size: st.size };
+});
+
+ipcMain.handle("health:getPiLogs", () => {
+  try { return { logs: (runtime.getRecentLogs && runtime.getRecentLogs()) || [] }; } catch { return { logs: [] }; }
+});
+
+ipcMain.handle("sessions:bulkExport", async (_e, files) => {
+  const list = Array.isArray(files) ? files : [];
+  const picked = [];
+  for (const f of list) {
+    try { const msgs = sessionsStore.readSessionMessages(path.resolve(String(f))); if (msgs.messages) picked.push({ file: f, count: msgs.messages.length }); } catch {}
+  }
+  return { ok: true, items: picked };
 });
 
 // --- pi lifecycle -----------------------------------------------------------
