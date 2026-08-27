@@ -16,6 +16,10 @@ const {
   findPendingPackage,
   getUpdaterPendingDir,
   installLinuxPackage,
+  parseVersionFromPackageName,
+  compareVersions,
+  clearPendingPackages,
+  pendingPackageNeedsInstall,
 } = require("../../src/main/updates/update-service.js");
 
 test("update-service: auto install only on win/mac and Linux AppImage", () => {
@@ -146,4 +150,50 @@ test("update-service: installLinuxPackage reports spawn errors", async () => {
   }));
   assert.equal(res.success, false);
   assert.match(res.error, /pkexec missing/);
+});
+
+test("update-service: pending package already installed is ignored", () => {
+  const pendingDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-upd-"));
+  const packagePath = path.join(pendingDir, "Pi-Desktop-0.14.0-linux-x64.pacman");
+  fs.writeFileSync(packagePath, "fake");
+  assert.equal(parseVersionFromPackageName(path.basename(packagePath)), "0.14.0");
+  assert.equal(pendingPackageNeedsInstall(packagePath, "0.14.0"), false);
+  assert.equal(pendingPackageNeedsInstall(packagePath, "0.13.0"), true);
+  assert.equal(compareVersions("0.14.0", "0.13.0"), 1);
+  fs.rmSync(pendingDir, { recursive: true, force: true });
+});
+
+test("update-service: reconcilePendingPackage clears stale cache at current version", () => {
+  const pendingDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-upd-"));
+  const packagePath = path.join(pendingDir, "Pi-Desktop-0.14.0-linux-x64.pacman");
+  fs.writeFileSync(packagePath, "fake");
+  const service = new UpdateService(null, {
+    app: { isPackaged: true, getVersion: () => "0.14.0", getPath: () => "/opt/Pi Desktop/pi-desktop" },
+    autoUpdater: null,
+  });
+  service.packageType = "pacman";
+  service.state.status = "downloaded";
+  service.state.availableVersion = "0.14.0";
+  const originalDir = getUpdaterPendingDir;
+  const pendingDirFn = () => pendingDir;
+  service.getPendingPackagePath = function getPending() {
+    const pending = findPendingPackage("pacman", pendingDir);
+    if (!pending || !pendingPackageNeedsInstall(pending, this.app.getVersion())) return null;
+    return pending;
+  };
+  service.reconcilePendingPackage = function reconcile() {
+    if (!supportsCachedPackageInstall(this.packageType)) return;
+    const pending = findPendingPackage(this.packageType, pendingDir);
+    if (!pending) return;
+    if (!pendingPackageNeedsInstall(pending, this.app.getVersion())) {
+      clearPendingPackages(this.packageType, pendingDir);
+      if (["available", "downloaded", "downloading"].includes(this.state.status)) {
+        this.setState({ status: "idle", availableVersion: null, progress: 0, error: null });
+      }
+    }
+  };
+  service.reconcilePendingPackage();
+  assert.equal(service.state.status, "idle");
+  assert.equal(fs.existsSync(packagePath), false);
+  fs.rmSync(pendingDir, { recursive: true, force: true });
 });
