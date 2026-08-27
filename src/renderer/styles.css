@@ -931,14 +931,14 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 .queue-badge svg { width: 11px; height: 11px; }
 .queue-badge.force { color: var(--amber); background: color-mix(in srgb, var(--amber) 11%, transparent); }
 .queue-badge.wait { color: var(--blue); background: color-mix(in srgb, var(--blue) 11%, transparent); }
-.queue-actions { flex: 0 0 auto; display: flex; gap: 2px; }
-.queue-action { width: 27px; height: 27px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 7px; color: var(--muted); background: transparent; cursor: pointer; }
+.queue-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+.queue-action { width: 27px; height: 27px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 7px; color: var(--muted); background: transparent; cursor: pointer; flex-shrink: 0; }
 .queue-action svg { width: 13px; height: 13px; }
 .queue-action:hover { color: var(--text); background: var(--hover); }
 .queue-action.force { color: var(--amber); }
 .queue-action.remove:hover { color: var(--red); background: color-mix(in srgb, var(--red) 9%, transparent); }
 .queue-action:disabled { opacity: .35; cursor: not-allowed; }
-.queue-native-state { flex: 0 0 auto; color: var(--muted); font-size: var(--font-micro); }
+.queue-native-state { flex: 0 0 auto; margin-left: auto; padding-left: 8px; color: var(--muted); font-size: var(--font-micro); white-space: nowrap; }
 .queue-row.editing { border-radius: 8px; background: var(--surface-2); }
 .queue-edit-input { min-width: 80px; height: 29px; flex: 1; padding: 4px 8px; border: 0; border-radius: 7px; color: var(--text); background: var(--bg); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 14%, transparent); font-size: 11px; }
 .busy-send-choice { position: absolute; right: 0; bottom: calc(100% + 7px); z-index: 3; display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface-3); box-shadow: var(--menu-shadow); }
@@ -1611,22 +1611,43 @@ html[data-theme="dark"] #chat-tooltip {
   #statusbar { display: none; }
 }
 
-/* App OTA (electron-updater) — come gittree #btn-update */
+/* App OTA (electron-updater) — barra header, come gittree #btn-update */
+.app-update-btn,
 #btn-app-update {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--amber) 13%, transparent);
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 11px;
   border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  border-radius: 999px;
   color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 13%, transparent);
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
   white-space: nowrap;
+  cursor: pointer;
 }
+.app-update-btn:hover,
+#btn-app-update:hover { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+.app-update-btn svg,
+#btn-app-update svg { width: 14px; height: 14px; flex-shrink: 0; }
+.app-update-btn.hidden,
 #btn-app-update.hidden { display: none !important; }
+.app-update-btn:disabled,
 #btn-app-update:disabled { opacity: .7; cursor: wait; }
-#btn-app-update.is-downloading i { animation: spin 1s linear infinite; }
+.app-update-btn.is-downloading svg,
+#btn-app-update.is-downloading svg { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.app-update-btn span:empty,
 #btn-app-update span:empty { display: none; }
+
+.app-update-row { display: flex; flex-direction: column; gap: 8px; }
+.app-update-settings-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.app-update-settings-status { min-height: 1.2em; }

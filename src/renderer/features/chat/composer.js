@@ -237,26 +237,38 @@ function renderQueuePanel() {
     row.innerHTML = `<span class="queue-badge wait">dopo</span><span class="queue-text"></span>`;
     row.querySelector(".queue-text").textContent = item.displayText;
     row.querySelector(".queue-text").title = item.displayText;
+    const actions = document.createElement("div");
+    actions.className = "queue-actions";
     const edit = document.createElement("button");
     edit.className = "queue-action";
-    edit.textContent = "Modifica";
+    edit.type = "button";
+    edit.title = "Modifica";
+    edit.setAttribute("aria-label", "Modifica messaggio in coda");
+    edit.innerHTML = icon("pencil");
     edit.addEventListener("click", () => editLocalMessage(item.id, row));
     const force = document.createElement("button");
     force.className = "queue-action force";
-    force.textContent = "Forza";
+    force.type = "button";
+    force.title = "Forza invio";
+    force.setAttribute("aria-label", "Forza invio");
+    force.innerHTML = icon("zap");
     force.disabled = state.directBashRunning;
     force.addEventListener("click", () => forceLocalMessage(item.id));
     const remove = document.createElement("button");
-    remove.className = "queue-action";
-    remove.textContent = "Rimuovi";
+    remove.className = "queue-action remove";
+    remove.type = "button";
+    remove.title = "Rimuovi";
+    remove.setAttribute("aria-label", "Rimuovi dalla coda");
+    remove.innerHTML = icon("x");
     remove.addEventListener("click", () => removeLocalMessage(item.id));
-    row.append(edit, force, remove);
+    actions.append(edit, force, remove);
+    row.append(actions);
     el.queuedNote.appendChild(row);
   }
   const appendNative = (text, forced) => {
     const row = document.createElement("div");
     row.className = "queue-row";
-    row.innerHTML = `<span class="queue-badge ${forced ? "force" : "wait"}">${forced ? "forzato" : "dopo"}</span><span class="queue-text"></span><span class="muted small">già inviato a Pi</span>`;
+    row.innerHTML = `<span class="queue-badge ${forced ? "force" : "wait"}">${forced ? "forzato" : "dopo"}</span><span class="queue-text"></span><span class="queue-native-state">già inviato a Pi</span>`;
     row.querySelector(".queue-text").textContent = text;
     row.querySelector(".queue-text").title = text;
     el.queuedNote.appendChild(row);
@@ -275,10 +287,16 @@ function editLocalMessage(id, row) {
   input.value = item.displayText;
   const save = document.createElement("button");
   save.className = "queue-action force";
-  save.textContent = "Salva";
+  save.type = "button";
+  save.title = "Salva";
+  save.setAttribute("aria-label", "Salva modifica");
+  save.innerHTML = icon("check");
   const cancel = document.createElement("button");
   cancel.className = "queue-action";
-  cancel.textContent = "Annulla";
+  cancel.type = "button";
+  cancel.title = "Annulla";
+  cancel.setAttribute("aria-label", "Annulla modifica");
+  cancel.innerHTML = icon("x");
   const commit = () => {
     const value = input.value.trim();
     if (!value) return toast("Il messaggio in coda non può essere vuoto.", "warn");
@@ -300,7 +318,10 @@ function editLocalMessage(id, row) {
       renderQueuePanel();
     }
   });
-  row.append(save, cancel);
+  const actions = document.createElement("div");
+  actions.className = "queue-actions";
+  actions.append(save, cancel);
+  row.append(actions);
   input.focus();
   input.select();
 }
