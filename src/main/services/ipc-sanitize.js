@@ -76,10 +76,11 @@ function capSerializedSize(messages, hiddenCount, maxBytes = MAX_SERIALIZED_CHAR
   return { messages: list, hiddenCount: hidden };
 }
 
-function sanitizeMessagesPayload(payload) {
+function sanitizeMessagesPayload(payload, maxMessages = MAX_MESSAGES, maxBytes = MAX_SERIALIZED_CHARS) {
   const root = sanitizeForIpc(payload);
   const raw = Array.isArray(root?.messages) ? root.messages : Array.isArray(root) ? root : [];
-  const sliced = sliceTailMessages(raw, MAX_MESSAGES);
+  const sliced = sliceTailMessages(raw, maxMessages);
+  const capped = capSerializedSize(sliced.messages, sliced.hiddenCount, maxBytes);
   const capped = capSerializedSize(sliced.messages, sliced.hiddenCount);
   const base = root && !Array.isArray(root) ? root : {};
   return {

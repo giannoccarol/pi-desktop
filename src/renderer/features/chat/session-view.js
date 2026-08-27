@@ -274,7 +274,7 @@
 
   async function ensureFullHistory(file) {
     if (historyState.file === file && historyState.full) return historyState.full;
-    const preview = await api.previewSession(file).catch(() => null);
+    const preview = await api.messagesPage(file, 6000).catch(() => null);
     const raw = preview?.messages || [];
     const full = (window.piChatUtils?.collapseRetryAttempts ?? ((m) => m))(raw);
     historyState.file = file;
