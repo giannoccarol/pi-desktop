@@ -1,3 +1,10 @@
+# [0.12.0](https://github.com/giannoccarol/pi-desktop/compare/v0.11.1...v0.12.0) (2026-08-27)
+
+
+### Features
+
+* **updates:** implement stale install notification and user name enhancements ([609eac7](https://github.com/giannoccarol/pi-desktop/commit/609eac7fc0b95df7342020c71729a3b4c21438e2))
+
 ## [0.11.1](https://github.com/giannoccarol/pi-desktop/compare/v0.11.0...v0.11.1) (2026-08-27)
 
 
