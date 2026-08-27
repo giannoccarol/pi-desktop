@@ -118,6 +118,7 @@
     }
     if (!attachments.length) attachmentWrap.remove();
     messagesEl.appendChild(wrap);
+    if ((options.status || "historical") !== "historical") window.piUi?.animateChatEntry?.(wrap);
     setUserMessageStatus(wrap, options.status || "historical");
     refreshIcons();
     scheduleScroll();

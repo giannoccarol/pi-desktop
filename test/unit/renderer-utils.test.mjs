@@ -42,6 +42,16 @@ test("utils: fmtCost / fmtTokens", () => {
   assert.equal(utils.fmtTokens(15600), "15.6k");
 });
 
+test("utils: cache hit includes uncached and cache-write prompt tokens", () => {
+  assert.deepEqual(utils.cacheHitStats({ input: 100, cacheRead: 800, cacheWrite: 100 }), {
+    percent: 80,
+    cacheRead: 800,
+    cacheWrite: 100,
+    prompt: 1000,
+  });
+  assert.equal(utils.cacheHitStats({}).percent, null);
+});
+
 test("utils: basename / truncate", () => {
   assert.equal(utils.basename("/a/b/c.txt"), "c.txt");
   assert.equal(utils.basename("C:\\a\\b\\"), "b");

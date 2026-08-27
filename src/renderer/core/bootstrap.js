@@ -69,18 +69,29 @@
     try{ window.piHealth?.init?.(); }catch{}
     try{
       const scwd = el.statusCwd;
+      const stok = el.statusTokens;
+      const openCosts = ()=>{ try{ window.piCosts?.openDashboard?.(); }catch{} };
       if(scwd){
         scwd.style.cursor = "pointer";
-        scwd.title = "Clicca per dettagli costi";
+        scwd.title = "Clicca per dashboard costi (doppio click)";
+        let lastClick=0;
         scwd.addEventListener("click", ()=>{
+          const now=Date.now();
+          if(now-lastClick<400){ openCosts(); return; }
+          lastClick=now;
           try{
             const cwd = state.settings?.cwd;
             const agg = window.piCosts?.getProjectCosts?.(cwd, state.sessions, null) || {count:0,cost:0,tokens:0};
             const txt = window.piCosts?.formatProjectCost?.(agg, window.i18n?.t) || `${agg.count} chat · ${agg.tokens} tok · $${agg.cost}`;
-            window.piUi?.toast?.(`${cwd||"progetto"}: ${txt}`, "info", 5000);
+            window.piUi?.toast?.(`${cwd||"progetto"}: ${txt} — doppio click per dashboard`, "info", 5000);
             window.piCosts?.renderProjectCosts?.();
           }catch{}
         });
+      }
+      if(stok){
+        stok.style.cursor="pointer";
+        stok.title="Dashboard costi";
+        stok.addEventListener("click", openCosts);
       }
     }catch{}
     try{
@@ -104,11 +115,7 @@
     if (el.btnScrollBottom) {
       el.btnScrollBottom.addEventListener("click", () => {
         state.chatStickToBottom = true;
-        try {
-          el.chat.scrollTo({ top: el.chat.scrollHeight, behavior: "smooth" });
-        } catch {
-          jumpToBottom();
-        }
+        jumpToBottom({ smooth: true });
         queueMicrotask(updateScrollBottomVisibility);
       });
     }
@@ -254,26 +261,45 @@
         toast(`Impossibile aggiungere il progetto: ${err.message}`, "error");
       }
     });
-    el.sessionSearch.addEventListener("input", async () => {
+    let searchDebounce=null;
+    const doSearch = async ()=>{
+      const qRaw = el.sessionSearch.value.trim();
       const mode = state.searchMode || "title";
-      if(mode==="fulltext" && el.sessionSearch.value.trim().length>=2){
+      // support filters: pinned:, progetto:, regex /.../
+      let q = qRaw;
+      let filterPinned = false;
+      if(q.toLowerCase().startsWith("pinned:")){ filterPinned=true; q=q.slice(7).trim(); }
+      let isRegex=false; let regex=null;
+      if(q.startsWith("/") && q.endsWith("/") && q.length>2){ try{ regex=new RegExp(q.slice(1,-1),"i"); isRegex=true; }catch{} }
+      state.searchRegex = regex;
+      state.searchFilterPinned = filterPinned;
+      if(mode==="fulltext" && q.length>=2){
         try{
-          const res = await api.searchFullText(el.sessionSearch.value.trim());
-          state.searchFullTextResults = res;
+          if(isRegex){ // client-side regex fallback: fulltext already returns, filter further
+            const res = await api.searchFullText(qRaw);
+            state.searchFullTextResults = res.filter(r=> regex.test(r.name||"") || regex.test(r.preview||"") || regex.test(r.snippet||""));
+          } else {
+            const res = await api.searchFullText(q);
+            state.searchFullTextResults = filterPinned ? res.filter(r=> (state.settings?.sessionMeta?.[r.file]?.pinned)) : res;
+          }
         }catch{ state.searchFullTextResults = []; }
       } else {
         state.searchFullTextResults = [];
       }
       (window.renderProjects||window.piSidebar?.renderProjects)?.();
+    };
+    el.sessionSearch.addEventListener("input", () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(doSearch, 150);
+    });
+    el.sessionSearch.addEventListener("keydown", (ev)=>{
+      if(ev.key==="Escape"){ el.sessionSearch.value=""; state.searchFullTextResults=[]; state.searchRegex=null; (window.renderProjects||window.piSidebar?.renderProjects)?.(); }
     });
     el.searchModeToggle?.addEventListener("click", ()=>{
       state.searchMode = state.searchMode==="fulltext" ? "title" : "fulltext";
       el.searchModeToggle.textContent = state.searchMode==="fulltext" ? "Tx" : "Aa";
-      el.searchModeToggle.title = state.searchMode==="fulltext" ? "Ricerca nel contenuto" : "Ricerca titolo/preview";
-      if(state.searchMode==="fulltext" && el.sessionSearch.value.trim().length>=2){
-        api.searchFullText(el.sessionSearch.value.trim()).then(r=>{ state.searchFullTextResults=r; (window.renderProjects||window.piSidebar?.renderProjects)?.(); }).catch(()=>{});
-      } else { state.searchFullTextResults=[]; }
-      (window.renderProjects||window.piSidebar?.renderProjects)?.();
+      el.searchModeToggle.title = state.searchMode==="fulltext" ? "Ricerca nel contenuto (punta /regex/, pinned:)" : "Ricerca titolo/preview";
+      doSearch();
     });
 
     el.commandsClose.addEventListener("click", () => el.modalCommands.close());
@@ -465,6 +491,61 @@
       const isSound = uiPrefs ? uiPrefs.notificationsSound(state.settings) : false;
       el.settingNotificationsEnabled.checked = isEnabled;
       if (el.settingNotificationsSound) el.settingNotificationsSound.checked = isSound;
+      const renderPerProjectMute = ()=>{
+        const cont = el.perProjectMute;
+        if(!cont) return;
+        cont.innerHTML="";
+        const projects = state.settings?.projects || [state.settings?.cwd].filter(Boolean);
+        const perMute = state.settings?.notificationPrefs?.perProjectMute || {};
+        for(const p of projects){
+          const label=document.createElement("label");
+          label.style.cssText="display:flex;gap:6px;align-items:center;font-size:11px";
+          const cb=document.createElement("input"); cb.type="checkbox"; cb.checked = !!perMute[p];
+          cb.addEventListener("change", async ()=>{
+            const next = {...(state.settings.notificationPrefs||{}), perProjectMute: {...(state.settings.notificationPrefs?.perProjectMute||{})} };
+            if(cb.checked) next.perProjectMute[p]=true; else delete next.perProjectMute[p];
+            try{ state.settings = await api.setSettings({ notificationPrefs: next }); }catch(err){ toast(err.message,"error"); }
+            renderPerProjectMute();
+          });
+          const span=document.createElement("span"); span.textContent=`Silenzia ${p.split("/").pop()||p}`; span.title=p;
+          label.append(cb, span);
+          cont.appendChild(label);
+        }
+        if(!projects.length) cont.innerHTML="<span class='muted small'>Nessun progetto</span>";
+      };
+      renderPerProjectMute();
+      // DND controls
+      const dndContainer = document.createElement("div");
+      dndContainer.style.cssText="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap";
+      const dndStatus = ()=>{
+        const until = state.settings?.notificationPrefs?.dndUntil || 0;
+        if(until && until > Date.now()){ const mins=Math.ceil((until-Date.now())/60000); return `DND attivo per ${mins} min`;} return "DND spento";
+      };
+      const renderDnd = ()=>{
+        dndContainer.innerHTML=`<span class="muted small" style="flex:1">${dndStatus()}</span>`;
+        const btn1=document.createElement("button"); btn1.className="btn ghost small"; btn1.textContent="1h"; btn1.addEventListener("click", async()=>{ const until=Date.now()+3600000; const next={...(state.settings.notificationPrefs||{}), dndUntil: until}; try{ state.settings=await api.setSettings({notificationPrefs: next}); renderDnd(); toast("DND 1h attivo","info"); }catch{}
+        });
+        const btn8=document.createElement("button"); btn8.className="btn ghost small"; btn8.textContent="8h"; btn8.addEventListener("click", async()=>{ const until=Date.now()+8*3600000; const next={...(state.settings.notificationPrefs||{}), dndUntil: until}; try{ state.settings=await api.setSettings({notificationPrefs: next}); renderDnd(); toast("DND 8h attivo","info"); }catch{}
+        });
+        const btnOff=document.createElement("button"); btnOff.className="btn ghost small"; btnOff.textContent="Off"; btnOff.addEventListener("click", async()=>{ const next={...(state.settings.notificationPrefs||{}), dndUntil: 0}; try{ state.settings=await api.setSettings({notificationPrefs: next}); renderDnd(); toast("DND disattivato","info"); }catch{}
+        });
+        dndContainer.append(btn1, btn8, btnOff);
+      };
+      renderDnd();
+      const notifRow = document.querySelector(".notification-row");
+      if(notifRow && !notifRow.querySelector("#dnd-row")){ dndContainer.id="dnd-row"; notifRow.appendChild(dndContainer); }
+      // re-render on settings open
+      const origOpen = el.btnSettingsOpen?.onclick;
+      // also hook after settings loaded: observe settings change
+      try{
+        const mo=new MutationObserver(renderPerProjectMute);
+        // simple: re-render every 2s while dialog open
+        let iv=null;
+        el.modalSettings?.addEventListener("close", ()=>{ if(iv) clearInterval(iv); });
+        document.addEventListener("click", (e)=>{
+          if(e.target===el.btnSettingsOpen){ setTimeout(()=>{ renderPerProjectMute(); renderDnd(); }, 100); iv=setInterval(()=>{ renderPerProjectMute(); renderDnd(); }, 2000); setTimeout(()=>{ if(iv) clearInterval(iv); }, 10000); }
+        });
+      }catch{}
       el.settingNotificationsEnabled.addEventListener("change", async () => {
         try {
           await uiPrefs?.persistNotifications?.(api, { enabled: el.settingNotificationsEnabled.checked });
@@ -634,10 +715,15 @@
       ]);
     }
     window.__piPollTick = pollTick;
-    setInterval(pollTick, 10000);
+    // fallback polling 30s; primary è fs.watch via sessions:changed
+    setInterval(pollTick, 30000);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) pollTick();
     });
+    // fs.watch push from main: sessions dir changed
+    if(api && api.on){
+      try{ api.on("sessions:changed", ()=>{ (window.refreshSessions || window.piSidebar?.refreshSessions)?.(); }); }catch{}
+    }
     state.settings = await api.getSettings();
     if (window.piUiSettings?.migrateLocalStorageToSettings) {
       state.settings = await window.piUiSettings.migrateLocalStorageToSettings(api, state.settings);

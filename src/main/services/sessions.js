@@ -210,19 +210,46 @@ function searchSessionsFullText(sessionsDirPath, query, maxResults = 80) {
   return results;
 }
 
+function trashDirFor(sessionsDirPath){ return path.join(path.resolve(sessionsDirPath), ".trash"); }
 function bulkDeleteSessions(files, sessionsDirPath) {
   let deleted = 0;
   const errors = [];
+  const trashDir = trashDirFor(sessionsDirPath);
+  try{ fs.mkdirSync(trashDir, {recursive:true}); }catch{}
   for (const file of files) {
     try {
       const resolved = path.resolve(String(file));
       const root = path.resolve(sessionsDirPath);
       if (!resolved.startsWith(root + path.sep) || !resolved.endsWith(".jsonl")) throw new Error("percorso non valido");
-      deleteSession(resolved);
+      const base = path.basename(resolved);
+      const trashPath = path.join(trashDir, `${Date.now()}-${base}`);
+      try{ fs.renameSync(resolved, trashPath); }catch{ fs.copyFileSync(resolved, trashPath); fs.unlinkSync(resolved); }
+      sessionMetaCache.delete(resolved); sessionMessagesCache.delete(resolved);
       deleted++;
     } catch (err) { errors.push({ file, error: err.message }); }
   }
+  // prune trash >30 days
+  try{
+    const entries = fs.readdirSync(trashDir);
+    const now = Date.now();
+    for(const e of entries){
+      try{ const st=fs.statSync(path.join(trashDir,e)); if(now - st.mtimeMs > 30*24*3600*1000) fs.unlinkSync(path.join(trashDir,e)); }catch{}
+    }
+  }catch{}
   return { deleted, errors };
+}
+function restoreFromTrash(sessionsDirPath, trashFile){
+  const trashDir = trashDirFor(sessionsDirPath);
+  const src = path.join(trashDir, path.basename(String(trashFile)));
+  const dest = path.join(path.resolve(sessionsDirPath), path.basename(String(trashFile)).replace(/^\d+-/,""));
+  // find original project subdir by reading trash header
+  try{
+    const head = fs.readFileSync(src,"utf8").split("\n")[0]; const hdr=JSON.parse(head); const cwd=hdr.cwd||"";
+    const projHash = cwd ? Buffer.from(cwd).toString("hex").slice(0,8) : "";
+    // fallback: try to restore by searching sessionsDir subdirs
+  }catch{}
+  fs.renameSync(src, dest);
+  return dest;
 }
 
 function listExplorerTree(cwd, depth = 2, maxEntries = 600) {
@@ -308,5 +335,7 @@ module.exports = {
   deleteSession,
   searchSessionsFullText,
   bulkDeleteSessions,
+  trashDirFor,
+  restoreFromTrash,
   listExplorerTree,
 };

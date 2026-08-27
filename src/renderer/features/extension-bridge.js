@@ -19,12 +19,29 @@
   }
 
   let uiRequest = null;
+  const recentNotifications = new Map();
+
+  function shouldShowNotification(message, kind = "info", now = Date.now(), ttlMs = 5000) {
+    const text = stripAnsi(message).trim();
+    if (!text) return false;
+    const key = `${kind}\u0000${text}`;
+    const previous = recentNotifications.get(key);
+    recentNotifications.set(key, now);
+    if (recentNotifications.size > 64) {
+      for (const [candidate, timestamp] of recentNotifications) {
+        if (now - timestamp > ttlMs) recentNotifications.delete(candidate);
+      }
+    }
+    return previous == null || now - previous >= ttlMs;
+  }
 
   function handleUiRequest(msg) {
     switch (msg.method) {
-      case "notify":
-        toast(msg.message || "", msg.notifyType === "warning" ? "warn" : msg.notifyType === "error" ? "error" : "info");
+      case "notify": {
+        const kind = msg.notifyType === "warning" ? "warn" : msg.notifyType === "error" ? "error" : "info";
+        if (shouldShowNotification(msg.message || "", kind)) toast(msg.message || "", kind);
         break;
+      }
       case "setTitle":
         if (msg.title) document.title = `Pi Desktop — ${msg.title}`;
         break;
@@ -133,7 +150,7 @@
 
   function getUiRequest() { return uiRequest; }
 
-  const apiExport = { handleUiRequest, updateExtensionStatus, updateExtensionWidget, showDialog, answerUi, stripAnsi, getUiRequest };
+  const apiExport = { handleUiRequest, updateExtensionStatus, updateExtensionWidget, showDialog, answerUi, stripAnsi, getUiRequest, shouldShowNotification };
   window.piExtensionBridge = apiExport;
   window.handleUiRequest = handleUiRequest;
   window.updateExtensionStatus = updateExtensionStatus;

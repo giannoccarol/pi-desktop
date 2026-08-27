@@ -41,6 +41,19 @@
     return String(Math.trunc(v));
   }
 
+  function cacheHitStats(tokens) {
+    const input = Math.max(0, Number(tokens?.input) || 0);
+    const cacheRead = Math.max(0, Number(tokens?.cacheRead) || 0);
+    const cacheWrite = Math.max(0, Number(tokens?.cacheWrite) || 0);
+    const prompt = input + cacheRead + cacheWrite;
+    return {
+      percent: prompt > 0 ? Math.round((cacheRead / prompt) * 100) : null,
+      cacheRead,
+      cacheWrite,
+      prompt,
+    };
+  }
+
   function basename(p) {
     if (!p) return "";
     return String(p).replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "";
@@ -210,6 +223,7 @@
     formatBytes,
     fmtCost,
     fmtTokens,
+    cacheHitStats,
     basename,
     truncate,
     clipboardImageExtension,

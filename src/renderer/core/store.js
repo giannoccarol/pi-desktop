@@ -54,6 +54,7 @@
     statusCwd: $("#status-cwd"),
     gitStatus: $("#git-status"),
     statusActivity: $("#status-activity"),
+    statusCacheHit: $("#status-cache-hit"),
     statusTokens: $("#status-tokens"),
     modelBtn: $("#model-btn"),
     modelLabel: $("#model-label"),
@@ -208,6 +209,7 @@
     healthLogBtn: $("#btn-health-log"),
     budgetsList: $("#budgets-list"),
     budgetsAddBtn: $("#btn-budgets-add"),
+    perProjectMute: $("#per-project-mute"),
   };
 
   const initialCommandUsage = (() => {

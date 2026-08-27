@@ -462,11 +462,28 @@ function renderProjects() {
         item.dataset.tooltipTime = timeLabel;
         item.dataset.tooltipPath = session.file || "";
         item.setAttribute("aria-busy", isLoading ? "true" : "false");
+        const fulltextHit = state.searchMode==="fulltext" && q ? (state.searchFullTextResults||[]).find(r=>r.file===session.file) : null;
+        const snippet = fulltextHit?.snippet || "";
         item.innerHTML =
           `<div class="session-title"></div>` +
+          `${snippet?`<div class="session-snippet" style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding-left:2px"></div>`:""}` +
           `<div class="session-meta"><span>${isLoading ? t("session.loading") : relTime(session.modified)}</span>` +
           `<button class="sess-del" title="Elimina sessione" aria-label="Elimina sessione">${icon("trash-2")}</button></div>`;
-        item.querySelector(".session-title").textContent = displayName;
+        const titleEl = item.querySelector(".session-title");
+        if(titleEl){
+          if(state.searchRegex && q && state.searchMode==="fulltext"){
+            try{ const re = state.searchRegex; const m = displayName.match(re); if(m){ const idx=displayName.toLowerCase().search(re); const before=displayName.slice(0, idx); const hit=displayName.slice(idx, idx+m[0].length); const after=displayName.slice(idx+m[0].length); titleEl.innerHTML = `${esc(before)}<mark style="background:var(--amber);color:var(--text);padding:0 2px;border-radius:3px">${esc(hit)}</mark>${esc(after)}`; } else titleEl.textContent=displayName; }catch{ titleEl.textContent=displayName; }
+          } else titleEl.textContent=displayName;
+        }
+        if(snippet){
+          const snEl = item.querySelector(".session-snippet");
+          if(snEl){
+            let html = esc(snippet);
+            if(state.searchRegex){ try{ html = html.replace(state.searchRegex, m=>`<mark style="background:color-mix(in srgb,var(--amber) 30%,transparent)">${esc(m)}</mark>`); }catch{} }
+            else if(q){ const qEsc = q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); try{ const re=new RegExp(`(${qEsc})`,"ig"); html = html.replace(re, '<mark style="background:color-mix(in srgb,var(--amber) 30%,transparent)">$1</mark>'); }catch{} }
+            snEl.innerHTML = html;
+          }
+        }
         // bulk checkbox
         if(state.bulkMode){
           const cb = document.createElement("input");

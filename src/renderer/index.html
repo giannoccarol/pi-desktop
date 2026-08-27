@@ -199,6 +199,7 @@
         <span id="git-status" class="muted small mono hidden" title="Git status"></span>
         <span class="flex-spacer"></span>
         <span id="status-activity" class="small"></span>
+        <span id="status-cache-hit" class="status-cache-hit muted small mono hidden"></span>
         <span id="status-tokens" class="muted small mono"></span>
       </footer>
     </main>
@@ -267,7 +268,8 @@
             <label><input id="setting-notifications-enabled" type="checkbox" /> <span data-i18n="settings.notifications.enabled">Mostra notifica quando Pi finisce in background</span></label>
             <label><input id="setting-notifications-sound" type="checkbox" /> <span data-i18n="settings.notifications.sound">Riproduci suono</span></label>
           </div>
-          <small class="muted" data-i18n="settings.notifications.help">Richiede permesso del sistema. Disattiva per silenziare.</small>
+          <div id="per-project-mute" class="col gap" style="margin-top:8px;max-height:120px;overflow:auto"></div>
+          <small class="muted" data-i18n="settings.notifications.help">Richiede permesso del sistema. Disattiva per silenziare. Puoi silencare per progetto.</small>
         </div>
         <div class="field" id="budgets-field">
           <span>Budget per progetto (opzionale)</span>

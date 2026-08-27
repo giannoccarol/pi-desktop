@@ -45,16 +45,40 @@ function renderAttachmentTray() {
   refreshIcons();
 }
 
+function shouldResizeImages(){ try{ const s=state.settings||{}; if(s.blockImages) return false; if(window.piUiSettings?.imageResize) return window.piUiSettings.imageResize(s)!==false; return true; }catch{ return true; } }
+async function resizeImageBase64(data, mimeType, maxDim=1600, quality=0.85){
+  try{
+    if(!data || !mimeType?.startsWith("image/")) return data;
+    const img = new Image();
+    const loaded = await new Promise((res, rej)=>{ img.onload=()=>res(true); img.onerror=()=>rej(new Error("load fail")); img.src=`data:${mimeType};base64,${data}`; });
+    if(!loaded) return data;
+    let {width, height} = img;
+    if(width<=maxDim && height<=maxDim) return data;
+    const ratio = Math.min(maxDim/width, maxDim/height);
+    width = Math.round(width*ratio); height = Math.round(height*ratio);
+    const canvas = document.createElement("canvas"); canvas.width=width; canvas.height=height;
+    const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, width, height);
+    const outMime = mimeType==="image/png" ? "image/png" : "image/jpeg";
+    const dataUrl = canvas.toDataURL(outMime, quality);
+    return dataUrl.split(",")[1] || data;
+  }catch{ return data; }
+}
 async function pickAttachments(kind) {
   try {
     const picked = await api.pickFiles(kind);
-    for (const attachment of picked) {
+    const doResize = shouldResizeImages();
+    for (let attachment of picked) {
+      if (attachment.data && doResize) {
+        try{ attachment.data = await resizeImageBase64(attachment.data, attachment.mimeType); }catch{}
+      }
       if (!state.attachments.some((candidate) => candidate.path === attachment.path)) state.attachments.push(attachment);
     }
     if (state.attachments.length > 12) {
       state.attachments.length = 12;
       toast(t("toast.attachLimit"), "warn");
     }
+    const resized = doResize ? picked.filter(p=>p.data).length : 0;
+    if(resized) toast(`${resized} immagini ridimensionate a max 1600px`, "info", 2000);
     renderAttachmentTray();
     el.input.focus();
   } catch (err) {
@@ -88,12 +112,14 @@ async function pasteClipboardImages(event) {
       continue;
     }
     const mimeType = item.type.toLowerCase();
+    let b64 = bufferToBase64(await file.arrayBuffer());
+    if(shouldResizeImages()){ try{ b64 = await resizeImageBase64(b64, mimeType); }catch{} }
     state.attachments.push({
       name: `clipboard-${new Date().toISOString().replace(/[:.]/g, "-")}.${clipboardImageExtension(mimeType)}`,
       path: null,
       size: file.size,
       mimeType,
-      data: bufferToBase64(await file.arrayBuffer()),
+      data: b64,
     });
     added += 1;
   }
@@ -122,6 +148,19 @@ async function refreshStats() {
     if (typeof st.cost === "number") bits.push(fmtCost(st.cost));
     if (st.contextUsage) bits.push(`ctx ${st.contextUsage.percent}%`);
     el.statusTokens.textContent = bits.join(" · ");
+    if (el.statusCacheHit) {
+      const cache = window.piUtils?.cacheHitStats?.(st.tokens);
+      const available = cache?.percent != null;
+      el.statusCacheHit.classList.toggle("hidden", !available);
+      el.statusCacheHit.textContent = available ? t("stats.cacheHit", { percent: cache.percent }) : "";
+      el.statusCacheHit.title = available
+        ? t("stats.cacheHitTitle", {
+          read: fmtTokens(cache.cacheRead),
+          prompt: fmtTokens(cache.prompt),
+          write: fmtTokens(cache.cacheWrite),
+        })
+        : "";
+    }
   } catch {}
 }
 

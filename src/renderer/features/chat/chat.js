@@ -228,6 +228,7 @@ function mountStreamAssistant() {
   const sa = state.streamAssistant;
   if (!sa || sa.mounted) return;
   el.messages.appendChild(sa.wrap);
+  window.piUi?.animateChatEntry?.(sa.wrap);
   sa.mounted = true;
   scheduleScroll();
 }

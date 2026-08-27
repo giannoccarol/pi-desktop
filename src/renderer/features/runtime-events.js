@@ -25,6 +25,15 @@
   function shouldNotify(options = {}) {
     const enabled = options.enabled !== undefined ? options.enabled : isNotificationsEnabled(options.storage);
     if (!enabled) return false;
+    // DND timer
+    try{
+      const prefs = window.piStore?.state?.settings?.notificationPrefs;
+      if(prefs && prefs.dndUntil && Number(prefs.dndUntil) > Date.now()) return false;
+      // per-project mute: check active tab cwd
+      const cwd = options.cwd || window.piStore?.state?.settings?.cwd || window.piStore?.state?.tabs?.find(t=>t.id===window.piStore?.state?.activeTabId)?.cwd;
+      if(cwd && prefs?.perProjectMute && prefs.perProjectMute[cwd]) return false;
+      if(options.cwd && prefs?.perProjectMute && prefs.perProjectMute[options.cwd]) return false;
+    }catch{}
     const hidden = options.documentHidden !== undefined ? options.documentHidden : (typeof document !== "undefined" ? Boolean(document.hidden) : false);
     let focused;
     if (options.windowFocused !== undefined) focused = Boolean(options.windowFocused);

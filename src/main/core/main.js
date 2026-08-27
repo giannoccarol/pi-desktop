@@ -44,6 +44,28 @@ const authControllers = new Map();
 let sessionsListCache = null;
 let sessionsListCacheAt = 0;
 const SESSIONS_CACHE_TTL_MS = 750;
+let sessionsWatcher = null;
+let sessionsWatcherDir = null;
+function restartSessionsWatcher(){
+  try{ if(sessionsWatcher){ sessionsWatcher.close(); sessionsWatcher=null; } }catch{}
+  let dir=""; try{ dir = sessionsDir(); }catch{ return; }
+  if(!dir || !isDirectory(dir)) return;
+  if(sessionsWatcherDir===dir && sessionsWatcher) return;
+  sessionsWatcherDir = dir;
+  try{
+    sessionsWatcher = fs.watch(dir, { recursive: false }, ()=>{
+      sessionsListCache=null; sessionsListCacheAt=0;
+      if(win && !win.isDestroyed()) try{ win.webContents.send("sessions:changed"); }catch{}
+    });
+    // also watch first-level project subdirs for new sessions (debounced)
+    try{
+      const subs = fs.readdirSync(dir, {withFileTypes:true}).filter(d=>d.isDirectory()).slice(0,20);
+      for(const sub of subs){
+        try{ fs.watch(path.join(dir, sub.name), ()=>{ sessionsListCache=null; if(win && !win.isDestroyed()) try{ win.webContents.send("sessions:changed"); }catch{} }); }catch{}
+      }
+    }catch{}
+  }catch(err){ console.warn("[sessionsWatcher]", err.message); }
+}
 
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 
@@ -375,7 +397,8 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, "..", "..", "renderer", "index.html"));
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    if (isAllowedExternalUrl(url)) shell.openExternal(url);
+    else console.warn("[windowOpen] blocked:", String(url).slice(0,200));
     return { action: "deny" };
   });
   if (!appUpdateService) {
@@ -439,6 +462,7 @@ if (!app.requestSingleInstanceLock({ version: APP_VERSION })) {
 
   app.whenReady().then(() => {
     settings = loadSettings();
+    try{ restartSessionsWatcher(); }catch{}
     createWindow();
     try { createTray(); } catch {}
     try { registerGlobalShortcut(); } catch {}
@@ -598,6 +622,7 @@ ipcMain.handle("settings:set", async (_e, patch) => {
   } else if (previousPiPath !== settings.piPath || previousSessionsDir !== settings.sessionsDir) {
     await runtime.restart({ piPath: settings.piPath || undefined }).catch(() => runtime.stop());
   }
+  try{ restartSessionsWatcher(); }catch{}
   return { ...publicSettings(), saveOk };
 });
 
@@ -735,8 +760,27 @@ ipcMain.handle("projects:remove", (_e, projectPath) => {
   return publicSettings();
 });
 
+function isAllowedExternalUrl(url){
+  try{
+    const u = new URL(String(url));
+    if(u.protocol==="https:" || u.protocol==="http:"){
+      // block private/local hosts and non-https downgrade? allow all http/https for now, but validate hostname
+      if(!u.hostname || u.hostname==="localhost" || u.hostname.endsWith(".local")) return false;
+      // basic hostname sanity
+      if(!/^[a-z0-9.-]+$/i.test(u.hostname)) return false;
+      return true;
+    }
+    if(u.protocol==="file:"){
+      const p = path.normalize(decodeURIComponent(u.pathname));
+      const allowedRoots = [...(settings?.projects||[]), settings?.cwd||"", app.getPath("home")].filter(Boolean).map(p=>path.resolve(String(p)));
+      return allowedRoots.some(root=> p===root || p.startsWith(root+path.sep));
+    }
+    return false;
+  }catch{ return false; }
+}
 ipcMain.handle("shell:openExternal", (_e, url) => {
-  if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  if (isAllowedExternalUrl(url)) shell.openExternal(url);
+  else console.warn("[openExternal] blocked:", String(url).slice(0,200));
 });
 
 ipcMain.handle("sessions:list", () => {
@@ -833,6 +877,23 @@ ipcMain.handle("sessions:bulkDelete", async (_e, files) => {
   saveSettings();
   return result;
 });
+ipcMain.handle("sessions:restoreTrash", async (_e, trashFile) => {
+  const trashDir = sessionsStore.trashDirFor(sessionsDir());
+  const src = path.join(trashDir, path.basename(String(trashFile)));
+  if(!fs.existsSync(src)) throw new Error("File trash non trovato");
+  const dest = sessionsStore.restoreFromTrash(sessionsDir(), src);
+  sessionsListCache=null; sessionsListCacheAt=0;
+  return { ok:true, restored: dest };
+});
+ipcMain.handle("sessions:listTrash", async () => {
+  const trashDir = sessionsStore.trashDirFor(sessionsDir());
+  try{
+    const entries = fs.readdirSync(trashDir).map(f=>{
+      const p=path.join(trashDir,f); const st=fs.statSync(p); return { file:f, path:p, mtime: st.mtimeMs, size: st.size };
+    }).sort((a,b)=>b.mtime-a.mtime).slice(0,50);
+    return entries;
+  }catch{ return []; }
+});
 
 ipcMain.handle("sessions:setMeta", (_e, { file, patch }) => {
   const resolvedRoot = path.resolve(sessionsDir());
@@ -909,15 +970,41 @@ ipcMain.handle("pi:listTabs", () => runtime.list());
 ipcMain.handle("pi:activateTab", (_e, tabId) => runtime.activate(tabId));
 ipcMain.handle("pi:closeTab", (_e, tabId) => runtime.close(tabId));
 
+function checkBudgetForCwd(cwd){
+  try{
+    const b = settings?.budgets?.[cwd];
+    if(!b || (b.maxCost==null && b.maxTokens==null)) return { ok:true };
+    const sessions = sessionsStore.listSessions(sessionsDir()).filter(s=>s.cwd===cwd);
+    let cost=0, tokens=0;
+    for(const s of sessions){ if(typeof s.cost==="number") cost+=s.cost; if(typeof s.tokens==="number") tokens+=s.tokens; else if(s.tokens && typeof s.tokens.total==="number") tokens+=s.tokens.total; }
+    const costOver = b.maxCost!=null && cost >= b.maxCost;
+    const tokOver = b.maxTokens!=null && tokens >= b.maxTokens;
+    if(costOver || tokOver) return { ok:false, cost, tokens, budget:b };
+    const costPct = b.maxCost ? cost/b.maxCost : 0;
+    const tokPct = b.maxTokens ? tokens/b.maxTokens : 0;
+    const pct = Math.max(costPct, tokPct);
+    if(pct>=0.8) console.warn(`[budget] ${cwd} ${Math.round(pct*100)}%`);
+    return { ok:true, cost, tokens, pct };
+  }catch{ return { ok:true }; }
+}
 ipcMain.handle("pi:prompt", async (_e, { message, images, streamingBehavior, tabId }) => {
+  const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
+  const chk = checkBudgetForCwd(cwd);
+  if(!chk.ok) throw new Error(`Budget superato per ${cwd}: costo ${chk.cost?.toFixed?.(2)||chk.cost} / ${chk.budget.maxCost} o token ${chk.tokens} / ${chk.budget.maxTokens}. Aggiorna il budget in Impostazioni.`);
   await ensureRuntime();
   return runtime.prompt(message, images, streamingBehavior, tabId);
 });
 ipcMain.handle("pi:steer", async (_e, { message, images, tabId }) => {
+  const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
+  const chk = checkBudgetForCwd(cwd);
+  if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.steer(message, images, tabId);
 });
 ipcMain.handle("pi:followUp", async (_e, { message, images, tabId }) => {
+  const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
+  const chk = checkBudgetForCwd(cwd);
+  if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.followUp(message, images, tabId);
 });
@@ -1146,8 +1233,8 @@ ipcMain.handle("providers:login", async (_e, { providerId, authType }) => {
       signal: controller.signal,
       prompt: (prompt) => requestAuthPrompt(providerId, prompt, prompt.signal || controller.signal),
       notify: (event) => {
-        if (event.type === "auth_url" && /^https?:\/\//i.test(event.url || "")) shell.openExternal(event.url);
-        if (event.type === "device_code" && /^https?:\/\//i.test(event.verificationUri || "")) shell.openExternal(event.verificationUri);
+        if (event.type === "auth_url" && isAllowedExternalUrl(event.url || "")) shell.openExternal(event.url);
+        if (event.type === "device_code" && isAllowedExternalUrl(event.verificationUri || "")) shell.openExternal(event.verificationUri);
         sendAuthEvent({ kind: "event", providerId, event });
       },
     });

@@ -62,6 +62,10 @@ test("decomposition: extension-bridge.js exposes expected API", () => {
   assert.equal(typeof ext.stripAnsi, "function");
   assert.equal(ext.stripAnsi("\x1b[31mred\x1b[0m"), "red");
   assert.equal(ext.stripAnsi("plain"), "plain");
+  assert.equal(ext.shouldShowNotification("Ponytail loaded: full", "info", 1000), true);
+  assert.equal(ext.shouldShowNotification("Ponytail loaded: full", "info", 1200), false);
+  assert.equal(ext.shouldShowNotification("Ponytail loaded: full", "info", 7000), true);
+  assert.equal(ext.shouldShowNotification("Ponytail loaded: full", "warn", 7100), true);
 });
 
 test("decomposition: media.js exposes expected API and safeImageSource logic", () => {

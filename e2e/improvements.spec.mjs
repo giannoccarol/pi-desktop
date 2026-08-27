@@ -105,7 +105,12 @@ test.describe("ottimizzazioni renderer", () => {
         await window.refreshTabs();
         const s = window.piStore.state;
         if (s.activeTabId !== res.tabId) await window.switchToTab(res.tabId);
-        else s.activeSessionFile = f;
+        else {
+          s.activeSessionFile = f;
+          const result = await window.piDesktop.getMessages(res.tabId);
+          const messages = (window.piChatUtils?.collapseRetryAttempts ?? ((items) => items))(result?.messages || []);
+          if (messages.length) await window.piSessionView.renderConversation(messages, () => true);
+        }
       }, file);
       // Aspetta che la conversazione sia renderizzata (finestra runtime ~100 nodi)
       // Il dialog di primo avvio puo' apparire: chiudilo prima e durante l'attesa

@@ -41,6 +41,11 @@
   --font-caption: 11px;
   --font-micro: 10px;
   --mono: ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 360ms;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-standard: cubic-bezier(.2, .8, .2, 1);
 }
 
 html[data-theme="dark"] {
@@ -661,7 +666,23 @@ body.session-loading .chat-tab:not(.loading):not(.active) { opacity: .45; }
 .session-item.running .session-title::after { content: ""; width: 6px; height: 6px; display: inline-block; margin-left: 7px; border-radius: 50%; background: var(--amber); vertical-align: 1px; animation: tab-pulse 1.4s ease-in-out infinite; }
 @keyframes tab-pulse { 50% { opacity: .38; } }
 #main { position: relative; }
-#chat { min-height: 0; flex: 1; overflow-y: auto; overflow-anchor: none; scroll-behavior: auto; }
+#chat {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-anchor: none;
+  overscroll-behavior-y: contain;
+  scroll-behavior: auto;
+  scroll-padding-block: 28px 48px;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+#chat::-webkit-scrollbar { width: 8px; }
+#chat::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--muted) 24%, transparent);
+  transition: background-color var(--motion-fast) ease;
+}
+#chat:hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--muted) 48%, transparent); }
 .scroll-bottom-btn {
   position: absolute;
   left: 50%;
@@ -684,6 +705,7 @@ body.session-loading .chat-tab:not(.loading):not(.active) { opacity: .45; }
   transition: opacity .18s ease, transform .18s ease, background .14s, box-shadow .14s;
 }
 .scroll-bottom-btn.hidden { display: none !important; }
+.scroll-bottom-btn:not(.hidden) { animation: floating-control-in var(--motion-base) var(--ease-out); }
 .scroll-bottom-btn:hover { background: var(--hover); border-color: var(--border-strong); transform: translateX(-50%) translateY(-1px); }
 .scroll-bottom-btn:active { transform: translateX(-50%) translateY(0); }
 .scroll-bottom-btn svg { width: 14px; height: 14px; }
@@ -802,6 +824,11 @@ html[data-theme="dark"] .hero-img--dark { display: block; }
 .tool-media .chat-media { width: min(280px, 100%); }
 .role-tag { margin-bottom: 4px; color: var(--muted); font-size: var(--font-caption); letter-spacing: .03em; text-transform: uppercase; }
 .msg-assistant .content { word-break: break-word; line-height: 1.58; }
+.message-entering { animation: message-in var(--motion-slow) var(--ease-out) both; }
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(9px) scale(.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 .msg-assistant.activity-only .role-tag { display: none; }
 .msg-assistant.activity-only .content { display: grid; gap: 4px; }
 .msg-assistant.activity-only { margin-block: 0; }
@@ -825,6 +852,9 @@ html[data-theme="dark"] .hero-img--dark { display: block; }
 .activity-label { color: var(--muted); }
 .activity-count { margin-left: auto; color: var(--subtle); font-size: var(--font-caption); }
 .activity-list { padding: 1px 3px 3px 21px; }
+.activity-bundle[open] > .activity-list,
+details.think[open] > .think-body,
+.tool-card[open] > .tool-body { animation: disclosure-in var(--motion-base) var(--ease-out); }
 .activity-list .msg-assistant.activity-only { margin: 0; }
 .activity-list .msg-assistant.activity-only + .msg-assistant.activity-only { margin-top: 0; }
 .activity-list .content { gap: 0; }
@@ -1231,6 +1261,17 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 }
 #status-cwd { max-width: 55%; }
 #status-activity { color: var(--blue); }
+.status-cache-hit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--green) 24%, transparent);
+  border-radius: 999px;
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+  white-space: nowrap;
+}
 .extension-statuses {
   display: flex;
   align-items: center;
@@ -1515,6 +1556,50 @@ dialog::backdrop { background: rgba(0, 0, 0, .42); backdrop-filter: blur(2px); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes toastOut { to { opacity: 0; transform: translateY(6px) scale(.98); } }
 @keyframes toastProgress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+.menu:not(.hidden),
+.slash-suggestions:not(.hidden),
+.busy-send-choice:not(.hidden) { animation: surface-in var(--motion-base) var(--ease-out) both; }
+dialog[open] { animation: dialog-in var(--motion-slow) var(--ease-out) both; }
+dialog[open]::backdrop { animation: backdrop-in var(--motion-base) ease-out both; }
+.chat-tab { animation: tab-in var(--motion-base) var(--ease-out) both; }
+.icon-btn:active,
+.btn:active,
+.composer-tool:active,
+.send-btn:active,
+.dock-button:active,
+.pi-status-button:active { transform: scale(.96); }
+
+@keyframes floating-control-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(7px) scale(.96); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes disclosure-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes surface-in {
+  from { opacity: 0; transform: translateY(5px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
 
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: color-mix(in srgb, var(--muted) 45%, transparent); background-clip: padding-box; }
