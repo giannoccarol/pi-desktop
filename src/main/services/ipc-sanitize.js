@@ -81,7 +81,6 @@ function sanitizeMessagesPayload(payload, maxMessages = MAX_MESSAGES, maxBytes =
   const raw = Array.isArray(root?.messages) ? root.messages : Array.isArray(root) ? root : [];
   const sliced = sliceTailMessages(raw, maxMessages);
   const capped = capSerializedSize(sliced.messages, sliced.hiddenCount, maxBytes);
-  const capped = capSerializedSize(sliced.messages, sliced.hiddenCount);
   const base = root && !Array.isArray(root) ? root : {};
   return {
     ...base,
