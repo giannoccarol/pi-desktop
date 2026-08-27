@@ -1244,6 +1244,18 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 .extension-widgets { width: min(780px, calc(100% - 28px)); max-height: 140px; margin: 4px auto; overflow: auto; }
 .extension-widget { margin: 4px 0; padding: 8px 10px; border-radius: 9px; color: var(--muted); background: var(--surface-2); white-space: pre-wrap; font: var(--font-caption)/1.45 var(--mono); }
 
+/* Bulk bar + search toggle */
+.bulk-bar { display:flex;align-items:center;gap:8px;padding:6px 8px;margin:6px 0;border:1px solid var(--hairline);border-radius:8px;background:var(--surface); }
+.bulk-bar.hidden{display:none !important;}
+.session-item.selected{background:color-mix(in srgb,var(--blue) 8%,var(--surface));border-color:color-mix(in srgb,var(--blue) 20%,transparent);}
+#search-mode-toggle{font-size:10px;font-weight:700;min-width:28px;}
+#search-mode-toggle:hover{background:var(--hover);}
+/* Explorer + Terminal panels */
+#explorer-panel.hidden,#terminal-panel.hidden,#health-banner.hidden{display:none !important;}
+#terminal-output::-webkit-scrollbar{width:6px;}
+/* Budgets */
+#budgets-list .icon-btn{opacity:.7;} #budgets-list .icon-btn:hover{opacity:1;}
+
 /* Dialogs / notices */
 dialog {
   width: min(92vw, 640px);
