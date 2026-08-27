@@ -8,6 +8,7 @@ builder-debug.yml
 builder-effective-config.yaml
 *.log
 .DS_Store
+.crew/
 
 # Playwright e2e
 e2e/.artifacts/
