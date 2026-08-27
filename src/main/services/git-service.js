@@ -54,10 +54,13 @@ async function getGitStatus(cwd){
     if(b && b!=="HEAD") branch = b;
   }
   let dirty = 0;
+  const dirtyFiles = [];
   for(let i=1;i<lines.length;i++){
     const l = lines[i];
     if(!l.trim()) continue;
     dirty++;
+    const rawPath=l.slice(3).trim();
+    dirtyFiles.push(rawPath.includes(" -> ") ? rawPath.split(" -> ").pop() : rawPath);
   }
   let ahead=0, behind=0;
   const mAhead = branchLine.match(/ahead (\d+)/);
@@ -75,7 +78,7 @@ async function getGitStatus(cwd){
       label += ` (${parts.join(" ")})`;
     }
   }
-  return { isGit:true, branch, dirty, ahead, behind, label };
+  return { isGit:true, branch, dirty, dirtyFiles, ahead, behind, label };
 }
 
 module.exports = { getGitStatus, readHead };

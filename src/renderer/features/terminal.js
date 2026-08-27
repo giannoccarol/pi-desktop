@@ -4,38 +4,57 @@
   const el = () => root.piStore?.el || {};
   const state = () => root.piStore?.state || {};
   function toast(m,k,ms){ return root.piUi?.toast(m,k,ms); }
-  function esc(s){ return root.piUtils?.escapeHtml(s) ?? String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+  function tr(key,fallback){ const value=root.i18n?.t?.(key); return value && value!==key ? value : fallback; }
 
-  function appendOutput(text, isError){
+  let histIndex = -1;
+  let draftInput = "";
+
+  function appendOutput(text, isError, isCmd){
     const out = el().terminalOutput;
     if(!out) return;
     const line = document.createElement("div");
+    line.style.cssText = isCmd ? "color:var(--blue);font-weight:600" : isError ? "color:var(--red)" : "color:#d4d4d4";
     line.textContent = text;
-    if(isError) line.style.color = "var(--red)";
     out.appendChild(line);
     out.scrollTop = out.scrollHeight;
-    // keep history bounded
     const s = state();
     s.terminalHistory = s.terminalHistory || [];
-    s.terminalHistory.push(text.slice(0, 2000));
-    if(s.terminalHistory.length>80) s.terminalHistory.splice(0, 40);
-    // persist lightly via settings
-    try{ api().setSettings({ terminalHistory: s.terminalHistory.slice(-40) }); }catch{}
+    // store only command lines for ↑/↓
+    if(isCmd){
+      s.terminalHistory.push(text.replace(/^\$\s*/,""));
+      if(s.terminalHistory.length>100) s.terminalHistory.splice(0,50);
+      try{ api().setSettings({ terminalHistory: s.terminalHistory.slice(-40) }); }catch{}
+      histIndex = s.terminalHistory.length;
+    }
+  }
+  const interactiveRe = /^(vim|vi|nano|emacs|htop|top|less|more|fzf|ssh|tmux|screen)\b/i;
+  function commandExecutable(command){
+    const parts=String(command||"").trim().split(/\s+/);
+    while(parts[0] && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(parts[0]) || ["sudo","env","command","nohup"].includes(parts[0].toLowerCase()))) parts.shift();
+    return parts.join(" ");
   }
   async function runCommand(cmd, exclude){
     if(!cmd.trim()) return;
+    if(interactiveRe.test(commandExecutable(cmd))){ toast(`Comando interattivo non supportato nel terminale embedded (serve PTY). Usa terminale esterno.` , "warn", 4000); return; }
     const s = state();
     s.terminalBusy = true;
-    appendOutput(`$ ${cmd}`, false);
+    const btn = document.getElementById("btn-terminal-run");
+    if(btn) btn.disabled = true;
+    appendOutput(`$ ${cmd}`, false, true);
     try{
       const res = await api().bash(cmd, !!exclude);
-      appendOutput(res.output || "(nessun output)", !!res.exitCode);
-      if(res.truncated) appendOutput(`… troncato: ${res.fullOutputPath}`, false);
+      const out = res.output || "(nessun output)";
+      // split large output into lines for better scroll
+      out.split("\n").forEach(l=> appendOutput(l, !!res.exitCode, false));
+      if(res.truncated) appendOutput(`… troncato: ${res.fullOutputPath}`, false, false);
+      if(res.exitCode) toast(`Exit ${res.exitCode}`, "warn", 2500);
     }catch(err){
-      appendOutput(`Errore: ${err.message}`, true);
+      appendOutput(`Errore: ${err.message}`, true, false);
       toast(err.message, "error");
     }finally{
       s.terminalBusy = false;
+      if(btn) btn.disabled = false;
+      el().terminalInput?.focus();
     }
   }
   function setVisible(v){
@@ -52,16 +71,72 @@
     const inp = e.terminalInput;
     const btn = document.getElementById("btn-terminal-run");
     const chk = document.getElementById("terminal-exclude");
+    const out = e.terminalOutput;
     const exec = ()=>{
       const cmd = inp ? inp.value.trim() : "";
       if(!cmd) return;
       if(inp) inp.value = "";
+      draftInput = "";
+      histIndex = (state().terminalHistory||[]).length;
       runCommand(cmd, chk?.checked);
     };
     btn?.addEventListener("click", exec);
+    // toolbar: clear / copy
+    const panel = e.terminalPanel;
+    if(panel && !panel.querySelector("#term-toolbar")){
+      const tb = document.createElement("div");
+      tb.id="term-toolbar";
+      tb.style.cssText="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px";
+      const copyBtn = document.createElement("button");
+      copyBtn.className="btn ghost small"; copyBtn.style.cssText="height:24px;font-size:11px;padding:0 6px";
+      copyBtn.textContent=tr("terminal.copy","Copia");
+      copyBtn.addEventListener("click", async ()=>{
+        try{ await navigator.clipboard.writeText(out ? out.innerText : ""); toast("Output copiato","info",1500);}catch{}
+      });
+      const clearBtn = document.createElement("button");
+      clearBtn.className="btn ghost small"; clearBtn.style.cssText="height:24px;font-size:11px;padding:0 6px";
+      clearBtn.textContent=tr("terminal.clear","Pulisci");
+      clearBtn.addEventListener("click", ()=>{ if(out) out.innerHTML=""; });
+      const abortBtn = document.createElement("button");
+      abortBtn.className="btn ghost small"; abortBtn.style.cssText="height:24px;font-size:11px;padding:0 6px;color:var(--red)";
+      abortBtn.textContent=tr("terminal.abort","Interrompi");
+      abortBtn.addEventListener("click", async()=>{
+        try{ await api().abortBash(); appendOutput(tr("terminal.stopped","Comando interrotto."),true,false); }catch(err){ toast(err.message,"error"); }
+      });
+      const openBtn = document.createElement("button");
+      openBtn.className="btn ghost small"; openBtn.style.cssText="height:24px;font-size:11px;padding:0 6px";
+      openBtn.textContent=tr("terminal.external","Apri terminale esterno");
+      openBtn.addEventListener("click", async ()=>{
+        const cwd = state().settings?.cwd || "";
+        try{ await api().openTerminal(cwd); }catch(err){ toast(err.message,"error"); }
+      });
+      tb.append(copyBtn, clearBtn, abortBtn, openBtn);
+      panel.insertBefore(tb, panel.querySelector("pre"));
+    }
     inp?.addEventListener("keydown", (ev)=>{
-      if(ev.key==="Enter"){ ev.preventDefault(); exec(); }
-      if(ev.key==="Escape") setVisible(false);
+      const hist = state().terminalHistory || [];
+      if(ev.key==="Enter"){
+        ev.preventDefault(); exec();
+      } else if(ev.key==="ArrowUp"){
+        ev.preventDefault();
+        if(histIndex===hist.length) draftInput = inp.value;
+        histIndex = Math.max(0, histIndex-1);
+        if(hist[histIndex]!=null) inp.value = hist[histIndex];
+      } else if(ev.key==="ArrowDown"){
+        ev.preventDefault();
+        histIndex = Math.min(hist.length, histIndex+1);
+        if(histIndex===hist.length) inp.value = draftInput;
+        else if(hist[histIndex]!=null) inp.value = hist[histIndex];
+      } else if(ev.key==="Escape"){
+        if(inp.value) inp.value="";
+        else setVisible(false);
+      } else if((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==="l"){
+        ev.preventDefault(); if(out) out.innerHTML="";
+      }
+    });
+    // Ctrl+` toggle
+    document.addEventListener("keydown", (ev)=>{
+      if((ev.ctrlKey||ev.metaKey) && ev.key==="`"){ ev.preventDefault(); toggle(); }
     });
   }
   root.piTerminal = { runCommand, setVisible, toggle, init, appendOutput };

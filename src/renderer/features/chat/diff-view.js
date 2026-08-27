@@ -160,11 +160,13 @@
     let html = `<div class="diff-view" data-mode="${mode}" data-raw="${escapeHtml(rawDiff.slice(0,8000))}">`;
     const p = parsedArgs.path || parsedArgs.file || parsedArgs.filePath;
     const pEsc = p ? escapeHtml(String(p)) : "";
+    const newTextForEdit = (()=>{ try{ const a = typeof parsedArgs==='object'?parsedArgs:JSON.parse(String(parsedArgs)); const v = a.newText ?? a.new_string ?? a.content ?? ""; return String(v).slice(0,8000); }catch{ return ""; } })();
     html += `<div class="diff-header">`;
     if (pEsc) html += `<span class="diff-path">${pEsc}</span>`;
     html += `<span class="diff-actions">` +
       `<button class="diff-btn" data-action="copy-diff" title="Copia diff">Copia diff</button>` +
       (pEsc ? `<button class="diff-btn" data-action="open" data-path="${pEsc}" title="Apri file">Apri</button>` : "") +
+      (newTextForEdit ? `<button class="diff-btn" data-action="edit-inline" data-newtext="${escapeHtml(newTextForEdit)}" title="Prepara una proposta nel composer">Proponi modifica</button>` : "") +
       `<button class="diff-btn" data-action="toggle" title="Toggle unified/split">${mode === "split" ? "Unificato" : "Split"}</button>` +
       `</span></div>`;
     if (mode === "split") {
@@ -217,6 +219,29 @@
       if (!btn || !rootEl.contains(btn)) return;
       const action = btn.dataset.action;
       const view = btn.closest(".diff-view");
+      if(action==="edit-inline"){
+        const cur = btn.dataset.newtext || "";
+        if(view.querySelector(".diff-inline-editor")) return;
+        const wrap=document.createElement("div"); wrap.className="diff-inline-editor"; wrap.style.cssText="padding:8px;background:var(--surface-2);border-top:1px solid var(--hairline)";
+        wrap.innerHTML=`<textarea style="width:100%;min-height:100px;font:12px var(--mono);padding:8px;border-radius:6px;border:1px solid var(--hairline)">${escapeHtml(cur)}</textarea><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button class="btn ghost small" data-inline="cancel">Annulla</button><button class="btn primary small" data-inline="apply">Applica nel composer</button></div>`;
+        view.appendChild(wrap);
+        const ta=wrap.querySelector("textarea"); ta.focus();
+        wrap.querySelector('[data-inline="cancel"]')?.addEventListener("click", ()=> wrap.remove());
+        wrap.querySelector('[data-inline="apply"]')?.addEventListener("click", ()=>{
+          const val=ta.value;
+          const inp = document.querySelector("#input");
+          if(inp){
+            const path = view.querySelector(".diff-path")?.textContent?.trim() || "file";
+            inp.value = (inp.value? inp.value+"\n" : "") + `Modifica ${path}:\n\`\`\`\n${val}\n\`\`\``;
+            inp.focus();
+            try{ window.piComposer?.autosize?.(); }catch{}
+          }
+          try{ navigator.clipboard.writeText(val); }catch{}
+          wrap.remove();
+          if(root.piUi?.toast) root.piUi.toast("Proposta inserita nel composer","info",3000);
+        });
+        return;
+      }
       if (action === "copy" || action === "copy-diff") {
         const raw = view?.dataset.raw || btn.dataset.raw || "";
         const text = raw || view?.textContent || "";
@@ -230,7 +255,11 @@
         const p = btn.dataset.path;
         if (p) {
           try {
-            if (window.piDesktop && window.piDesktop.openExternal) window.piDesktop.openExternal(p);
+            const cwd=window.piStore?.state?.settings?.cwd || "";
+            const absolute=/^(?:[A-Za-z]:[\\/]|\/)/.test(p) ? p : `${cwd.replace(/[\\/]+$/,"")}/${p}`;
+            const normalized=absolute.replace(/\\/g,"/");
+            const fileUrl=/^[A-Za-z]:\//.test(normalized) ? `file:///${normalized}` : `file://${normalized}`;
+            if (window.piDesktop && window.piDesktop.openExternal) window.piDesktop.openExternal(encodeURI(fileUrl));
             else if (window.piDesktop && window.piDesktop.openPath) window.piDesktop.openPath(p);
           } catch {}
         }

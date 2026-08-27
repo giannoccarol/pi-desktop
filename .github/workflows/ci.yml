@@ -41,6 +41,8 @@ jobs:
         run: node scripts/build/prepare-build-assets.js
       - name: Verify (check + renderer integrity + lint + tests + smoke)
         run: xvfb-run -a npm run verify
+      - name: Electron end-to-end tests
+        run: xvfb-run -a npm run test:e2e
       - name: Verify Linux package
         run: npx electron-builder --linux --dir --publish never
 
@@ -60,6 +62,8 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+      - name: Verify renderer integrity and lint
+        run: npm run verify:quick
       - name: Prepare build assets
         run: node scripts/build/prepare-build-assets.js
       - name: Verify unsigned Windows package
@@ -82,6 +86,8 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+      - name: Verify renderer integrity and lint
+        run: npm run verify:quick
       - name: Prepare build assets
         run: node scripts/build/prepare-build-assets.js
       - name: Verify macOS package

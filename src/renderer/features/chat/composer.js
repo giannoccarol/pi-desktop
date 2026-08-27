@@ -45,16 +45,48 @@ function renderAttachmentTray() {
   refreshIcons();
 }
 
+function imagePolicy(){ return state.piSettings?.images || {}; }
+function shouldResizeImages(){ const images=imagePolicy(); return images.blockImages!==true && images.autoResize!==false; }
+function base64Size(data){ return Math.max(0, Math.floor(String(data||"").length*3/4)); }
+async function resizeImageBase64(data, mimeType, maxDim=1600, quality=0.85){
+  try{
+    if(!data || !mimeType?.startsWith("image/")) return {data,mimeType,size:base64Size(data),resized:false};
+    if(mimeType==="image/gif") return {data,mimeType,size:base64Size(data),resized:false};
+    const img = new Image();
+    const loaded = await new Promise((res, rej)=>{ img.onload=()=>res(true); img.onerror=()=>rej(new Error("load fail")); img.src=`data:${mimeType};base64,${data}`; });
+    if(!loaded) return {data,mimeType,size:base64Size(data),resized:false};
+    let {width, height} = img;
+    if(width<=maxDim && height<=maxDim) return {data,mimeType,size:base64Size(data),resized:false};
+    const ratio = Math.min(maxDim/width, maxDim/height);
+    width = Math.round(width*ratio); height = Math.round(height*ratio);
+    const canvas = document.createElement("canvas"); canvas.width=width; canvas.height=height;
+    const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, width, height);
+    const outMime = ["image/png","image/jpeg","image/webp"].includes(mimeType) ? mimeType : "image/png";
+    const dataUrl = canvas.toDataURL(outMime, quality);
+    const nextData=dataUrl.split(",")[1] || data;
+    return {data:nextData,mimeType:outMime,size:base64Size(nextData),resized:nextData!==data};
+  }catch{ return {data,mimeType,size:base64Size(data),resized:false}; }
+}
 async function pickAttachments(kind) {
   try {
     const picked = await api.pickFiles(kind);
-    for (const attachment of picked) {
+    const doResize = shouldResizeImages();
+    let resized=0;
+    for (let attachment of picked) {
+      if (attachment.data && doResize) {
+        try{
+          const result=await resizeImageBase64(attachment.data, attachment.mimeType);
+          attachment={...attachment,data:result.data,mimeType:result.mimeType,size:result.size};
+          if(result.resized) resized++;
+        }catch{}
+      }
       if (!state.attachments.some((candidate) => candidate.path === attachment.path)) state.attachments.push(attachment);
     }
     if (state.attachments.length > 12) {
       state.attachments.length = 12;
       toast(t("toast.attachLimit"), "warn");
     }
+    if(resized) toast(`${resized} immagini ridimensionate a max 1600px`, "info", 2000);
     renderAttachmentTray();
     el.input.focus();
   } catch (err) {
@@ -88,12 +120,15 @@ async function pasteClipboardImages(event) {
       continue;
     }
     const mimeType = item.type.toLowerCase();
+    let b64 = bufferToBase64(await file.arrayBuffer());
+    let resized={data:b64,mimeType,size:file.size,resized:false};
+    if(shouldResizeImages()){ try{ resized = await resizeImageBase64(b64, mimeType); }catch{} }
     state.attachments.push({
-      name: `clipboard-${new Date().toISOString().replace(/[:.]/g, "-")}.${clipboardImageExtension(mimeType)}`,
+      name: `clipboard-${new Date().toISOString().replace(/[:.]/g, "-")}.${clipboardImageExtension(resized.mimeType)}`,
       path: null,
-      size: file.size,
-      mimeType,
-      data: bufferToBase64(await file.arrayBuffer()),
+      size: resized.size,
+      mimeType: resized.mimeType,
+      data: resized.data,
     });
     added += 1;
   }
@@ -122,6 +157,19 @@ async function refreshStats() {
     if (typeof st.cost === "number") bits.push(fmtCost(st.cost));
     if (st.contextUsage) bits.push(`ctx ${st.contextUsage.percent}%`);
     el.statusTokens.textContent = bits.join(" · ");
+    if (el.statusCacheHit) {
+      const cache = window.piUtils?.cacheHitStats?.(st.tokens);
+      const available = cache?.percent != null;
+      el.statusCacheHit.classList.toggle("hidden", !available);
+      el.statusCacheHit.textContent = available ? t("stats.cacheHit", { percent: cache.percent }) : "";
+      el.statusCacheHit.title = available
+        ? t("stats.cacheHitTitle", {
+          read: fmtTokens(cache.cacheRead),
+          prompt: fmtTokens(cache.prompt),
+          write: fmtTokens(cache.cacheWrite),
+        })
+        : "";
+    }
   } catch {}
 }
 
@@ -413,6 +461,11 @@ async function sendMessage(rawBehavior) {
     el.input.value = "";
     autosize();
     await runDirectBash(command, excludeFromContext);
+    return;
+  }
+  const imageAttachments = attachments.filter((attachment) => attachment.data && attachment.mimeType?.startsWith("image/"));
+  if(imagePolicy().blockImages && imageAttachments.length){
+    toast("L'invio di immagini è bloccato nelle impostazioni Pi.", "warn", 5000);
     return;
   }
   const images = attachments

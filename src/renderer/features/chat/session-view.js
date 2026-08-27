@@ -341,11 +341,15 @@
       const staging = document.createElement("div");
       const savedMsgs = el.messages;
       el.messages = staging;
+      window.piUi?.pauseIconRefresh?.();
       try {
         for (let i = 0; i < chunk.length; i++) {
           try { renderFn(chunk[i], { results, consumed }); } catch { /* salta messaggi problematici */ }
         }
-      } finally { el.messages = savedMsgs; }
+      } finally {
+        window.piUi?.resumeIconRefresh?.();
+        el.messages = savedMsgs;
+      }
       if (!staging.firstChild) {
         historyState.start = from;
         return count;

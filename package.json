@@ -1,7 +1,7 @@
 {
   "name": "pi-desktop",
   "productName": "Pi Desktop",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Desktop companion for the Pi coding agent: chat history, provider/model switching, and self-updating pi independent of the app.",
   "main": "src/main/core/main.js",
   "license": "MIT",
@@ -33,12 +33,12 @@
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/npm": "^12.0.1",
+    "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.0.3",
     "electron": "^43.4.1",
     "electron-builder": "^26.15.3",
     "eslint": "^8.57.0",
-    "semantic-release": "^24.2.3"
+    "semantic-release": "^25.0.9"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
   pickDirectory: (title) => ipcRenderer.invoke("dialog:pickDirectory", title),
   pickFiles: (kind) => ipcRenderer.invoke("dialog:pickFiles", kind),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
+  openTerminal: (cwd) => ipcRenderer.invoke("shell:openTerminal", cwd),
   searchFiles: (query) => ipcRenderer.invoke("fs:searchFiles", query),
   listDroppedFiles: (absPath) => ipcRenderer.invoke("fs:listDropped", absPath),
   addProject: () => ipcRenderer.invoke("projects:add"),
@@ -27,9 +28,11 @@ contextBridge.exposeInMainWorld("piDesktop", {
   searchFullText: (query) => ipcRenderer.invoke("sessions:searchFullText", query),
   bulkDeleteSessions: (files) => ipcRenderer.invoke("sessions:bulkDelete", files),
   bulkExportSessions: (files) => ipcRenderer.invoke("sessions:bulkExport", files),
+  listTrash: () => ipcRenderer.invoke("sessions:listTrash"),
+  restoreTrash: (file) => ipcRenderer.invoke("sessions:restoreTrash", file),
   getSessionMeta: () => ipcRenderer.invoke("sessions:getMeta"),
   setSessionMeta: (file, patch) => ipcRenderer.invoke("sessions:setMeta", { file, patch }),
-  listExplorer: (cwd, depth) => ipcRenderer.invoke("fs:listExplorer", { cwd, depth }),
+  listExplorer: (cwd, depth, showDotfiles) => ipcRenderer.invoke("fs:listExplorer", { cwd, depth, showDotfiles }),
   readTextFile: (filePath) => ipcRenderer.invoke("fs:readTextFile", filePath),
   getPiLogs: () => ipcRenderer.invoke("health:getPiLogs"),
 
@@ -110,7 +113,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
 
   // events from main
   on(channel, cb) {
-    const ALLOWED_CHANNELS = ["pi:event", "pi:maintenance-output", "pi:package-output", "pi:auth-request", "pi:tray-new-chat", "update:state", "app:stale-install"];
+    const ALLOWED_CHANNELS = ["pi:event", "pi:maintenance-output", "pi:package-output", "pi:auth-request", "pi:tray-new-chat", "update:state", "app:stale-install", "sessions:changed"];
     if (!ALLOWED_CHANNELS.includes(channel)) return () => {};
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on(channel, handler);

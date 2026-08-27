@@ -40,6 +40,19 @@
 
   function icon(name) { return `<i data-lucide="${name}"></i>`; }
 
+  function prefersReducedMotion() {
+    try { return root.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true; }
+    catch { return false; }
+  }
+
+  function animateChatEntry(node) {
+    if (!node || prefersReducedMotion()) return;
+    node.classList.add("message-entering");
+    const finish = () => node.classList.remove("message-entering");
+    node.addEventListener("animationend", finish, { once: true });
+    setTimeout(finish, 450);
+  }
+
   function chatBottomDistance() {
     const el = getEl();
     if (!el.chat) return 0;
@@ -60,6 +73,34 @@
   // Dopo un restore al fondo il contenuto continua a dimensionarsi (immagini
   // lazy, tool card, highlight): senza re-pin la viewport resta a metà chat.
   let bottomPinRaf = 0;
+  let liveScrollRaf = 0;
+  let manualScrollRaf = 0;
+  let manualScrollCleanup = null;
+
+  function cancelAnimatedChatScroll(userInitiated = false) {
+    if (liveScrollRaf) cancelAnimationFrame(liveScrollRaf);
+    if (manualScrollRaf) cancelAnimationFrame(manualScrollRaf);
+    liveScrollRaf = 0;
+    manualScrollRaf = 0;
+    if (manualScrollCleanup) manualScrollCleanup();
+    manualScrollCleanup = null;
+    const state = getState();
+    state.chatAutoScrolling = false;
+    if (userInitiated) state.chatStickToBottom = false;
+  }
+
+  function bindManualScrollInterruption(chat) {
+    const interrupt = () => cancelAnimatedChatScroll(true);
+    const options = { passive: true };
+    chat.addEventListener("wheel", interrupt, options);
+    chat.addEventListener("touchstart", interrupt, options);
+    chat.addEventListener("pointerdown", interrupt, options);
+    return () => {
+      chat.removeEventListener("wheel", interrupt, options);
+      chat.removeEventListener("touchstart", interrupt, options);
+      chat.removeEventListener("pointerdown", interrupt, options);
+    };
+  }
   function pinBottomUntilSettled({ maxFrames = 90, stableFrames = 8, maxDistance = 4 } = {}) {
     if (bottomPinRaf) cancelAnimationFrame(bottomPinRaf);
     const elStart = getEl();
@@ -156,6 +197,7 @@
 
   function noteChatScroll() {
     const state = getState();
+    if (state.chatAutoScrolling) return;
     state.chatStickToBottom = isNearBottom(140);
   }
 
@@ -167,16 +209,78 @@
     // Recomputing "near bottom" after inserting a tall activity block makes the
     // viewport appear to jump upwards even though the user never scrolled away.
     const shouldFollow = force || state.chatStickToBottom !== false;
-    if (shouldFollow) {
+    if (!shouldFollow) return;
+    state.chatStickToBottom = true;
+    if (prefersReducedMotion() || typeof document === "undefined" || typeof requestAnimationFrame !== "function") {
       el.chat.scrollTop = el.chat.scrollHeight;
-      state.chatStickToBottom = true;
       queueMicrotask(updateScrollBottomVisibility);
+      return;
     }
+    if (manualScrollRaf || liveScrollRaf) return;
+    state.chatAutoScrolling = true;
+    manualScrollCleanup = bindManualScrollInterruption(el.chat);
+    let frames = 0;
+    const step = () => {
+      const currentEl = getEl();
+      const currentState = getState();
+      if (!currentEl.chat || currentState.chatStickToBottom === false) {
+        cancelAnimatedChatScroll();
+        return;
+      }
+      const target = Math.max(0, currentEl.chat.scrollHeight - currentEl.chat.clientHeight);
+      const delta = target - currentEl.chat.scrollTop;
+      frames += 1;
+      if (Math.abs(delta) <= 1 || frames >= 18) {
+        currentEl.chat.scrollTop = currentEl.chat.scrollHeight;
+        liveScrollRaf = 0;
+        currentState.chatAutoScrolling = false;
+        if (manualScrollCleanup) manualScrollCleanup();
+        manualScrollCleanup = null;
+        queueMicrotask(updateScrollBottomVisibility);
+        return;
+      }
+      currentEl.chat.scrollTop += Math.max(1, delta * 0.34);
+      liveScrollRaf = requestAnimationFrame(step);
+    };
+    liveScrollRaf = requestAnimationFrame(step);
   }
 
-  function jumpToBottom() {
+  function jumpToBottom({ smooth = false } = {}) {
     const el = getEl();
     if (!el.chat) return;
+    cancelAnimatedChatScroll();
+    if (smooth && !prefersReducedMotion() && typeof performance !== "undefined" && typeof requestAnimationFrame === "function") {
+      const state = getState();
+      const start = el.chat.scrollTop;
+      const initialTarget = Math.max(0, el.chat.scrollHeight - el.chat.clientHeight);
+      const distance = Math.max(0, initialTarget - start);
+      if (distance > 2) {
+        const startedAt = performance.now();
+        const duration = Math.min(520, Math.max(220, 180 + distance * 0.08));
+        state.chatStickToBottom = true;
+        state.chatAutoScrolling = true;
+        manualScrollCleanup = bindManualScrollInterruption(el.chat);
+        const step = (now) => {
+          const currentEl = getEl();
+          if (!currentEl.chat || getState().chatStickToBottom === false) return cancelAnimatedChatScroll();
+          const progress = Math.min(1, Math.max(0, (now - startedAt) / duration));
+          const eased = 1 - Math.pow(1 - progress, 4);
+          const target = Math.max(0, currentEl.chat.scrollHeight - currentEl.chat.clientHeight);
+          currentEl.chat.scrollTop = start + (target - start) * eased;
+          if (progress < 1) {
+            manualScrollRaf = requestAnimationFrame(step);
+            return;
+          }
+          currentEl.chat.scrollTop = currentEl.chat.scrollHeight;
+          cancelAnimatedChatScroll();
+          getState().chatStickToBottom = true;
+          pinBottomUntilSettled({ maxFrames: 24, stableFrames: 3, maxDistance: 4 });
+          queueMicrotask(updateScrollBottomVisibility);
+        };
+        manualScrollRaf = requestAnimationFrame(step);
+        return;
+      }
+    }
     el.chat.style.scrollBehavior = "auto";
     el.chat.scrollTop = el.chat.scrollHeight;
     getState().chatStickToBottom = true;
@@ -305,6 +409,7 @@
 
   const api = {
     toast, refreshIcons, pauseIconRefresh, resumeIconRefresh, icon,
+    prefersReducedMotion, animateChatEntry, cancelAnimatedChatScroll,
     chatBottomDistance, captureChatScrollState, restoreChatScrollState, noteChatScroll,
     scrollBottom, jumpToBottom, waitUntilPinnedToBottom, isNearBottom, updateScrollBottomVisibility,
     scheduleScrollVisibility, scheduleScroll, md, setConversationMode,

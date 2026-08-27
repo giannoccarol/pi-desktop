@@ -31,10 +31,10 @@ test("update-service: auto install only on win/mac and Linux AppImage", () => {
   assert.equal(supportsAutoInstall("linux", ""), false);
 });
 
-test("update-service: pacman/deb/native use cached package install on Linux", () => {
+test("update-service: only known Linux package formats use cached install", () => {
   assert.equal(supportsCachedPackageInstall("linux", "pacman"), true);
   assert.equal(supportsCachedPackageInstall("linux", "deb"), true);
-  assert.equal(supportsCachedPackageInstall("linux", "native"), true);
+  assert.equal(supportsCachedPackageInstall("linux", "native"), false);
   assert.equal(supportsCachedPackageInstall("linux", "appimage"), false);
   assert.equal(supportsCachedPackageInstall("win32", "pacman"), false);
 });
@@ -74,16 +74,16 @@ test("update-service: download on pacman uses electron-updater", async () => {
   assert.equal(downloaded, true);
 });
 
-test("update-service: inferPackageType defaults linux installs to pacman", () => {
+test("update-service: unknown legacy Linux installs stay manual", () => {
   const type = inferPackageType({
     getPath(name) {
       if (name === "exe") return "/opt/Pi Desktop/pi-desktop";
       return "";
     },
   });
-  assert.equal(type, "pacman");
+  assert.equal(type, "native");
   assert.equal(supportsAutoInstall("linux", type), false);
-  assert.equal(supportsCachedPackageInstall("linux", type), true);
+  assert.equal(supportsCachedPackageInstall("linux", type), false);
 });
 
 test("update-service: getState keeps downloaded when pending pacman exists", () => {
@@ -97,6 +97,8 @@ test("update-service: getState keeps downloaded when pending pacman exists", () 
   });
   service.packageType = "pacman";
   service.cachedInstall = true;
+  service.state.packageType = "pacman";
+  service.state.cachedInstall = true;
   service.getUpdaterPendingDir = () => pendingDir;
   service.findCachedPendingPackage = () => packagePath;
   service.reconcilePendingPackage = function reconcile() {

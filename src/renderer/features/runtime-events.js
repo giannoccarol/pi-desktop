@@ -2,6 +2,7 @@
 (function (root) {
   const NOTIF_ENABLED_KEY = "pi-desktop-notifications-enabled";
   const NOTIF_SOUND_KEY = "pi-desktop-notifications-sound";
+  const lastNotifications = new Map();
   function isNotificationsEnabled(storage) {
     const settings = typeof window !== "undefined" ? window.piStore?.state?.settings : null;
     if (settings && settings.notificationsEnabled !== undefined) return Boolean(settings.notificationsEnabled);
@@ -25,6 +26,15 @@
   function shouldNotify(options = {}) {
     const enabled = options.enabled !== undefined ? options.enabled : isNotificationsEnabled(options.storage);
     if (!enabled) return false;
+    // DND timer
+    try{
+      const prefs = window.piStore?.state?.settings?.notificationPrefs;
+      if(prefs && prefs.dndUntil && Number(prefs.dndUntil) > Date.now()) return false;
+      // per-project mute: check active tab cwd
+      const cwd = options.cwd || window.piStore?.state?.tabs?.find(t=>t.id===window.piStore?.state?.activeTabId)?.cwd || window.piStore?.state?.settings?.cwd;
+      if(cwd && prefs?.perProjectMute && prefs.perProjectMute[cwd]) return false;
+      if(options.cwd && prefs?.perProjectMute && prefs.perProjectMute[options.cwd]) return false;
+    }catch{}
     const hidden = options.documentHidden !== undefined ? options.documentHidden : (typeof document !== "undefined" ? Boolean(document.hidden) : false);
     let focused;
     if (options.windowFocused !== undefined) focused = Boolean(options.windowFocused);
@@ -61,7 +71,11 @@
   }
   function showNotification(msg) {
     try {
-      if (!shouldNotify()) return;
+      if (!shouldNotify({cwd:msg?.cwd})) return;
+      const key=msg?.tabId || "active";
+      const now=Date.now();
+      if(now-(lastNotifications.get(key)||0)<2000) return;
+      lastNotifications.set(key,now);
       const payload = buildNotificationPayload(msg, { t: (root.i18n && root.i18n.t) ? root.i18n.t : (k) => k });
       const Notif = (typeof window !== "undefined" && window.Notification) || (typeof globalThis !== "undefined" && globalThis.Notification);
       if (!Notif) return;
@@ -95,6 +109,7 @@
         }
         if (state.activeTabId && msg.tabId !== state.activeTabId && msg.type !== "extension_ui_request") {
           if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "tab_status") { refreshSessionsSoon(); refreshTabsSoon(); }
+          if(msg.type === "agent_settled") showNotification(msg);
           return;
         }
       }
@@ -170,6 +185,7 @@
         }
         if (state.activeTabId && msg.tabId !== state.activeTabId && msg.type !== "extension_ui_request") {
           if (msg.type === "agent_settled" || msg.type === "pi-exit" || msg.type === "tab_status") { refreshSessionsSoon(); refreshTabsSoon(); }
+          if(msg.type === "agent_settled") showNotification(msg);
           return;
         }
       }

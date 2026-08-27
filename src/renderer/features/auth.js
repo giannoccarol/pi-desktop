@@ -112,6 +112,7 @@
     try {
       const data = await api.getPiSettings();
       const settings = data.effective || {};
+      state.piSettings = settings;
       el.projectTrust.value = data.trust?.exact === true ? "true" : data.trust?.exact === false ? "false" : "inherit";
       el.defaultTrust.value = settings.defaultProjectTrust || "ask";
       el.transport.value = settings.transport || "auto";
@@ -168,6 +169,7 @@
     el.piSettingsSave.disabled = true;
     try {
       await api.savePiSettings(patch, trustDecision);
+      state.piSettings = { ...(state.piSettings||{}), ...patch, images:{...(state.piSettings?.images||{}), ...patch.images} };
       state.autoRetryEnabled = el.retryEnabled.checked;
       if (el.autoRetry) el.autoRetry.checked = el.retryEnabled.checked;
       try { await api.setAutoRetry(el.retryEnabled.checked); } catch {}

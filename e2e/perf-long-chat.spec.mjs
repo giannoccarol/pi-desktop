@@ -9,9 +9,9 @@
 import { test, expect } from "@playwright/test";
 import { launchApp, piAvailable, readManifest, saveMetrics } from "./helpers/app.mjs";
 
-const BUDGET_OPEN_MS = 150_000; // il resume di 6000 messaggi nell'agente e' dominato dal runtime pi
-const BUDGET_SCROLL_WORST_TASK_MS = 600;
-const BUDGET_SCROLL_LONGTASKS = 40;
+const BUDGET_OPEN_MS = 30_000;
+const BUDGET_SCROLL_WORST_TASK_MS = 500;
+const BUDGET_SCROLL_LONGTASKS = 15;
 
 test.describe("perf: chat lunghissime", () => {
   test.skip(!piAvailable(), "agente pi non disponibile");

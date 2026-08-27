@@ -51,8 +51,7 @@ function run() {
         fail(`smoke FAIL: Uncaught Exception rilevato:\n${output.slice(-3000)}`);
       } else if (!/agente avviato/i.test(output)) {
         console.log(output.slice(-2000));
-        // Se non abbiamo visto agente avviato ma nemmeno errori, consideriamo warn ma pass se check precedenti ok
-        pass("smoke: warn - nessun 'agente avviato' ma nessun errore critico (timeout, verifica manuale consigliata)");
+        fail("smoke FAIL: marker '[pi-desktop] agente avviato' non rilevato entro il timeout");
       } else {
         pass("smoke: ok (timeout)");
       }
@@ -107,9 +106,8 @@ function run() {
     }
 
     proc.on("error", (err) => {
-      console.warn("smoke: spawn fallito (xvfb mancante?)", err.message);
       clearTimeout(timer);
-      pass("smoke: skip - xvfb/electron non disponibile");
+      fail(`smoke FAIL: avvio Electron non riuscito: ${err.message}`);
     });
   });
 }

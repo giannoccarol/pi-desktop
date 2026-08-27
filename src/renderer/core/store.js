@@ -54,7 +54,9 @@
     statusCwd: $("#status-cwd"),
     gitStatus: $("#git-status"),
     statusActivity: $("#status-activity"),
+    statusCacheHit: $("#status-cache-hit"),
     statusTokens: $("#status-tokens"),
+    costsBtn: $("#btn-costs"),
     modelBtn: $("#model-btn"),
     modelLabel: $("#model-label"),
     modelMenu: $("#model-menu"),
@@ -208,6 +210,7 @@
     healthLogBtn: $("#btn-health-log"),
     budgetsList: $("#budgets-list"),
     budgetsAddBtn: $("#btn-budgets-add"),
+    perProjectMute: $("#per-project-mute"),
   };
 
   const initialCommandUsage = (() => {
@@ -220,6 +223,7 @@
 
   const state = {
     settings: null,
+    piSettings: null,
     sessions: [],
     sessionMeta: {},
     selectedSessions: new Set(),
@@ -228,6 +232,7 @@
     explorerVisible: false,
     searchMode: "title",
     searchFullTextResults: [],
+    searchParsed: { raw:"", text:"", pinned:false, archived:false, project:"", tag:"", regex:null },
     terminalVisible: false,
     terminalHistory: [],
     terminalBusy: false,

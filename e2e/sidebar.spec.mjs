@@ -115,7 +115,7 @@ test.describe("sidebar con mockup gigante", () => {
     await expect(page.locator("#projects-list .project-block")).toHaveCount(manifest.totalProjects);
   });
 
-  test("@perf refresh della lista sotto 2s con centinaia di sessioni", async () => {
+  test("@perf refresh della lista sotto 250ms con centinaia di sessioni", async () => {
     const runs = [];
     for (let i = 0; i < 5; i++) {
       const ms = await page.evaluate(async () => {
@@ -127,9 +127,9 @@ test.describe("sidebar con mockup gigante", () => {
     }
     const sorted = [...runs].sort((a, b) => a - b);
     const p95 = sorted[Math.min(sorted.length - 1, Math.ceil(0.95 * sorted.length) - 1)];
-    saveMetrics("sidebar-refresh", { runsMs: runs, p95, budgetP95Ms: 2000 });
+    saveMetrics("sidebar-refresh", { runsMs: runs, p95, budgetP95Ms: 250 });
     console.log(`[perf] sidebar.refreshSessions x5: ${runs.join(", ")} ms (p95=${p95}ms)`);
-    expect(p95, `p95 refresh lista ${p95}ms < 2000ms`).toBeLessThan(2000);
+    expect(p95, `p95 refresh lista ${p95}ms < 250ms`).toBeLessThan(250);
   });
 
   test("nessun errore console critico durante il boot con fixture giganti", async () => {

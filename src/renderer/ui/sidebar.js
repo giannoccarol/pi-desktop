@@ -307,8 +307,13 @@ async function refreshSessions() {
 let lastProjectsSig = null;
 function projectsRenderSignature(q, projects) {
   const s = window.piStore ? window.piStore.state : {};
+  const relevantFiles = new Set(projects.flatMap((p)=>p.sessions.map((session)=>session.file)));
+  const sessionMeta = s.settings?.sessionMeta || s.sessionMeta || {};
   return JSON.stringify([
     q,
+    s.searchMode || "title",
+    s.searchParsed ? { ...s.searchParsed, regex:s.searchParsed.regex?.toString?.() || "" } : null,
+    (s.searchFullTextResults || []).map((result)=>[result.file, result.snippet || "", result.matchReason || ""]),
     window.i18n?.getLang?.() || "",
     Math.floor(Date.now() / 60000),
     s.settings?.cwd ?? null,
@@ -317,6 +322,9 @@ function projectsRenderSignature(q, projects) {
     Boolean(s.creatingChat),
     s.openingSessionFile ?? null,
     s.openProjectMenu ?? null,
+    Boolean(s.bulkMode),
+    [...(s.selectedSessions || [])].sort(),
+    Object.entries(sessionMeta).filter(([file])=>relevantFiles.has(file)).map(([file,meta])=>[file, meta]).sort(([a],[b])=>a.localeCompare(b)),
     [...(s.expandedProjects || [])].sort(),
     [...(s.projectLimits || new Map())].map(([k, v]) => [k, v]),
     (s.tabs || []).map((tb) => [tb.id, tb.sessionFile || "", Boolean(tb.busy)]),
@@ -330,23 +338,29 @@ function projectsRenderSignature(q, projects) {
 
 function renderProjects() {
   const qRaw = (el.sessionSearch.value || "").trim();
-  const q = qRaw.toLowerCase();
-  const isFulltext = state.searchMode === "fulltext" && q.length >= 2;
+  const parsed = state.searchParsed || { text:qRaw, project:"", tag:"", pinned:false, archived:false, regex:state.searchRegex || null };
+  const q = String(parsed.text || "").toLowerCase();
+  const hasQuery = Boolean(qRaw);
+  const isFulltext = state.searchMode === "fulltext" && (q.length >= 2 || parsed.regex);
   const fulltextSet = isFulltext ? new Set((state.searchFullTextResults||[]).map(s=>s.file)) : null;
   const previousScrollTop = el.projectsList.scrollTop;
   const projects = configuredProjects().map((projectPath) => {
     const sessions = sessionsForProject(projectPath);
-    const matchesProject = `${basename(projectPath)} ${projectPath}`.toLowerCase().includes(q);
+    const projectHaystack = `${basename(projectPath)} ${projectPath}`.toLowerCase();
+    const matchesProject = (!parsed.project || projectHaystack.includes(parsed.project)) && (!q || projectHaystack.includes(q));
     let matchingSessions;
-    if(isFulltext && q){
-      matchingSessions = sessions.filter((session) => fulltextSet.has(session.file));
-    } else {
-      matchingSessions = sessions.filter((session) =>
-        `${session.name || ""} ${session.preview || ""}`.toLowerCase().includes(q)
-      );
-    }
+    matchingSessions = sessions.filter((session) => {
+      const meta = state.settings?.sessionMeta?.[session.file] || state.sessionMeta?.[session.file] || {};
+      if(parsed.project && !projectHaystack.includes(parsed.project)) return false;
+      if(parsed.pinned && !meta.pinned) return false;
+      if(parsed.archived ? !meta.archived : meta.archived) return false;
+      if(parsed.tag && !(meta.tags || []).some((tag)=>String(tag).toLowerCase().includes(parsed.tag))) return false;
+      if(isFulltext) return fulltextSet.has(session.file);
+      if(parsed.regex){ parsed.regex.lastIndex=0; return parsed.regex.test(`${session.name || ""} ${session.preview || ""}`); }
+      return !q || `${session.name || ""} ${session.preview || ""}`.toLowerCase().includes(q);
+    });
     return { path: projectPath, sessions, matchesProject, matchingSessions };
-  }).filter((project) => !q || project.matchesProject || project.matchingSessions.length);
+  }).filter((project) => !hasQuery || project.matchesProject || project.matchingSessions.length);
 
   const sig = projectsRenderSignature(q, projects);
   if (sig === lastProjectsSig && el.projectsList.childElementCount > 0) {
@@ -359,7 +373,7 @@ function renderProjects() {
 
   for (const project of projects) {
     const active = project.path === state.settings?.cwd;
-    const expanded = Boolean(q) || state.expandedProjects.has(project.path);
+    const expanded = hasQuery || state.expandedProjects.has(project.path);
     const block = document.createElement("section");
     block.className = `project-block${active ? " active" : ""}${expanded ? " expanded" : ""}`;
     block.dataset.path = project.path;
@@ -439,8 +453,12 @@ function renderProjects() {
     if (expanded) {
       const chats = document.createElement("div");
       chats.className = "project-chats";
-      const candidates = q && !project.matchesProject ? project.matchingSessions : project.sessions;
-      const limit = q ? candidates.length : (state.projectLimits.get(project.path) || 6);
+      const hasSessionFilter = Boolean(q || parsed.regex || parsed.pinned || parsed.tag || parsed.archived);
+      const candidates = hasSessionFilter && !(!parsed.pinned && !parsed.tag && !parsed.archived && project.matchesProject) ? project.matchingSessions : project.sessions.filter((session)=>{
+        const meta=state.settings?.sessionMeta?.[session.file] || state.sessionMeta?.[session.file] || {};
+        return !meta.archived || parsed.archived;
+      });
+      const limit = hasQuery ? candidates.length : (state.projectLimits.get(project.path) || 6);
       for (const session of candidates.slice(0, limit)) {
         const openTab = session.tabId
           ? state.tabs.find((tab) => tab.id === session.tabId)
@@ -452,6 +470,8 @@ function renderProjects() {
         item.className = "session-item" + (isActive ? " active" : "") + (isLoading ? " loading" : "") + (openTab?.busy || session.busy ? " running" : "") + (isSelected ? " selected" : "");
         item.dataset.sessionFile = session.file || "";
         item.dataset.tabId = session.tabId || openTab?.id || "";
+        item.setAttribute("role", "button");
+        item.tabIndex = 0;
         const displayName = session.hasName ? session.name : truncate(session.preview || t("session.newChat"), 120);
         const prefLabel = preferenceLabel(session.preference);
         const timeLabel = isLoading ? t("session.loading") : relTime(session.modified);
@@ -462,11 +482,28 @@ function renderProjects() {
         item.dataset.tooltipTime = timeLabel;
         item.dataset.tooltipPath = session.file || "";
         item.setAttribute("aria-busy", isLoading ? "true" : "false");
+        const fulltextHit = state.searchMode==="fulltext" && q ? (state.searchFullTextResults||[]).find(r=>r.file===session.file) : null;
+        const snippet = fulltextHit?.snippet || "";
         item.innerHTML =
           `<div class="session-title"></div>` +
+          `${snippet?`<div class="session-snippet" style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding-left:2px"></div>`:""}` +
           `<div class="session-meta"><span>${isLoading ? t("session.loading") : relTime(session.modified)}</span>` +
           `<button class="sess-del" title="Elimina sessione" aria-label="Elimina sessione">${icon("trash-2")}</button></div>`;
-        item.querySelector(".session-title").textContent = displayName;
+        const titleEl = item.querySelector(".session-title");
+        if(titleEl){
+          if(state.searchRegex && q && state.searchMode==="fulltext"){
+            try{ const re = state.searchRegex; const m = displayName.match(re); if(m){ const idx=displayName.toLowerCase().search(re); const before=displayName.slice(0, idx); const hit=displayName.slice(idx, idx+m[0].length); const after=displayName.slice(idx+m[0].length); titleEl.innerHTML = `${esc(before)}<mark style="background:var(--amber);color:var(--text);padding:0 2px;border-radius:3px">${esc(hit)}</mark>${esc(after)}`; } else titleEl.textContent=displayName; }catch{ titleEl.textContent=displayName; }
+          } else titleEl.textContent=displayName;
+        }
+        if(snippet){
+          const snEl = item.querySelector(".session-snippet");
+          if(snEl){
+            let html = esc(snippet);
+            if(state.searchRegex){ try{ html = html.replace(state.searchRegex, m=>`<mark style="background:color-mix(in srgb,var(--amber) 30%,transparent)">${esc(m)}</mark>`); }catch{} }
+            else if(q){ const qEsc = q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); try{ const re=new RegExp(`(${qEsc})`,"ig"); html = html.replace(re, '<mark style="background:color-mix(in srgb,var(--amber) 30%,transparent)">$1</mark>'); }catch{} }
+            snEl.innerHTML = html;
+          }
+        }
         // bulk checkbox
         if(state.bulkMode){
           const cb = document.createElement("input");
@@ -484,6 +521,9 @@ function renderProjects() {
           else if (openTab) await switchToTab(openTab.id);
           else await openHistorySession(session);
         });
+        item.addEventListener("keydown", (ev)=>{
+          if((ev.key==="Enter" || ev.key===" ") && !ev.target.closest("button,input")){ ev.preventDefault(); item.click(); }
+        });
         // long-press / right-click to enter bulk mode
         item.addEventListener("contextmenu", (ev)=>{ ev.preventDefault(); if(!state.bulkMode) window.piBulk?.toggleSession(session.file); });
         const meta = state.settings?.sessionMeta?.[session.file] || state.sessionMeta?.[session.file] || null;
@@ -491,6 +531,14 @@ function renderProjects() {
           const pin = document.createElement("span"); pin.textContent="📌"; pin.title="Pinned"; pin.style.cssText="font-size:10px;margin-left:4px";
           item.querySelector(".session-title")?.appendChild(pin);
           item.style.order=-1;
+        }
+        if(meta?.archived){
+          const badge=document.createElement("span"); badge.className="session-meta-badge"; badge.textContent="archived"; badge.title="Sessione archiviata";
+          item.querySelector(".session-title")?.appendChild(badge);
+        }
+        for(const tag of (meta?.tags || []).slice(0,3)){
+          const badge=document.createElement("span"); badge.className="session-meta-badge"; badge.textContent=`#${tag}`;
+          item.querySelector(".session-title")?.appendChild(badge);
         }
         const deleteButton = item.querySelector(".sess-del");
         if (session.draft) {

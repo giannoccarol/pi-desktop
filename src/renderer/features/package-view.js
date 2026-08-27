@@ -60,11 +60,14 @@ function renderPackageStore() {
       .slice(0, 3)
       .map((keyword) => `<span>${escapeHtml(keyword)}</span>`)
       .join("");
+    const rating = Number.isFinite(pkg.rating) ? Math.max(0, Math.min(5, Number(pkg.rating))) : null;
+    const roundedRating = rating == null ? 0 : Math.round(rating);
+    const stars = rating!=null && rating>0 ? `<span title="Rating ${rating.toFixed(1)}">${"★".repeat(roundedRating)}${"☆".repeat(5-roundedRating)} ${rating.toFixed(1)}</span>` : (pkg.downloads>1000 ? `<span class="muted" title="Popolare">★ Popolare</span>` : "");
     card.innerHTML =
       `<div class="package-card-icon">${icon(isInstalled ? "badge-check" : "package")}</div>` +
       `<div class="package-card-content"><div class="package-card-title"><strong>${escapeHtml(pkg.name)}</strong>${pkg.version ? `<span>v${escapeHtml(pkg.version)}</span>` : ""}${isInstalled ? `<span class="package-installed-badge">Installato</span>` : ""}</div>` +
       `<p>${escapeHtml(pkg.description)}</p><div class="package-card-meta">${tags}` +
-      `${pkg.publisher ? `<span>di ${escapeHtml(pkg.publisher)}</span>` : ""}<span class="package-card-downloads">${icon("download")} ${formatDownloads(pkg.monthlyDownloads || pkg.downloads)} / mese</span></div></div>` +
+      `${pkg.publisher ? `<span>di ${escapeHtml(pkg.publisher)}</span>` : ""}<span class="package-card-downloads">${icon("download")} ${formatDownloads(pkg.monthlyDownloads || pkg.downloads)} / mese</span>${stars?` · ${stars}`:""}</div></div>` +
       `<div class="package-card-actions"><a class="icon-btn borderless tiny" href="${escapeHtml(pkg.npmUrl)}" title="Apri su npm" aria-label="Apri su npm">${icon("external-link")}</a>` +
       `<button class="btn ${isInstalled ? "ghost package-uninstall" : "primary package-install"}" ${state.packageBusy ? "disabled" : ""}>` +
       `${state.packageBusy === pkg.name ? "Attendi…" : isInstalled ? "Rimuovi" : "Installa"}</button></div>`;

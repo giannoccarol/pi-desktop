@@ -37,7 +37,7 @@ function inferPackageType(appRef = app) {
   const exe = typeof appRef.getPath === "function" ? String(appRef.getPath("exe") || "") : "";
   if (process.env.APPIMAGE || exe.includes(".AppImage")) return "appimage";
   if (fromFile && fromFile !== "native") return fromFile;
-  return "pacman";
+  return "native";
 }
 
 function supportsAutoInstall(platform, packageType) {
@@ -47,7 +47,7 @@ function supportsAutoInstall(platform, packageType) {
 
 function supportsCachedPackageInstall(platform, packageType) {
   if (platform !== "linux" || packageType === "appimage") return false;
-  return ["pacman", "deb", "rpm", "native"].includes(packageType);
+  return ["pacman", "deb", "rpm"].includes(packageType);
 }
 
 function getUpdaterPendingDir(homedir = os.homedir()) {

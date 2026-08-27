@@ -3,6 +3,12 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const crypto = require("crypto");
+
+// pi-subagents prepends this stable sentence to forked worker prompts. Older
+// releases could leave those fork files beside normal sessions on Windows,
+// where they were then mistaken for user chats by the desktop sidebar.
+const DELEGATED_AGENT_MARKER = "You are a delegated subagent running from a fork of the parent session.";
 
 function defaultSessionsDir() {
   return path.join(os.homedir(), ".pi", "agent", "sessions");
@@ -27,6 +33,64 @@ function firstUserText(content) {
 // thousands of sessions on disk.
 const sessionMetaCache = new Map(); // file -> { mtimeMs, size, parsed }
 const sessionMessagesCache = new Map(); // file -> { mtimeMs, size, messages }
+const SESSION_MESSAGES_CACHE_MAX_BYTES = 64 * 1024 * 1024;
+let sessionMessagesCacheBytes = 0;
+function dropMessagesCache(file){
+  const cached=sessionMessagesCache.get(file);
+  if(cached) sessionMessagesCacheBytes=Math.max(0,sessionMessagesCacheBytes-cached.size);
+  sessionMessagesCache.delete(file);
+}
+function trimMessagesCache(){
+  while(sessionMessagesCacheBytes>SESSION_MESSAGES_CACHE_MAX_BYTES && sessionMessagesCache.size>1){
+    dropMessagesCache(sessionMessagesCache.keys().next().value);
+  }
+}
+
+function sessionFacts(file, header = {}) {
+  const total = { input:0, output:0, cacheRead:0, cacheWrite:0, total:0, cost:0 };
+  const headerTimestamp = Date.parse(header.timestamp || "");
+  const inspectFork = Boolean(header.parentSession);
+  let delegatedAgent = false;
+  let inheritedEntries = false;
+  let ownUserActivity = false;
+  let fd;
+  try {
+    fd = fs.openSync(file, "r");
+    const buffer = Buffer.alloc(256 * 1024);
+    let carry = "";
+    let bytes = 0;
+    const consume = (line)=>{
+      if(inspectFork && line.includes(DELEGATED_AGENT_MARKER)) delegatedAgent = true;
+      if(!line.includes('"usage"') && !(inspectFork && line.includes('"timestamp"'))) return;
+      try{
+        const entry=JSON.parse(line);
+        if(inspectFork && Number.isFinite(headerTimestamp)){
+          const entryTimestamp = Date.parse(entry?.timestamp || "");
+          if(Number.isFinite(entryTimestamp)){
+            if(entryTimestamp < headerTimestamp) inheritedEntries = true;
+            else if(entry.type === "message" && entry.message?.role === "user") ownUserActivity = true;
+          }
+        }
+        const usage=entry?.message?.usage;
+        if(!usage) return;
+        total.input += Number(usage.input) || 0;
+        total.output += Number(usage.output) || 0;
+        total.cacheRead += Number(usage.cacheRead) || 0;
+        total.cacheWrite += Number(usage.cacheWrite) || 0;
+        total.total += Number(usage.totalTokens) || 0;
+        total.cost += Number(usage.cost?.total) || 0;
+      }catch{}
+    };
+    while((bytes=fs.readSync(fd, buffer, 0, buffer.length, null))>0){
+      const chunk=carry+buffer.toString("utf8",0,bytes);
+      const lines=chunk.split("\n");
+      carry=lines.pop() || "";
+      for(const line of lines) consume(line);
+    }
+    if(carry) consume(carry);
+  }catch{} finally { if(fd!==undefined) try{ fs.closeSync(fd); }catch{} }
+  return { usage:total, delegatedAgent, inheritedEntries, ownUserActivity };
+}
 
 function readSessionMessagesCached(file) {
   let st;
@@ -36,10 +100,15 @@ function readSessionMessagesCached(file) {
     return [];
   }
   const cached = sessionMessagesCache.get(file);
-  if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) return cached.messages;
+  if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size){
+    sessionMessagesCache.delete(file); sessionMessagesCache.set(file,cached);
+    return cached.messages;
+  }
+  dropMessagesCache(file);
   const messages = readSessionMessages(file).messages;
-  if (sessionMessagesCache.size > 24) sessionMessagesCache.clear();
   sessionMessagesCache.set(file, { mtimeMs: st.mtimeMs, size: st.size, messages });
+  sessionMessagesCacheBytes+=st.size;
+  trimMessagesCache();
   return messages;
 }
 
@@ -113,6 +182,8 @@ function parseSessionFile(file, stat = null) {
       }
     }
 
+    const facts = sessionFacts(file, header);
+    const usage = facts.usage;
     const parsed = {
       file,
       id: header.id || path.basename(file, ".jsonl"),
@@ -124,7 +195,13 @@ function parseSessionFile(file, stat = null) {
       timestamp: header.timestamp || st.birthtime.toISOString(),
       modified: st.mtimeMs,
       size,
+      parentSession: header.parentSession || null,
+      isDelegatedAgent: facts.delegatedAgent,
+      isInheritedFork: facts.inheritedEntries,
+      hasOwnUserActivity: facts.ownUserActivity,
       preference: Object.keys(preference).length ? preference : null,
+      cost: usage.cost,
+      tokens: { input:usage.input, output:usage.output, cacheRead:usage.cacheRead, cacheWrite:usage.cacheWrite, total:usage.total },
     };
     if (sessionMetaCache.size > 5000) sessionMetaCache.clear();
     sessionMetaCache.set(file, { mtimeMs: st.mtimeMs, size: st.size, parsed });
@@ -165,7 +242,11 @@ function listSessions(sessionsDir = defaultSessionsDir()) {
         continue;
       }
       const parsed = parseSessionFile(filePath, st);
-      if (parsed) out.push(parsed);
+      // Forked workers are implementation details, not user chats. While a
+      // just-created inherited fork is still waiting for its worker prompt,
+      // keep it out too so fs.watch cannot make it flash in and out. A normal
+      // user fork becomes visible as soon as the user sends its first message.
+      if (parsed && !parsed.isDelegatedAgent && (!parsed.isInheritedFork || parsed.hasOwnUserActivity)) out.push(parsed);
     }
   }
   out.sort((a, b) => b.modified - a.modified);
@@ -175,18 +256,25 @@ function listSessions(sessionsDir = defaultSessionsDir()) {
 function deleteSession(file) {
   fs.unlinkSync(file);
   sessionMetaCache.delete(file);
-  sessionMessagesCache.delete(file);
+  dropMessagesCache(file);
 }
 
 function searchSessionsFullText(sessionsDirPath, query, maxResults = 80) {
-  const needle = String(query || "").trim().toLowerCase();
-  if (!needle) return [];
+  const options = query && typeof query === "object" ? query : { query };
+  const needle = String(options.query || "").trim().toLowerCase();
+  let matcher = null;
+  if (options.pattern && String(options.pattern).length <= 200) {
+    try { matcher = new RegExp(String(options.pattern), String(options.flags || "i").replace(/[^imsu]/g, "")); } catch {}
+  }
+  if (!needle && !matcher) return [];
   const sessions = listSessions(sessionsDirPath);
   const results = [];
   for (const session of sessions) {
     if (results.length >= maxResults) break;
-    const nameHit = (session.name || "").toLowerCase().includes(needle);
-    const previewHit = (session.preview || "").toLowerCase().includes(needle);
+    const nameHit = matcher ? matcher.test(session.name || "") : (session.name || "").toLowerCase().includes(needle);
+    if (matcher) matcher.lastIndex = 0;
+    const previewHit = matcher ? matcher.test(session.preview || "") : (session.preview || "").toLowerCase().includes(needle);
+    if (matcher) matcher.lastIndex = 0;
     if (nameHit || previewHit) {
       results.push({ ...session, matchReason: nameHit ? "name" : "preview" });
       continue;
@@ -197,7 +285,9 @@ function searchSessionsFullText(sessionsDirPath, query, maxResults = 80) {
       let hitSnippet = null;
       for (const msg of msgs) {
         const text = typeof msg.content === "string" ? msg.content : Array.isArray(msg.content) ? msg.content.map((b) => b.text || "").join(" ") : "";
-        const idx = text.toLowerCase().indexOf(needle);
+        const match = matcher ? matcher.exec(text) : null;
+        const idx = matcher ? (match ? match.index : -1) : text.toLowerCase().indexOf(needle);
+        if (matcher) matcher.lastIndex = 0;
         if (idx !== -1) {
           const start = Math.max(0, idx - 60);
           hitSnippet = truncate(text.slice(start, start + 160).replace(/\s+/g, " ").trim(), 160);
@@ -210,23 +300,72 @@ function searchSessionsFullText(sessionsDirPath, query, maxResults = 80) {
   return results;
 }
 
+function trashDirFor(sessionsDirPath){ return path.join(path.resolve(sessionsDirPath), ".trash"); }
+function trashMetaPath(trashPath){ return `${trashPath}.meta.json`; }
 function bulkDeleteSessions(files, sessionsDirPath) {
   let deleted = 0;
   const errors = [];
+  const trashDir = trashDirFor(sessionsDirPath);
+  try{ fs.mkdirSync(trashDir, {recursive:true}); }catch{}
   for (const file of files) {
     try {
       const resolved = path.resolve(String(file));
       const root = path.resolve(sessionsDirPath);
       if (!resolved.startsWith(root + path.sep) || !resolved.endsWith(".jsonl")) throw new Error("percorso non valido");
-      deleteSession(resolved);
+      const trashPath = path.join(trashDir, `${Date.now()}-${crypto.randomUUID()}.jsonl`);
+      const relativePath = path.relative(root, resolved);
+      fs.writeFileSync(trashMetaPath(trashPath), JSON.stringify({ relativePath, deletedAt: Date.now() }), { encoding: "utf8", mode: 0o600 });
+      try{ fs.renameSync(resolved, trashPath); }catch{ fs.copyFileSync(resolved, trashPath); fs.unlinkSync(resolved); }
+      sessionMetaCache.delete(resolved); dropMessagesCache(resolved);
       deleted++;
     } catch (err) { errors.push({ file, error: err.message }); }
   }
+  // prune trash >30 days
+  try{
+    const entries = fs.readdirSync(trashDir);
+    const now = Date.now();
+    for(const e of entries){
+      try{
+        const entryPath = path.join(trashDir,e);
+        const st=fs.statSync(entryPath);
+        if(now - st.mtimeMs > 30*24*3600*1000){
+          fs.unlinkSync(entryPath);
+          if(e.endsWith(".jsonl")) try{ fs.unlinkSync(trashMetaPath(entryPath)); }catch{}
+        }
+      }catch{}
+    }
+  }catch{}
   return { deleted, errors };
 }
+function restoreFromTrash(sessionsDirPath, trashFile){
+  const trashDir = trashDirFor(sessionsDirPath);
+  const src = path.join(trashDir, path.basename(String(trashFile)));
+  const root = path.resolve(sessionsDirPath);
+  if(!src.startsWith(trashDir + path.sep) || !fs.existsSync(src)) throw new Error("File trash non trovato");
+  let relativePath = "";
+  try{ relativePath = String(JSON.parse(fs.readFileSync(trashMetaPath(src), "utf8")).relativePath || ""); }catch{}
+  if(!relativePath || path.isAbsolute(relativePath) || relativePath.startsWith(`..${path.sep}`)){
+    const originalName = path.basename(src).replace(/^\d+-/, "");
+    const fallbackDir = fs.readdirSync(root, {withFileTypes:true}).find((entry)=> entry.isDirectory() && entry.name !== ".trash");
+    if(!fallbackDir) throw new Error("Destinazione originale non disponibile");
+    relativePath = path.join(fallbackDir.name, originalName);
+  }
+  let dest = path.resolve(root, relativePath);
+  if(!dest.startsWith(root + path.sep)) throw new Error("Destinazione di ripristino non valida");
+  fs.mkdirSync(path.dirname(dest), {recursive:true});
+  if(fs.existsSync(dest)){
+    const ext = path.extname(dest);
+    dest = `${dest.slice(0, -ext.length)}-restored-${Date.now()}${ext}`;
+  }
+  fs.renameSync(src, dest);
+  try{ fs.unlinkSync(trashMetaPath(src)); }catch{}
+  return dest;
+}
 
-function listExplorerTree(cwd, depth = 2, maxEntries = 600) {
+function listExplorerTree(cwd, depth = 2, maxEntries = 600, options = {}) {
   const out = [];
+  const root = fs.realpathSync(path.resolve(cwd));
+  const visited = new Set([root]);
   function walk(dir, relBase, currentDepth) {
     if (currentDepth > depth || out.length >= maxEntries) return;
     let entries = [];
@@ -236,13 +375,19 @@ function listExplorerTree(cwd, depth = 2, maxEntries = 600) {
       return a.name.localeCompare(b.name);
     });
     for (const e of entries) {
-      if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "__pycache__") continue;
+      if ((!options.showDotfiles && e.name.startsWith(".")) || e.name === "node_modules" || e.name === "__pycache__") continue;
       const abs = path.join(dir, e.name);
       const rel = relBase ? path.join(relBase, e.name) : e.name;
       let size = 0;
       let isDir = e.isDirectory();
-      try { const st = fs.statSync(abs); size = st.size; isDir = st.isDirectory(); } catch { continue; }
-      out.push({ name: e.name, path: abs, rel, isDirectory: isDir, size });
+      try {
+        const real = fs.realpathSync(abs);
+        if(real!==root && !real.startsWith(root+path.sep)) continue;
+        const st = fs.statSync(real); size = st.size; isDir = st.isDirectory();
+        if(isDir && visited.has(real)) continue;
+        if(isDir) visited.add(real);
+      } catch { continue; }
+      out.push({ name: e.name, path: abs, rel, isDirectory: isDir, size, isSymlink:e.isSymbolicLink() });
       if (out.length >= maxEntries) return;
       if (isDir && currentDepth < depth) walk(abs, rel, currentDepth + 1);
     }
@@ -308,5 +453,7 @@ module.exports = {
   deleteSession,
   searchSessionsFullText,
   bulkDeleteSessions,
+  trashDirFor,
+  restoreFromTrash,
   listExplorerTree,
 };

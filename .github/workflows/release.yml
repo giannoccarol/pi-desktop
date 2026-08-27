@@ -30,7 +30,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run verify:quick
+      - run: xvfb-run -a npm run verify
+      - run: xvfb-run -a npm run test:e2e
       - run: npm run release:check
 
   prepare-release:

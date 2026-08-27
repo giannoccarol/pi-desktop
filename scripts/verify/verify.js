@@ -66,8 +66,8 @@ let failed = false;
   let orderOk = true;
   for (const rel of order) {
     const idx = html.indexOf(`src="${rel}"`);
-    if (idx === -1) { console.error(`WARN: ${f} non trovato in index.html`); orderOk = false; }
-    else if (idx < lastIdx) { console.error(`FAIL: ordine script errato: ${f} prima del precedente`); orderOk = false; failed = true; }
+    if (idx === -1) { console.error(`FAIL: ${rel} non trovato in index.html`); orderOk = false; failed = true; }
+    else if (idx < lastIdx) { console.error(`FAIL: ordine script errato: ${rel} prima del precedente`); orderOk = false; failed = true; }
     lastIdx = Math.max(lastIdx, idx);
   }
   if (orderOk) log("renderer-order", "ok - ordine store->...->app rispettato");
@@ -110,7 +110,7 @@ let failed = false;
     const needXvfb = isCI && !hasDisplay;
     if (needXvfb) {
       try { require("child_process").execFileSync("which", ["xvfb-run"], { stdio: "pipe" }); }
-      catch { log("smoke", "skip - xvfb-run non disponibile in CI"); }
+      catch { console.error("FAIL: smoke - xvfb-run non disponibile in CI"); failed = true; }
     }
     const r = spawnSync(process.execPath, ["scripts/verify/smoke-electron.js"], { cwd: root, encoding: "utf8", timeout: 25000, env: { ...process.env, SMOKE_TIMEOUT: "12000" } });
     const out = (r.stdout || "") + (r.stderr || "");

@@ -466,6 +466,8 @@ class PiRuntime {
   }
 
   async _request(command, timeoutMs) {
+    const readOnly = new Set(["get_state","get_messages","get_available_models","get_available_thinking_levels","get_session_stats","get_commands","get_tree","get_entries","get_fork_messages","get_last_assistant_text"]).has(command.type);
+    if(readOnly) return this._requestUnlocked(command, timeoutMs);
     return this._withLock(() => this._requestUnlocked(command, timeoutMs));
   }
 

@@ -471,6 +471,42 @@ test("sessions: parse fixture files and list newest-first", () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("sessions: hides delegated worker forks that land beside Windows chats", () => {
+  const delegatedMarker = "You are a delegated subagent running from a fork of the parent session.";
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-desktop-worker-sessions-"));
+  const proj = path.join(dir, "--C-Users-matti-workspace-project--");
+  fs.mkdirSync(proj);
+  const parent = path.join(proj, "parent.jsonl");
+  const parentTimestamp = "2026-08-27T14:00:00.000Z";
+  fs.writeFileSync(parent, [
+    JSON.stringify({ type:"session", version:3, id:"parent", timestamp:parentTimestamp, cwd:"C:\\Users\\matti\\workspace\\project" }),
+    JSON.stringify({ type:"message", id:"p1", timestamp:"2026-08-27T14:00:01.000Z", message:{ role:"user", content:"chat visibile" } }),
+  ].join("\n"));
+
+  const worker = path.join(proj, "worker.jsonl");
+  fs.writeFileSync(worker, [
+    JSON.stringify({ type:"session", version:3, id:"worker", timestamp:"2026-08-27T14:05:00.000Z", cwd:"C:\\Users\\matti\\workspace\\project", parentSession:parent }),
+    JSON.stringify({ type:"message", id:"p1", timestamp:"2026-08-27T14:00:01.000Z", message:{ role:"user", content:'<file name="C:\\Users\\matti\\request.md">...</file>' } }),
+    JSON.stringify({ type:"message", id:"w1", timestamp:"2026-08-27T14:05:01.000Z", message:{ role:"user", content:`${delegatedMarker}\n\nTask:\nExplore project architecture` } }),
+  ].join("\n"));
+
+  const pendingFork = path.join(proj, "pending-fork.jsonl");
+  fs.writeFileSync(pendingFork, [
+    JSON.stringify({ type:"session", version:3, id:"pending", timestamp:"2026-08-27T14:06:00.000Z", cwd:"C:\\Users\\matti\\workspace\\project", parentSession:parent }),
+    JSON.stringify({ type:"message", id:"p1", timestamp:"2026-08-27T14:00:01.000Z", message:{ role:"user", content:"contenuto ereditato" } }),
+  ].join("\n"));
+
+  assert.deepEqual(sessionsStore.listSessions(dir).map((session)=>session.id), ["parent"]);
+
+  fs.appendFileSync(pendingFork, "\n" + JSON.stringify({
+    type:"message", id:"u2", timestamp:"2026-08-27T14:06:01.000Z",
+    message:{ role:"user", content:"messaggio scritto nel fork dall’utente" },
+  }));
+  assert.deepEqual(new Set(sessionsStore.listSessions(dir).map((session)=>session.id)), new Set(["parent", "pending"]));
+
+  fs.rmSync(dir, { recursive:true, force:true });
+});
+
 test("markdown: code blocks, tables, links are rendered safely", () => {
   global.window = {};
   require("../../src/renderer/lib/markdown.js");

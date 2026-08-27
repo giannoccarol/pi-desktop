@@ -116,6 +116,9 @@ class RuntimeTabs {
       if (tab.busy !== wasBusy || payload?.type === "pi-exit") {
         this.send("pi:event", { type: "tab_status", busy: tab.busy, tabId: tab.id });
       }
+      if(payload?.type === "agent_settled"){
+        this.send("pi:event", { ...payload, tabId:tab.id, cwd:tab.cwd, background:true });
+      }
       return;
     }
 

@@ -60,6 +60,52 @@ test.describe("ottimizzazioni renderer", () => {
     expect(res, "refreshSessions a dati identici mantiene gli stessi nodi").toBe(true);
   });
 
+  test("#1 bulk e metadati invalidano la memoization della sidebar", async () => {
+    const result=await page.evaluate(async()=>{
+      const first=window.piStore.state.sessions[0];
+      window.piBulk.setBulkMode(true);
+      const checkboxes=document.querySelectorAll('.session-item input[type="checkbox"]').length;
+      window.piBulk.setBulkMode(false);
+      await window.piDesktop.setSessionMeta(first.file,{pinned:true});
+      window.piStore.state.settings.sessionMeta=await window.piDesktop.getSessionMeta();
+      window.renderProjects();
+      const item=document.querySelector(`.session-item[data-session-file="${CSS.escape(first.file)}"]`);
+      return {checkboxes,pinned:item?.textContent?.includes("📌")||false};
+    });
+    expect(result.checkboxes).toBeGreaterThan(0);
+    expect(result.pinned).toBe(true);
+  });
+
+  test("ricerca regex full-text e filtro pinned restituiscono risultati", async()=>{
+    await page.locator("#search-mode-toggle").click();
+    await page.locator("#session-search").fill("/debug\\s+marathon/i");
+    await expect(page.locator(".session-item").filter({hasText:/debug marathon/i})).toHaveCount(1,{timeout:10_000});
+    await page.locator("#search-mode-toggle").click();
+    await page.locator("#session-search").fill("pinned:");
+    await expect(page.locator(".session-item").filter({hasText:"📌"}).first()).toBeVisible({timeout:10_000});
+    await page.locator("#session-search").fill("");
+  });
+
+  test("package catalog non interpreta i download come rating", async()=>{
+    const result=await page.evaluate(()=>{
+      const state=window.piStore.state;
+      const previous={packages:state.packages,installed:state.installedPackages};
+      try{
+        state.packages=[{name:"fixture-package",description:"fixture",types:[],keywords:[],score:12500,downloads:12500,monthlyDownloads:12500,npmUrl:"https://www.npmjs.com/package/fixture-package"}];
+        state.installedPackages=[];
+        window.piPackageView.renderPackageStore();
+        return {ok:true,text:document.querySelector("#package-list")?.textContent||""};
+      }catch(error){ return {ok:false,error:error.message}; }
+      finally{
+        state.packages=previous.packages;
+        state.installedPackages=previous.installed;
+        window.piPackageView.renderPackageStore();
+      }
+    });
+    expect(result.ok,result.error).toBe(true);
+    expect(result.text).toContain("Popolare");
+  });
+
   test("#2 il polling salta i tick quando la finestra e' nascosta", async () => {
     const out = await page.evaluate(async () => {
       let calls = 0;
@@ -105,7 +151,12 @@ test.describe("ottimizzazioni renderer", () => {
         await window.refreshTabs();
         const s = window.piStore.state;
         if (s.activeTabId !== res.tabId) await window.switchToTab(res.tabId);
-        else s.activeSessionFile = f;
+        else {
+          s.activeSessionFile = f;
+          const result = await window.piDesktop.getMessages(res.tabId);
+          const messages = (window.piChatUtils?.collapseRetryAttempts ?? ((items) => items))(result?.messages || []);
+          if (messages.length) await window.piSessionView.renderConversation(messages, () => true);
+        }
       }, file);
       // Aspetta che la conversazione sia renderizzata (finestra runtime ~100 nodi)
       // Il dialog di primo avvio puo' apparire: chiudilo prima e durante l'attesa

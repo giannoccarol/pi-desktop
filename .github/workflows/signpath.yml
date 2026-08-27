@@ -25,6 +25,10 @@ jobs:
       SIGNPATH_SIGNING_POLICY_ID: ${{ secrets.SIGNPATH_SIGNING_POLICY_ID }}
 
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Validate SignPath configuration
         shell: bash
         run: |
@@ -50,6 +54,7 @@ jobs:
             exit 1
           fi
           gh release download "$tag" --pattern "$asset" --dir .
+          gh release download "$tag" --pattern "latest.yml" --dir .
           echo "installer=$asset" >> "$GITHUB_ENV"
 
       - name: Submit for signing
@@ -93,10 +98,10 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ github.event.inputs.tag }}"
-          signed_name="${installer%.exe}-signed.exe"
-          curl -sS -L -o "$signed_name" \
+          curl -sS -L -o "$installer.signed" \
             "https://app.signpath.io/api/v1/$SIGNPATH_ORG_ID/SigningRequests/$request_id/SignedArtifact" \
             -H "Authorization: Bearer $SIGNPATH_API_TOKEN"
-          gh release delete-asset "$tag" "$installer" --yes
-          gh release upload "$tag" "$signed_name" --clobber
-          echo "Signed installer uploaded as $signed_name"
+          mv "$installer.signed" "$installer"
+          node scripts/build/update-latest-yml.js latest.yml "$installer"
+          gh release upload "$tag" "$installer" latest.yml --clobber
+          echo "Signed installer and latest.yml uploaded atomically with the original asset name"

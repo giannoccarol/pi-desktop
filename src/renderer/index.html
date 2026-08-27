@@ -55,6 +55,9 @@
           <span data-profile-name>—</span>
         </div>
         <span id="sessions-count" class="muted small"></span>
+        <button id="btn-costs" class="icon-btn borderless tiny" data-i18n-title="btn.costs.title" data-i18n-aria-label="btn.costs.aria">
+          <i data-lucide="bar-chart-3"></i>
+        </button>
         <button id="btn-settings" class="icon-btn borderless tiny" data-i18n-title="sideFoot.settings.title" data-i18n-aria-label="sideFoot.settings.title">
           <i data-lucide="settings"></i>
         </button>
@@ -199,6 +202,7 @@
         <span id="git-status" class="muted small mono hidden" title="Git status"></span>
         <span class="flex-spacer"></span>
         <span id="status-activity" class="small"></span>
+        <span id="status-cache-hit" class="status-cache-hit muted small mono hidden"></span>
         <span id="status-tokens" class="muted small mono"></span>
       </footer>
     </main>
@@ -222,11 +226,11 @@
     </div>
   </dialog>
 
-  <dialog id="modal-settings">
+  <dialog id="modal-settings" aria-labelledby="settings-title">
     <div class="modal-body">
       <div class="modal-title-row">
         <span class="modal-icon"><i data-lucide="settings"></i></span>
-        <div><h2 data-i18n="modal.settings.title">Impostazioni</h2><p class="muted small" data-i18n="modal.settings.subtitle">Configura runtime e archiviazione di pi.</p></div>
+        <div><h2 id="settings-title" data-i18n="modal.settings.title">Impostazioni</h2><p class="muted small" data-i18n="modal.settings.subtitle">Configura runtime, preferenze e archiviazione di pi.</p></div>
       </div>
       <div class="settings-tabs" role="tablist">
         <button class="settings-tab active" data-settings-tab="general" role="tab" data-i18n="settings.tab.general">Generali</button>
@@ -235,81 +239,125 @@
       </div>
 
       <div id="settings-general" class="settings-panel">
-        <label class="field">
-          <span data-i18n="settings.general.cwd.label">Directory di lavoro predefinita dell’agente</span>
-          <div class="row gap">
-            <code id="setting-cwd" class="grow mono ellipsis"></code>
-            <button id="btn-pick-cwd" class="btn ghost small" data-i18n="btn.choose">Scegli…</button>
+        <section class="settings-section">
+          <div class="settings-section-heading">
+            <span class="settings-section-icon"><i data-lucide="folder"></i></span>
+            <span><strong data-i18n="settings.section.workspace.title">Progetto e archiviazione</strong><small data-i18n="settings.section.workspace.help">Dove lavora Pi e dove conserva le conversazioni.</small></span>
           </div>
-        </label>
-        <label class="field">
-          <span data-i18n="settings.general.piPath.label">Percorso binario pi (opzionale, altrimenti cercato nel PATH)</span>
-          <input id="setting-pipath" type="text" data-i18n-placeholder="settings.general.piPath.placeholder" spellcheck="false" />
-        </label>
-        <label class="field">
-          <span data-i18n="settings.general.sessionsDir.label">Cartella sessioni (opzionale, default <code>~/.pi/agent/sessions</code>)</span>
-          <input id="setting-sessionsdir" type="text" data-i18n-placeholder="settings.general.sessionsDir.placeholder" spellcheck="false" />
-        </label>
-        <label class="field">
-          <span data-i18n="settings.language.label">Lingua / Language</span>
-          <select id="setting-language">
-            <option value="it" data-i18n="settings.language.it">Italiano</option>
-            <option value="en" data-i18n="settings.language.en">English</option>
-          </select>
-        </label>
-        <label class="field">
-          <span data-i18n="settings.userName.label">Il tuo nome</span>
-          <input id="setting-username" type="text" data-i18n-placeholder="settings.userName.placeholder" spellcheck="false" maxlength="40" />
-        </label>
-        <div class="field notification-row">
-          <span data-i18n="settings.notifications.title">Notifiche desktop</span>
+          <div class="settings-field-grid">
+            <label class="field settings-field-wide">
+              <span data-i18n="settings.general.cwd.label">Directory di lavoro</span>
+              <small data-i18n="settings.general.cwd.help">Cartella usata per nuove chat e comandi dell’agente.</small>
+              <div class="row gap">
+                <code id="setting-cwd" class="grow mono ellipsis settings-value"></code>
+                <button id="btn-pick-cwd" class="btn ghost small" data-i18n="btn.choose">Scegli…</button>
+              </div>
+            </label>
+            <label class="field">
+              <span data-i18n="settings.general.piPath.label">Binario pi</span>
+              <small data-i18n="settings.general.piPath.help">Lascia vuoto per usare quello trovato nel PATH.</small>
+              <input id="setting-pipath" type="text" data-i18n-placeholder="settings.general.piPath.placeholder" spellcheck="false" />
+            </label>
+            <label class="field">
+              <span data-i18n="settings.general.sessionsDir.label">Cartella sessioni</span>
+              <small data-i18n="settings.general.sessionsDir.help">Lascia vuoto per usare ~/.pi/agent/sessions.</small>
+              <input id="setting-sessionsdir" type="text" data-i18n-placeholder="settings.general.sessionsDir.placeholder" spellcheck="false" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-heading">
+            <span class="settings-section-icon"><i data-lucide="user"></i></span>
+            <span><strong data-i18n="settings.section.personal.title">Aspetto personale</strong><small data-i18n="settings.section.personal.help">Lingua dell’interfaccia e nome mostrato nei saluti.</small></span>
+          </div>
+          <div class="settings-field-grid">
+            <label class="field">
+              <span data-i18n="settings.language.label">Lingua</span>
+              <select id="setting-language">
+                <option value="it" data-i18n="settings.language.it">Italiano</option>
+                <option value="en" data-i18n="settings.language.en">English</option>
+              </select>
+            </label>
+            <label class="field">
+              <span data-i18n="settings.userName.label">Il tuo nome</span>
+              <input id="setting-username" type="text" data-i18n-placeholder="settings.userName.placeholder" spellcheck="false" maxlength="40" />
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section notification-row">
+          <div class="settings-section-heading">
+            <span class="settings-section-icon"><i data-lucide="bell"></i></span>
+            <span><strong data-i18n="settings.notifications.title">Notifiche desktop</strong><small data-i18n="settings.notifications.help">Scegli quando Pi può richiamare la tua attenzione.</small></span>
+          </div>
           <div class="toggle-row">
             <label><input id="setting-notifications-enabled" type="checkbox" /> <span data-i18n="settings.notifications.enabled">Mostra notifica quando Pi finisce in background</span></label>
             <label><input id="setting-notifications-sound" type="checkbox" /> <span data-i18n="settings.notifications.sound">Riproduci suono</span></label>
           </div>
-          <small class="muted" data-i18n="settings.notifications.help">Richiede permesso del sistema. Disattiva per silenziare.</small>
-        </div>
-        <div class="field" id="budgets-field">
-          <span>Budget per progetto (opzionale)</span>
+          <div id="per-project-mute" class="col gap" style="margin-top:8px;max-height:120px;overflow:auto"></div>
+          <small class="settings-footnote" data-i18n="settings.notifications.permission">Le notifiche richiedono il permesso del sistema.</small>
+        </section>
+
+        <section class="settings-section" id="budgets-field">
+          <div class="settings-section-heading">
+            <span class="settings-section-icon"><i data-lucide="gauge"></i></span>
+            <span><strong data-i18n="settings.budgets.title">Budget per progetto</strong><small data-i18n="settings.budgets.help">Ricevi un avviso quando costi o token si avvicinano al limite.</small></span>
+          </div>
           <div id="budgets-list" class="col gap" style="margin:6px 0"></div>
-          <button id="btn-budgets-add" class="btn ghost small" type="button"><i data-lucide="plus"></i> Aggiungi budget progetto corrente</button>
-          <small class="muted">Limiti di costo/token salvati in settings.json e rispettati dal runtime.</small>
-        </div>
-        <div class="field app-update-row">
-          <span data-i18n="settings.appUpdate.label">Pi Desktop — versione</span>
+          <button id="btn-budgets-add" class="btn ghost small settings-section-action" type="button"><i data-lucide="plus"></i> <span data-i18n="settings.budgets.add">Aggiungi un budget al progetto corrente</span></button>
+        </section>
+
+        <section class="settings-section app-update-row">
+          <div class="settings-section-heading">
+            <span class="settings-section-icon"><i data-lucide="refresh-cw"></i></span>
+            <span><strong data-i18n="settings.appUpdate.title">Aggiornamenti</strong><small data-i18n="settings.appUpdate.help">Controlla la versione installata di Pi Desktop.</small></span>
+          </div>
           <div class="app-update-settings-meta">
-            <code id="app-version" class="mono small">—</code>
+            <span class="settings-version"><span data-i18n="settings.appUpdate.label">Versione installata</span><code id="app-version" class="mono small">—</code></span>
             <button id="btn-check-app-update" class="btn ghost small" type="button" data-i18n="settings.checkUpdate">Verifica aggiornamenti</button>
           </div>
-          <small class="muted" data-i18n="settings.appUpdate.useHeader">Scarica e installa dall’icona nella barra in alto quando compare.</small>
           <span id="check-app-update-status" class="muted small app-update-settings-status" aria-live="polite"></span>
-        </div>
+        </section>
       </div>
 
       <div id="settings-runtime" class="settings-panel runtime-settings hidden">
-        <div class="tool-setting-grid">
-          <label class="field"><span data-i18n="settings.runtime.projectTrust.label">Trust del progetto corrente</span><select id="setting-project-trust"><option value="inherit" data-i18n="settings.runtime.projectTrust.inherit">Eredita / predefinito</option><option value="true" data-i18n="settings.runtime.projectTrust.true">Considera attendibile</option><option value="false" data-i18n="settings.runtime.projectTrust.false">Non attendibile</option></select></label>
-          <label class="field"><span data-i18n="settings.runtime.defaultTrust.label">Trust predefinito per nuovi progetti</span><select id="setting-default-trust"><option value="ask" data-i18n="settings.runtime.defaultTrust.ask">Chiedi / ignora in RPC</option><option value="always" data-i18n="settings.runtime.defaultTrust.always">Considera attendibili</option><option value="never" data-i18n="settings.runtime.defaultTrust.never">Non considerare attendibili</option></select></label>
-          <label class="field"><span data-i18n="settings.runtime.transport.label">Trasporto provider</span><select id="setting-transport"><option value="auto" data-i18n="settings.runtime.transport.auto">Automatico</option><option value="sse">SSE</option><option value="websocket">WebSocket</option><option value="websocket-cached">WebSocket cached</option></select></label>
-          <label class="field"><span data-i18n="settings.runtime.enabledModels.label">Modelli inclusi nel cycling, separati da virgola</span><input id="setting-enabled-models" type="text" data-i18n-placeholder="settings.runtime.enabledModels.placeholder" /></label>
-        </div>
-        <fieldset class="native-tools"><legend data-i18n="settings.runtime.nativeTools.legend">Tool abilitati di default</legend><label><input type="checkbox" value="read" /> read</label><label><input type="checkbox" value="bash" /> bash</label><label><input type="checkbox" value="powershell" /> powershell</label><label><input type="checkbox" value="edit" /> edit</label><label><input type="checkbox" value="write" /> write</label><label><input type="checkbox" value="grep" /> grep</label><label><input type="checkbox" value="find" /> find</label><label><input type="checkbox" value="ls" /> ls</label></fieldset>
-        <div class="tool-setting-grid">
-          <label class="field"><span data-i18n="settings.runtime.shellPath.label">Shell personalizzata</span><input id="setting-shell-path" type="text" placeholder="/bin/bash" /></label>
-          <label class="field"><span data-i18n="settings.runtime.shellPrefix.label">Prefisso comandi shell</span><input id="setting-shell-prefix" type="text" data-i18n-placeholder="settings.runtime.shellPrefix.placeholder" /></label>
-          <label class="field"><span data-i18n="settings.runtime.compactReserve.label">Token riservati alla risposta</span><input id="setting-compact-reserve" type="number" min="1024" /></label>
-          <label class="field"><span data-i18n="settings.runtime.compactKeep.label">Token recenti da conservare</span><input id="setting-compact-keep" type="number" min="0" /></label>
-          <label class="field"><span data-i18n="settings.runtime.retryMax.label">Numero massimo retry</span><input id="setting-retry-max" type="number" min="0" max="20" /></label>
-          <label class="field"><span data-i18n="settings.runtime.retryDelay.label">Ritardo retry iniziale (ms)</span><input id="setting-retry-delay" type="number" min="100" /></label>
-        </div>
-        <div class="toggle-row"><label><input id="setting-compact-enabled" type="checkbox" /> <span data-i18n="settings.runtime.compactEnabled">Compattazione automatica</span></label><label><input id="setting-retry-enabled" type="checkbox" /> <span data-i18n="settings.runtime.retryEnabled">Retry automatico</span></label></div>
-        <div class="toggle-row"><label><input id="setting-image-resize" type="checkbox" /> <span data-i18n="settings.runtime.imageResize">Ridimensiona immagini automaticamente</span></label><label><input id="setting-block-images" type="checkbox" /> <span data-i18n="settings.runtime.blockImages">Blocca immagini verso il modello</span></label></div>
-        <div id="project-trust-note" class="muted small"></div>
+        <section class="settings-section">
+          <div class="settings-section-heading"><span class="settings-section-icon"><i data-lucide="shield-check"></i></span><span><strong data-i18n="settings.runtime.security.title">Sicurezza del progetto</strong><small data-i18n="settings.runtime.security.help">Controlla quali progetti possono usare gli strumenti locali.</small></span></div>
+          <div class="tool-setting-grid">
+            <label class="field"><span data-i18n="settings.runtime.projectTrust.label">Progetto corrente</span><select id="setting-project-trust"><option value="inherit" data-i18n="settings.runtime.projectTrust.inherit">Eredita / predefinito</option><option value="true" data-i18n="settings.runtime.projectTrust.true">Considera attendibile</option><option value="false" data-i18n="settings.runtime.projectTrust.false">Non attendibile</option></select></label>
+            <label class="field"><span data-i18n="settings.runtime.defaultTrust.label">Nuovi progetti</span><select id="setting-default-trust"><option value="ask" data-i18n="settings.runtime.defaultTrust.ask">Chiedi / ignora in RPC</option><option value="always" data-i18n="settings.runtime.defaultTrust.always">Considera attendibili</option><option value="never" data-i18n="settings.runtime.defaultTrust.never">Non considerare attendibili</option></select></label>
+          </div>
+          <fieldset class="native-tools"><legend data-i18n="settings.runtime.nativeTools.legend">Tool abilitati di default</legend><label><input type="checkbox" value="read" /> read</label><label><input type="checkbox" value="bash" /> bash</label><label><input type="checkbox" value="powershell" /> powershell</label><label><input type="checkbox" value="edit" /> edit</label><label><input type="checkbox" value="write" /> write</label><label><input type="checkbox" value="grep" /> grep</label><label><input type="checkbox" value="find" /> find</label><label><input type="checkbox" value="ls" /> ls</label></fieldset>
+          <div id="project-trust-note" class="settings-footnote"></div>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-heading"><span class="settings-section-icon"><i data-lucide="terminal"></i></span><span><strong data-i18n="settings.runtime.connection.title">Modelli e shell</strong><small data-i18n="settings.runtime.connection.help">Configura trasporto, modelli disponibili e ambiente dei comandi.</small></span></div>
+          <div class="tool-setting-grid">
+            <label class="field"><span data-i18n="settings.runtime.transport.label">Trasporto provider</span><select id="setting-transport"><option value="auto" data-i18n="settings.runtime.transport.auto">Automatico</option><option value="sse">SSE</option><option value="websocket">WebSocket</option><option value="websocket-cached">WebSocket cached</option></select></label>
+            <label class="field"><span data-i18n="settings.runtime.enabledModels.label">Modelli nel selettore rapido</span><input id="setting-enabled-models" type="text" data-i18n-placeholder="settings.runtime.enabledModels.placeholder" /></label>
+            <label class="field"><span data-i18n="settings.runtime.shellPath.label">Shell personalizzata</span><input id="setting-shell-path" type="text" placeholder="/bin/bash" /></label>
+            <label class="field"><span data-i18n="settings.runtime.shellPrefix.label">Prefisso comandi shell</span><input id="setting-shell-prefix" type="text" data-i18n-placeholder="settings.runtime.shellPrefix.placeholder" /></label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-heading"><span class="settings-section-icon"><i data-lucide="workflow"></i></span><span><strong data-i18n="settings.runtime.automation.title">Automazioni del runtime</strong><small data-i18n="settings.runtime.automation.help">Regola compattazione, tentativi automatici e gestione immagini.</small></span></div>
+          <div class="tool-setting-grid">
+            <label class="field"><span data-i18n="settings.runtime.compactReserve.label">Token riservati alla risposta</span><input id="setting-compact-reserve" type="number" min="1024" /></label>
+            <label class="field"><span data-i18n="settings.runtime.compactKeep.label">Token recenti da conservare</span><input id="setting-compact-keep" type="number" min="0" /></label>
+            <label class="field"><span data-i18n="settings.runtime.retryMax.label">Numero massimo retry</span><input id="setting-retry-max" type="number" min="0" max="20" /></label>
+            <label class="field"><span data-i18n="settings.runtime.retryDelay.label">Ritardo retry iniziale (ms)</span><input id="setting-retry-delay" type="number" min="100" /></label>
+          </div>
+          <div class="toggle-row"><label><input id="setting-compact-enabled" type="checkbox" /> <span data-i18n="settings.runtime.compactEnabled">Compattazione automatica</span></label><label><input id="setting-retry-enabled" type="checkbox" /> <span data-i18n="settings.runtime.retryEnabled">Retry automatico</span></label></div>
+          <div class="toggle-row"><label><input id="setting-image-resize" type="checkbox" /> <span data-i18n="settings.runtime.imageResize">Ridimensiona immagini automaticamente</span></label><label><input id="setting-block-images" type="checkbox" /> <span data-i18n="settings.runtime.blockImages">Blocca immagini verso il modello</span></label></div>
+        </section>
         <div class="row end"><button id="btn-pi-settings-save" class="btn primary" data-i18n="btn.savePiSettings">Salva impostazioni Pi e riavvia runtime</button></div>
       </div>
 
       <div id="settings-providers" class="settings-panel hidden">
-        <div class="provider-settings-head">
+        <div class="provider-settings-head settings-section">
           <div>
             <strong data-i18n="settings.providers.title">Provider AI</strong>
             <p class="muted small" data-i18n="settings.providers.subtitle">Le credenziali sono condivise con l’installazione esterna di pi.</p>
@@ -320,14 +368,14 @@
           </div>
         </div>
         <div id="provider-settings-list" class="provider-settings-list"></div>
-        <p class="provider-note muted small" data-i18n="settings.providers.note">
+        <p class="provider-note muted small" data-i18n="settings.providers.note" data-i18n-html>
           OAuth e API key vengono configurati tramite il runtime dell’installazione esterna e salvati nel suo
           <code>~/.pi/agent/auth.json</code>. Provider aggiunti da estensioni restano disponibili automaticamente.
         </p>
       </div>
-      <div class="row gap end">
-        <button id="btn-settings-save" class="btn primary" data-i18n="btn.save">Salva</button>
+      <div class="row gap end settings-actions">
         <button id="btn-settings-close" class="btn ghost" data-i18n="btn.close">Chiudi</button>
+        <button id="btn-settings-save" class="btn primary" data-i18n="btn.saveChanges">Salva modifiche</button>
       </div>
     </div>
   </dialog>

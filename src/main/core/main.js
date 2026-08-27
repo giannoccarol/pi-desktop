@@ -3,6 +3,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, globalShortcut, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { spawn } = require("child_process");
+const { fileURLToPath } = require("node:url");
 // execFile moved to mention-service.js
 
 const { RuntimeTabs } = require("./runtime-tabs");
@@ -44,6 +46,37 @@ const authControllers = new Map();
 let sessionsListCache = null;
 let sessionsListCacheAt = 0;
 const SESSIONS_CACHE_TTL_MS = 750;
+const sessionsWatchers = new Set();
+let sessionsWatchTimer = null;
+function closeSessionsWatchers(){
+  for(const watcher of sessionsWatchers) try{ watcher.close(); }catch{}
+  sessionsWatchers.clear();
+  if(sessionsWatchTimer){ clearTimeout(sessionsWatchTimer); sessionsWatchTimer=null; }
+}
+function notifySessionsChanged(rescan=false){
+  sessionsListCache=null; sessionsListCacheAt=0;
+  if(sessionsWatchTimer) clearTimeout(sessionsWatchTimer);
+  sessionsWatchTimer=setTimeout(()=>{
+    sessionsWatchTimer=null;
+    if(win && !win.isDestroyed()) try{ win.webContents.send("sessions:changed"); }catch{}
+    if(rescan) restartSessionsWatcher();
+  },120);
+  sessionsWatchTimer.unref?.();
+}
+function restartSessionsWatcher(){
+  closeSessionsWatchers();
+  let dir=""; try{ dir = sessionsDir(); }catch{ return; }
+  if(!dir || !isDirectory(dir)) return;
+  try{
+    sessionsWatchers.add(fs.watch(dir, { recursive: false }, ()=>notifySessionsChanged(true)));
+    try{
+      const subs = fs.readdirSync(dir, {withFileTypes:true}).filter(d=>d.isDirectory());
+      for(const sub of subs){
+        try{ sessionsWatchers.add(fs.watch(path.join(dir, sub.name), ()=>notifySessionsChanged(false))); }catch{}
+      }
+    }catch{}
+  }catch(err){ console.warn("[sessionsWatcher]", err.message); }
+}
 
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 
@@ -75,6 +108,7 @@ function loadSettings() {
   };
   try {
     const loaded = { ...defaults, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) };
+    try{ fs.chmodSync(settingsFile(), 0o600); }catch{}
     const projects = Array.isArray(loaded.projects) ? loaded.projects : [loaded.cwd];
     loaded.projects = [...new Set([loaded.cwd, ...projects].filter((value) => typeof value === "string" && value.trim()))];
     loaded.sessionPreferences = loaded.sessionPreferences && typeof loaded.sessionPreferences === "object" ? loaded.sessionPreferences : {};
@@ -102,11 +136,16 @@ function loadSettings() {
 }
 
 function saveSettings() {
+  const target=settingsFile();
+  const temp=`${target}.${process.pid}.tmp`;
   try {
-    fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
-    fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2), "utf8");
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(temp, JSON.stringify(settings, null, 2), { encoding:"utf8", mode:0o600 });
+    fs.renameSync(temp,target);
+    try{ fs.chmodSync(target,0o600); }catch{}
     return true;
   } catch (err) {
+    try{ fs.unlinkSync(temp); }catch{}
     console.error("[settings] salvataggio fallito:", err);
     return false;
   }
@@ -366,7 +405,7 @@ function createWindow() {
       preload: path.join(__dirname, "..", "..", "preload", "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       spellcheck: false,
     },
   });
@@ -374,10 +413,7 @@ function createWindow() {
     win = null;
   });
   win.loadFile(path.join(__dirname, "..", "..", "renderer", "index.html"));
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
-    return { action: "deny" };
-  });
+  attachNavigationPolicy(win);
   if (!appUpdateService) {
     appUpdateService = new UpdateService(win);
   } else {
@@ -439,6 +475,7 @@ if (!app.requestSingleInstanceLock({ version: APP_VERSION })) {
 
   app.whenReady().then(() => {
     settings = loadSettings();
+    try{ restartSessionsWatcher(); }catch{}
     createWindow();
     try { createTray(); } catch {}
     try { registerGlobalShortcut(); } catch {}
@@ -466,6 +503,7 @@ app.on("window-all-closed", () => {
   runtime.stop();
   app.quit();
 });
+app.on("before-quit", closeSessionsWatchers);
 
 app.on("will-quit", () => {
   stopStaleInstallWatch();
@@ -598,6 +636,7 @@ ipcMain.handle("settings:set", async (_e, patch) => {
   } else if (previousPiPath !== settings.piPath || previousSessionsDir !== settings.sessionsDir) {
     await runtime.restart({ piPath: settings.piPath || undefined }).catch(() => runtime.stop());
   }
+  try{ restartSessionsWatcher(); }catch{}
   return { ...publicSettings(), saveOk };
 });
 
@@ -649,7 +688,7 @@ ipcMain.handle("fs:searchFiles", (_e, query) => searchMentionCandidates(query));
 ipcMain.handle("fs:listDropped", async (_e, absPath) => {
   try {
     const p = String(absPath || "").trim();
-    if (!p) return [];
+    if (!p || !isAllowedProjectPath(p)) return [];
     let stat;
     try { stat = fs.statSync(p); } catch { return []; }
     if (stat.isFile()) return [path.basename(p)];
@@ -664,6 +703,7 @@ ipcMain.handle("fs:listDropped", async (_e, absPath) => {
 
 ipcMain.handle("git:getStatus", async (_e, cwd) => {
   const target = cwd || settings?.cwd || process.cwd();
+  if(!isAllowedProjectPath(target)) return { isGit:false, branch:null, dirty:0, label:"" };
   try { return await gitService.getGitStatus(target); } catch { return { isGit:false, branch:null, dirty:0, label:"" }; }
 });
 
@@ -685,16 +725,13 @@ ipcMain.handle("window:popOutTab", async (_e, tabId) => {
         preload: path.join(__dirname, "..", "..", "preload", "preload.js"),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false,
+        sandbox: true,
       },
     });
     const url = path.join(__dirname, "..", "..", "renderer", "index.html");
     // pass tabId via query so renderer can activate it
     await pop.loadFile(url, { query: { popOutTabId: id } });
-    pop.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:\/\//i.test(url)) shell.openExternal(url);
-      return { action: "deny" };
-    });
+    attachNavigationPolicy(pop);
     return { ok:true, tabId:id };
   } catch (err) { return { ok:false, error: String(err?.message||err) }; }
 });
@@ -735,8 +772,92 @@ ipcMain.handle("projects:remove", (_e, projectPath) => {
   return publicSettings();
 });
 
+function isPrivateHostname(hostname){
+  const host=String(hostname||"").toLowerCase().replace(/^\[|\]$/g,"");
+  if(!host || host==="localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+  if(host==="::1" || host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return true;
+  const parts=host.split(".").map(Number);
+  if(parts.length===4 && parts.every((part)=>Number.isInteger(part) && part>=0 && part<=255)){
+    return parts[0]===10 || parts[0]===127 || parts[0]===0 || (parts[0]===169 && parts[1]===254) || (parts[0]===172 && parts[1]>=16 && parts[1]<=31) || (parts[0]===192 && parts[1]===168);
+  }
+  return false;
+}
+function isAllowedExternalUrl(url){
+  try{
+    const u = new URL(String(url));
+    if(u.protocol==="https:"){
+      if(isPrivateHostname(u.hostname)) return false;
+      if(!/^[a-z0-9.-]+$/i.test(u.hostname)) return false;
+      return true;
+    }
+    if(u.protocol==="file:"){
+      const p = path.normalize(fileURLToPath(u));
+      const allowedRoots = [...(settings?.projects||[]), settings?.cwd||"", app.getPath("home")].filter(Boolean).map(p=>path.resolve(String(p)));
+      return allowedRoots.some(root=> p===root || p.startsWith(root+path.sep));
+    }
+    return false;
+  }catch{ return false; }
+}
+function attachNavigationPolicy(browserWindow){
+  const contents=browserWindow.webContents;
+  contents.setWindowOpenHandler(({url})=>{
+    if(isAllowedExternalUrl(url)) shell.openExternal(url);
+    else console.warn("[windowOpen] blocked:",String(url).slice(0,200));
+    return {action:"deny"};
+  });
+  const blockNavigation=(event,url)=>{
+    if(String(url).startsWith("file:")){
+      try{
+        const target=realPath(fileURLToPath(url));
+        const rendererRoot=realPath(path.join(__dirname,"..","..","renderer"));
+        if(target===rendererRoot || target.startsWith(rendererRoot+path.sep)) return;
+      }catch{}
+    }
+    event.preventDefault();
+    if(isAllowedExternalUrl(url)) shell.openExternal(url);
+    else console.warn("[navigation] blocked:",String(url).slice(0,200));
+  };
+  contents.on("will-navigate",blockNavigation);
+  contents.on("will-redirect",blockNavigation);
+}
+
+function realPath(value){
+  const resolved=path.resolve(String(value||""));
+  try{return fs.realpathSync.native(resolved);}catch{return resolved;}
+}
+function allowedProjectRoots(){
+  return [...new Set([...(settings?.projects||[]),settings?.cwd].filter(Boolean).map(realPath))];
+}
+function isAllowedProjectPath(value){
+  const target=realPath(value);
+  return allowedProjectRoots().some((root)=>target===root || target.startsWith(root+path.sep));
+}
 ipcMain.handle("shell:openExternal", (_e, url) => {
-  if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  if (isAllowedExternalUrl(url)) shell.openExternal(url);
+  else console.warn("[openExternal] blocked:", String(url).slice(0,200));
+});
+ipcMain.handle("shell:openTerminal", (_e, requestedCwd) => {
+  const cwd=realPath(requestedCwd || settings?.cwd);
+  if(!isAllowedProjectPath(cwd) || !isDirectory(cwd)) throw new Error("Cartella terminale non valida");
+  let command=""; let args=[];
+  if(process.platform==="darwin"){ command="open"; args=["-a","Terminal",cwd]; }
+  else if(process.platform==="win32"){ command="cmd.exe"; args=["/K"]; }
+  else{
+    const candidates=[
+      ["/usr/bin/x-terminal-emulator",[]],
+      ["/usr/bin/gnome-terminal",[`--working-directory=${cwd}`]],
+      ["/usr/bin/konsole",["--workdir",cwd]],
+      ["/usr/bin/xfce4-terminal",[`--working-directory=${cwd}`]],
+      ["/usr/bin/kitty",["--directory",cwd]],
+      ["/usr/bin/alacritty",["--working-directory",cwd]],
+    ];
+    const found=candidates.find(([bin])=>fs.existsSync(bin));
+    if(!found) throw new Error("Nessun emulatore di terminale trovato");
+    [command,args]=found;
+  }
+  const child=spawn(command,args,{cwd,detached:true,stdio:"ignore"});
+  child.unref();
+  return {ok:true};
 });
 
 ipcMain.handle("sessions:list", () => {
@@ -833,6 +954,23 @@ ipcMain.handle("sessions:bulkDelete", async (_e, files) => {
   saveSettings();
   return result;
 });
+ipcMain.handle("sessions:restoreTrash", async (_e, trashFile) => {
+  const trashDir = sessionsStore.trashDirFor(sessionsDir());
+  const src = path.join(trashDir, path.basename(String(trashFile)));
+  if(!fs.existsSync(src)) throw new Error("File trash non trovato");
+  const dest = sessionsStore.restoreFromTrash(sessionsDir(), src);
+  sessionsListCache=null; sessionsListCacheAt=0;
+  return { ok:true, restored: dest };
+});
+ipcMain.handle("sessions:listTrash", async () => {
+  const trashDir = sessionsStore.trashDirFor(sessionsDir());
+  try{
+    const entries = fs.readdirSync(trashDir).filter(f=>f.endsWith(".jsonl")).map(f=>{
+      const p=path.join(trashDir,f); const st=fs.statSync(p); return { file:f, path:p, mtime: st.mtimeMs, size: st.size };
+    }).sort((a,b)=>b.mtime-a.mtime).slice(0,50);
+    return entries;
+  }catch{ return []; }
+});
 
 ipcMain.handle("sessions:setMeta", (_e, { file, patch }) => {
   const resolvedRoot = path.resolve(sessionsDir());
@@ -859,15 +997,15 @@ ipcMain.handle("sessions:setMeta", (_e, { file, patch }) => {
 
 ipcMain.handle("sessions:getMeta", () => settings.sessionMeta || {});
 
-ipcMain.handle("fs:listExplorer", (_e, { cwd, depth }) => {
+ipcMain.handle("fs:listExplorer", (_e, { cwd, depth, showDotfiles }) => {
   const target = cwd ? path.resolve(String(cwd)) : path.resolve(settings.cwd || app.getPath("home"));
-  if (!isDirectory(target)) throw new Error("Cartella non disponibile");
-  return sessionsStore.listExplorerTree(target, Math.min(Math.max(Number(depth)||2,1),4), 800);
+  if (!isDirectory(target) || !isAllowedProjectPath(target)) throw new Error("Cartella non disponibile");
+  return sessionsStore.listExplorerTree(target, Math.min(Math.max(Number(depth)||2,1),4), 800, { showDotfiles: Boolean(showDotfiles) });
 });
 
 ipcMain.handle("fs:readTextFile", async (_e, filePath) => {
-  const p = path.resolve(String(filePath||""));
-  const cwd = path.resolve(settings.cwd || app.getPath("home"));
+  const p = realPath(filePath);
+  const cwd = realPath(settings.cwd || app.getPath("home"));
   if (!p.startsWith(cwd + path.sep) && p !== cwd) throw new Error("File fuori dal progetto");
   const st = fs.statSync(p);
   if (!st.isFile() || st.size > 512*1024) throw new Error("File troppo grande o non leggibile");
@@ -881,8 +1019,15 @@ ipcMain.handle("health:getPiLogs", () => {
 ipcMain.handle("sessions:bulkExport", async (_e, files) => {
   const list = Array.isArray(files) ? files : [];
   const picked = [];
+  const root = path.resolve(sessionsDir());
   for (const f of list) {
-    try { const msgs = sessionsStore.readSessionMessages(path.resolve(String(f))); if (msgs.messages) picked.push({ file: f, count: msgs.messages.length }); } catch {}
+    try {
+      const resolved = path.resolve(String(f));
+      if(!resolved.startsWith(root + path.sep) || !resolved.endsWith(".jsonl")) continue;
+      const msgs = sessionsStore.readSessionMessages(resolved);
+      const session = sessionsStore.parseSessionFile(resolved);
+      if (msgs.messages) picked.push({ file: resolved, session, count: msgs.messages.length, messages: msgs.messages });
+    } catch {}
   }
   return { ok: true, items: picked };
 });
@@ -909,15 +1054,48 @@ ipcMain.handle("pi:listTabs", () => runtime.list());
 ipcMain.handle("pi:activateTab", (_e, tabId) => runtime.activate(tabId));
 ipcMain.handle("pi:closeTab", (_e, tabId) => runtime.close(tabId));
 
+function checkBudgetForCwd(cwd, tabId){
+  try{
+    const b = settings?.budgets?.[cwd];
+    if(!b || (b.maxCost==null && b.maxTokens==null)) return { ok:true };
+    let sessions = sessionsStore.listSessions(sessionsDir()).filter(s=>s.cwd===cwd);
+    if(b.reset==="monthly"){
+      const month = new Date().toISOString().slice(0,7);
+      sessions = sessions.filter((session)=>String(session.timestamp || new Date(session.modified).toISOString()).slice(0,7)===month);
+    } else if(b.reset==="session"){
+      const activeFile = tabId ? runtime.list().find((tab)=>tab.id===tabId)?.sessionFile : null;
+      sessions = activeFile ? sessions.filter((session)=>session.file===activeFile) : sessions.slice(0,1);
+    }
+    let cost=0, tokens=0;
+    for(const s of sessions){ if(typeof s.cost==="number") cost+=s.cost; if(typeof s.tokens==="number") tokens+=s.tokens; else if(s.tokens && typeof s.tokens.total==="number") tokens+=s.tokens.total; }
+    const costOver = b.maxCost!=null && cost >= b.maxCost;
+    const tokOver = b.maxTokens!=null && tokens >= b.maxTokens;
+    if(costOver || tokOver) return { ok:false, cost, tokens, budget:b };
+    const costPct = b.maxCost ? cost/b.maxCost : 0;
+    const tokPct = b.maxTokens ? tokens/b.maxTokens : 0;
+    const pct = Math.max(costPct, tokPct);
+    if(pct>=0.8) console.warn(`[budget] ${cwd} ${Math.round(pct*100)}%`);
+    return { ok:true, cost, tokens, pct };
+  }catch{ return { ok:true }; }
+}
 ipcMain.handle("pi:prompt", async (_e, { message, images, streamingBehavior, tabId }) => {
+  const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
+  const chk = checkBudgetForCwd(cwd, tabId);
+  if(!chk.ok) throw new Error(`Budget superato per ${cwd}: costo ${chk.cost?.toFixed?.(2)||chk.cost} / ${chk.budget.maxCost} o token ${chk.tokens} / ${chk.budget.maxTokens}. Aggiorna il budget in Impostazioni.`);
   await ensureRuntime();
   return runtime.prompt(message, images, streamingBehavior, tabId);
 });
 ipcMain.handle("pi:steer", async (_e, { message, images, tabId }) => {
+  const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
+  const chk = checkBudgetForCwd(cwd, tabId);
+  if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.steer(message, images, tabId);
 });
 ipcMain.handle("pi:followUp", async (_e, { message, images, tabId }) => {
+  const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
+  const chk = checkBudgetForCwd(cwd, tabId);
+  if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.followUp(message, images, tabId);
 });
@@ -1146,8 +1324,8 @@ ipcMain.handle("providers:login", async (_e, { providerId, authType }) => {
       signal: controller.signal,
       prompt: (prompt) => requestAuthPrompt(providerId, prompt, prompt.signal || controller.signal),
       notify: (event) => {
-        if (event.type === "auth_url" && /^https?:\/\//i.test(event.url || "")) shell.openExternal(event.url);
-        if (event.type === "device_code" && /^https?:\/\//i.test(event.verificationUri || "")) shell.openExternal(event.verificationUri);
+        if (event.type === "auth_url" && isAllowedExternalUrl(event.url || "")) shell.openExternal(event.url);
+        if (event.type === "device_code" && isAllowedExternalUrl(event.verificationUri || "")) shell.openExternal(event.verificationUri);
         sendAuthEvent({ kind: "event", providerId, event });
       },
     });
