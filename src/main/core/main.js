@@ -682,7 +682,7 @@ ipcMain.handle("sessions:messagesPage", (_e, { file, limit = 2000 }) => {
   if (!resolvedFile.startsWith(resolvedRoot + path.sep) || !resolvedFile.endsWith(".jsonl")) {
     throw new Error("Percorso sessione non valido");
   }
-  return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile), Math.min(limit, 3000), 10_000_000);
+  return ipcSanitize.sanitizeMessagesPayload(sessionsStore.readSessionMessages(resolvedFile), Math.min(limit, 3000), 2_000_000);
 });
 
 ipcMain.handle("sessions:delete", async (_e, file) => {

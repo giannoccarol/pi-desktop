@@ -21,6 +21,8 @@ test.describe("switch chat aperte", () => {
       manifest.totalSessions,
       { timeout: 30_000 }
     );
+    // Chiudi eventuali dialog di primo avvio che potrebbero bloccare l'interazione
+    await page.waitForFunction(() => !document.querySelector("dialog[open]"), null, { timeout: 10_000 }).catch(() => {});
   });
 
   test.afterAll(async () => {
@@ -35,6 +37,8 @@ test.describe("switch chat aperte", () => {
    */
   async function openSession(projPath, basename_) {
     const file = `${projPath.replace("/projects/", "/sessions/")}/${basename_}`;
+    // Chiudi il dialog di primo avvio se ancora aperto
+    await page.evaluate(() => { document.querySelectorAll("dialog[open]").forEach((d) => d.close()); });
     await page.evaluate(async (f) => {
       window.piSidebar?.stashActiveTabContext?.(); // come fa openHistorySession all'ingresso
       const sess = window.piStore.state.sessions.find((x) => x.file === f);
@@ -78,9 +82,11 @@ test.describe("switch chat aperte", () => {
     const tabB = page.locator(".chat-tab").last();
     const tabA = page.locator(".chat-tab").nth(tabsA - 1);
     for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => { document.querySelectorAll("dialog[open]").forEach((d) => d.close()); });
       await tabA.click();
       await expect(page.locator(".chat-tab.active")).toHaveClass(/active/);
       expect(await page.evaluate(() => window.piStore.state.activeSessionFile)).toBe(fileA);
+      await page.evaluate(() => { document.querySelectorAll("dialog[open]").forEach((d) => d.close()); });
       await tabB.click();
       expect(await page.evaluate(() => window.piStore.state.activeSessionFile)).toBe(fileB);
     }
@@ -101,6 +107,7 @@ test.describe("switch chat aperte", () => {
     const valueOther = await page.locator("#input").inputValue();
 
     // torna sul primo tab tramite la TAB BAR (stabile, non ricostruita dalla sidebar)
+    await page.evaluate(() => { document.querySelectorAll("dialog[open]").forEach((d) => d.close()); });
     await page.locator(`.chat-tab[data-tab-id="${tabA}"]`).click();
     await expect(page.locator(`.chat-tab.active[data-tab-id="${tabA}"]`)).toBeVisible();
     await expect
@@ -114,6 +121,7 @@ test.describe("switch chat aperte", () => {
     await page.evaluate(() => window.newChat());
     await page.waitForTimeout(800);
     const before = await page.locator(".chat-tab").count();
+    await page.evaluate(() => { document.querySelectorAll("dialog[open]").forEach((d) => d.close()); });
     await page.locator("#btn-new-chat").click();
     await page.waitForTimeout(800);
     expect(await page.locator(".chat-tab").count()).toBe(before);

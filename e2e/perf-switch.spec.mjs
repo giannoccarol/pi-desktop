@@ -28,6 +28,7 @@ test.describe("perf: switch tra chat", () => {
       manifest.totalSessions,
       { timeout: 30_000 }
     );
+    await page.waitForFunction(() => !document.querySelector("dialog[open]"), null, { timeout: 10_000 }).catch(() => {});
   });
 
   test.afterAll(async () => {
@@ -39,6 +40,8 @@ test.describe("perf: switch tra chat", () => {
 
   async function openSessionByFile(projPath, basename_) {
     const file = `${projPath.replace("/projects/", "/sessions/")}/${basename_}`;
+    await page.evaluate(() => { const d = document.querySelector("dialog[open]"); if (d) d.close(); }).catch(() => {});
+    await page.waitForTimeout(300);
     const t0 = Date.now();
     await page.evaluate(async (f) => {
       window.piSidebar?.stashActiveTabContext?.(); // come fa openHistorySession all ingresso
