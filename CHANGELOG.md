@@ -1,3 +1,10 @@
+## [0.14.2](https://github.com/giannoccarol/pi-desktop/compare/v0.14.1...v0.14.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* **updates:** align Linux OTA flow with gittree cached install ([71ddcc0](https://github.com/giannoccarol/pi-desktop/commit/71ddcc02c353ae061645f78a16d3fb74455d8be8))
+
 ## [0.14.1](https://github.com/giannoccarol/pi-desktop/compare/v0.14.0...v0.14.1) (2026-08-27)
 
 
