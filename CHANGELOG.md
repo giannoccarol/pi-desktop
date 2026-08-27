@@ -1,3 +1,12 @@
+## [0.14.3](https://github.com/giannoccarol/pi-desktop/compare/v0.14.2...v0.14.3) (2026-08-27)
+
+
+### Bug Fixes
+
+* **auth, models:** improve provider state management and refresh logic ([1582fc4](https://github.com/giannoccarol/pi-desktop/commit/1582fc48304b70833e110fc9900a5acc0b1a14e0))
+* **ui:** OTA nella barra header e layout pannello coda ([9eaf914](https://github.com/giannoccarol/pi-desktop/commit/9eaf914db34a81e6cc402d8c9d952f53bafa7fe7))
+* **updates:** unblock 0.14.1 download when stale cache blocks check ([c9b102f](https://github.com/giannoccarol/pi-desktop/commit/c9b102fca15547afb117a8a9beff58377ed4ddd6))
+
 ## [0.14.2](https://github.com/giannoccarol/pi-desktop/compare/v0.14.1...v0.14.2) (2026-08-27)
 
 
