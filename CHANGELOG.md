@@ -1,3 +1,10 @@
+# [0.15.0](https://github.com/giannoccarol/pi-desktop/compare/v0.14.3...v0.15.0) (2026-08-27)
+
+
+### Features
+
+* **settings, sessions:** enhance session management and settings structure ([b132c7f](https://github.com/giannoccarol/pi-desktop/commit/b132c7fb8f7a04db6e1909c13a359ddac1f0d761))
+
 ## [0.14.3](https://github.com/giannoccarol/pi-desktop/compare/v0.14.2...v0.14.3) (2026-08-27)
 
 
