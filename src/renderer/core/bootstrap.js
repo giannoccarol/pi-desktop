@@ -199,7 +199,6 @@
     }
 
     el.newChat.addEventListener("click", () => (window.newChat||window.piSession?.newChat)?.());
-    el.topNewChat.addEventListener("click", () => (window.newChat||window.piSession?.newChat)?.());
     // "Nuova chat" dal menu tray (main invia pi:tray-new-chat dopo showWindow).
     // Se il tab corrente e' gia' una chat vuota, newSession lo riusa senza creare
     // un nuovo tab (vedi RuntimeTabs.newSession): mostriamo comunque un feedback,

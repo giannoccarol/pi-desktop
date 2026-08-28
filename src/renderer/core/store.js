@@ -20,7 +20,6 @@
     addProject: $("#btn-add-project"),
     sessionsCount: $("#sessions-count"),
     newChat: $("#btn-new-chat"),
-    topNewChat: $("#top-new-chat"),
     commandsBtn: $("#btn-commands"),
     treeBtn: $("#btn-tree"),
     sessionToolsBtn: $("#btn-session-tools"),

@@ -1882,6 +1882,155 @@ html[data-theme="dark"] #chat-tooltip {
   transform: translateX(-50%);
 }
 
+/* Visual refresh: one quiet spatial and typographic system across the shell. */
+:root {
+  --content-max: 880px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-control: 9px;
+  --radius-surface: 14px;
+  --radius-composer: 18px;
+}
+
+body { font-size: 14px; }
+
+/* Sidebar */
+#sidebar {
+  --sidebar-w: 280px;
+  border-right: 1px solid var(--hairline);
+}
+.side-head { padding: 18px 14px 12px; gap: 12px; }
+.brand-row { min-height: 30px; padding: 0 5px; }
+.brand { gap: 9px; }
+.brand-name { font-size: 14px; }
+#btn-new-chat.side-new-chat {
+  width: auto;
+  min-height: 36px;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 6px;
+  padding: 0 11px;
+  border-radius: var(--radius-control);
+  border: 0;
+  color: var(--text);
+  background: var(--surface-2);
+}
+#btn-new-chat.side-new-chat:hover { background: var(--hover); }
+#btn-new-chat .new-chat-label { font-size: 12px; font-weight: 600; }
+.global-search { height: 36px; border-radius: var(--radius-control); }
+.projects-head { min-height: 30px; padding: 0 5px; }
+.side-section-title { padding: 0 5px; font-size: 11px; letter-spacing: .02em; text-transform: none; }
+#projects-list { padding: 5px 10px 16px; gap: 3px; }
+.project-block { margin: 0; }
+.project-row { height: 35px; gap: 8px; padding: 0 8px 0 9px; border-radius: 9px; }
+.project-title { font-size: 13px; font-weight: 600; }
+.project-chats { gap: 1px; padding: 2px 0 3px; }
+.session-item { min-height: 35px; padding: 7px 9px 7px 30px; border-radius: 8px; }
+.project-chats .session-item { padding-left: 30px; }
+.session-title { font-size: 12.5px; }
+.session-meta { font-size: 11px; }
+.side-foot { min-height: 52px; padding: 9px 13px; border-top-color: var(--hairline); }
+
+/* Topbar and open-chat navigation */
+#topbar { min-height: 56px; padding: 10px 18px; gap: 4px; }
+.chat-tabs { max-width: min(62vw, 860px); gap: 4px; margin-left: 4px; padding: 1px 2px; }
+.chat-tab {
+  min-width: 168px;
+  max-width: 210px;
+  height: 36px;
+  flex-basis: 168px;
+  gap: 7px;
+  padding: 5px 8px 5px 10px;
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+}
+.chat-tab:hover { border-color: transparent; box-shadow: none; }
+.chat-tab.active { border-color: transparent; background: var(--surface-2); box-shadow: none; }
+.chat-tab-title { font-size: 12px; }
+.chat-tab-subtitle { font-size: 11px; }
+
+/* Conversation rail */
+#messages {
+  width: min(var(--content-max), calc(100% - 40px));
+  padding: 32px 0 48px;
+  gap: 22px;
+}
+.msg-user .bubble { max-width: 78%; padding: 11px 14px; border-radius: 16px 16px 5px 16px; font-size: 14px; }
+.msg-assistant .content { line-height: 1.62; font-size: 14px; }
+.role-tag { margin-bottom: 5px; font-size: 11px; }
+.activity-bundle > summary, .tool-card > summary { min-height: 30px; }
+
+/* Composer and model controls share the same rail as the conversation. */
+#composer-wrap { padding: 0 24px 18px; }
+#composer {
+  width: min(var(--content-max), 100%);
+  min-height: 108px;
+  padding: 14px 16px 11px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-composer);
+  background: var(--surface-2);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+#input { min-height: 48px; font-size: 15px; line-height: 1.55; }
+.composer-actions { min-height: 35px; gap: 8px; padding-top: 8px; }
+.composer-tools { gap: 2px; }
+.composer-tool { width: 32px; height: 32px; border-radius: 9px; }
+.send-group { gap: 6px; }
+#btn-send { width: 36px; min-width: 36px; height: 36px; padding: 0; border-radius: 50%; }
+#btn-send .send-label { display: none; }
+#btn-send svg { width: 16px; height: 16px; }
+.send-btn.stop { min-width: 68px; height: 36px; border-radius: 11px; }
+#model-dock { width: min(var(--content-max), calc(100% - 40px)); min-height: 66px; margin-bottom: 14px; border-radius: var(--radius-surface); }
+#model-dock.compact { margin: 0 8px 0 auto; }
+#model-dock.compact .dock-button { border-color: transparent; background: transparent; }
+#model-dock.compact .dock-button:hover { border-color: transparent; background: var(--surface-3); }
+
+/* Menus and settings use the same section/card rhythm. */
+.menu { gap: 4px; padding: 6px; border-radius: var(--radius-surface); }
+.menu-item { min-height: 36px; padding: 7px 9px; border-radius: 8px; }
+.slash-suggestion { min-height: 36px; padding: 8px 9px; }
+#modal-settings .modal-body { gap: 16px; }
+.settings-panel { gap: 12px; }
+.settings-section { padding: 16px; border-radius: var(--radius-surface); }
+.settings-section-heading { gap: 11px; margin-bottom: 14px; }
+.settings-section-heading strong { font-size: 13px; }
+.settings-section-heading small { font-size: 11px; }
+.settings-section-icon { width: 32px; height: 32px; flex-basis: 32px; border-radius: 10px; }
+
+/* Keep the refreshed desktop rhythm usable at the existing breakpoints. */
+@media (max-width: 920px) {
+  #sidebar { --sidebar-w: 226px; width: 226px; min-width: 226px; }
+  #sidebar.collapsed { margin-left: -226px; }
+  #model-dock { width: calc(100% - 28px); }
+  #messages { width: min(var(--content-max), calc(100% - 32px)); }
+  #composer-wrap { padding-inline: 16px; }
+  #model-dock.compact #provider-dropdown { display: none; }
+}
+
+@media (max-width: 700px) {
+  #btn-new-chat.side-new-chat { width: auto; min-width: 0; justify-content: center; padding: 0; }
+  #btn-new-chat .new-chat-label { display: none; }
+  #topbar { padding-inline: 10px; }
+  .chat-tabs { max-width: 48vw; }
+  .chat-tab { min-width: 148px; flex-basis: 148px; }
+  #messages { width: calc(100% - 24px); padding-top: 24px; }
+  .msg-user .bubble { max-width: 88%; }
+  #composer-wrap { padding: 0 10px 12px; }
+  #composer { min-height: 102px; padding: 12px 12px 9px; }
+  #input { font-size: 14px; }
+  #model-dock { width: calc(100% - 20px); }
+}
+
+@media (max-height: 670px) {
+  #composer { min-height: 88px; }
+  #model-dock { min-height: 60px; margin-bottom: 8px; }
+}
+
 .session-meta-badge {
   margin-left: 4px;
   padding: 1px 4px;

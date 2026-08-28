@@ -157,7 +157,6 @@ async function newChat(projectPath = state.settings?.cwd, parentSession = null) 
   state.creatingChat = true;
   document.body.classList.add("session-loading");
   el.newChat?.setAttribute("disabled", "true");
-  el.topNewChat?.setAttribute("disabled", "true");
   try {
     resetQueueState();
     setBusy(false);
@@ -186,7 +185,6 @@ async function newChat(projectPath = state.settings?.cwd, parentSession = null) 
     state.creatingChat = false;
     document.body.classList.remove("session-loading");
     el.newChat?.removeAttribute("disabled");
-    el.topNewChat?.removeAttribute("disabled");
     renderProjects();
   }
 }
