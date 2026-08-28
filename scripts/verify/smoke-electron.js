@@ -44,8 +44,13 @@ function run() {
 
     const timer = setTimeout(() => {
       // Timeout: se abbiamo visto "agente avviato" e nessun errore critico, è ok
-      if (/agente avviato/i.test(output) && !/ReferenceError|Object has been destroyed|Uncaught Exception|TypeError.*destroyed/i.test(output)) {
-        pass("smoke: ok - '[pi-desktop] agente avviato' e nessun ReferenceError/Object destroyed (timeout)");
+      const agentStarted = /agente avviato/i.test(output);
+      const agentUnavailable = /PI_NOT_INSTALLED|pi non installato/i.test(output);
+      const hasCriticalError = /ReferenceError|Object has been destroyed|Uncaught Exception|TypeError.*destroyed/i.test(output);
+      if ((agentStarted || (process.env.CI && agentUnavailable)) && !hasCriticalError) {
+        pass(agentStarted
+          ? "smoke: ok - '[pi-desktop] agente avviato' e nessun ReferenceError/Object destroyed (timeout)"
+          : "smoke: ok - app avviata senza agente pi e nessun ReferenceError/Object destroyed (timeout)");
       } else if (/ReferenceError|is not defined/i.test(output)) {
         fail(`smoke FAIL: ReferenceError rilevato:\n${output.slice(-3000)}`);
       } else if (/Object has been destroyed/i.test(output)) {
