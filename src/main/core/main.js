@@ -930,9 +930,13 @@ ipcMain.handle("sessions:delete", async (_e, file) => {
 });
 
 ipcMain.handle("sessions:searchFullText", (_e, query) => {
-  const q = String(query || "").trim();
-  if (!q) return [];
-  return sessionsStore.searchSessionsFullText(sessionsDir(), q, 80);
+  if (typeof query === "string") {
+    const q = query.trim();
+    if (!q) return [];
+    return sessionsStore.searchSessionsFullText(sessionsDir(), q, 80);
+  }
+  if (!query || typeof query !== "object") return [];
+  return sessionsStore.searchSessionsFullText(sessionsDir(), query, 80);
 });
 
 ipcMain.handle("sessions:bulkDelete", async (_e, files) => {

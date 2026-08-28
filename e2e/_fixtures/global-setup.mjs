@@ -9,7 +9,7 @@ export default function globalSetup() {
   const gen = path.join(root, "_fixtures", "generate.mjs");
   const manifest = path.join(root, ".artifacts", "fixtures", "manifest.json");
   if (!fs.existsSync(manifest)) {
-    execFileSync(process.execPath, [gen], { cwd: path.resolve(root, "..", ".."), stdio: "inherit" });
+    execFileSync(process.execPath, [gen], { cwd: path.resolve(root, ".."), stdio: "inherit" });
   } else {
     const m = JSON.parse(fs.readFileSync(manifest, "utf8"));
     console.log(`[global-setup] fixture pronte: ${m.totalProjects} progetti, ${m.totalSessions} sessioni, ${m.totalMessages} messaggi`);
