@@ -68,6 +68,7 @@
     if (window.piDragDrop && window.piDragDrop.initDragDrop) window.piDragDrop.initDragDrop();
     else if (typeof initDragDrop === "function") initDragDrop();
     try{ window.piExplorer?.init?.(); }catch{}
+    try{ window.piRightPanel?.init?.(); }catch{}
     try{ window.piTerminal?.init?.(); }catch{}
     try{ window.piBulk?.init?.(); }catch{}
     try{ window.piBudgets?.init?.(); }catch{}

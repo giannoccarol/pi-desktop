@@ -193,17 +193,18 @@
     }
   }
   function setVisible(v){
+    if(root.piRightPanel){ root.piRightPanel.setVisible(!!v); if(v) root.piRightPanel.switchTab("explorer"); return; }
     const e = el(); const s = state();
     s.explorerVisible = !!v;
     if(e.explorerPanel) e.explorerPanel.classList.toggle("hidden", !v);
     if(v) loadExplorer();
   }
-  function toggle(){ setVisible(!state().explorerVisible); }
+  function toggle(){ if(root.piRightPanel){ root.piRightPanel.toggle(); return; } setVisible(!state().explorerVisible); }
   function init(){
+    if(root.piRightPanel) return;
     const e = el();
     e.explorerToggle?.addEventListener("click", toggle);
     e.explorerClose?.addEventListener("click", ()=> setVisible(false));
-    // keyboard: Ctrl+E
     document.addEventListener("keydown", (ev)=>{
       if((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==="e"){ ev.preventDefault(); toggle(); }
     });
