@@ -1,3 +1,11 @@
+# [0.17.0](https://github.com/giannoccarol/pi-desktop/compare/v0.16.0...v0.17.0) (2026-08-28)
+
+
+### Features
+
+* close audit gaps and sync main ([086c8d4](https://github.com/giannoccarol/pi-desktop/commit/086c8d4cbd7103b474934c9a95a902e57d67313a))
+* **ui:** update new chat button and enhance styles for improved user experience ([3c7cff7](https://github.com/giannoccarol/pi-desktop/commit/3c7cff763ff129d7a77c0a0cf91190b4a9943069))
+
 # [0.17.0](https://github.com/giannoccarol/pi-desktop/compare/v0.16.0...v0.17.0) (2026-08-27)
 
 
