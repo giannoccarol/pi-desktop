@@ -62,7 +62,9 @@ test.describe("ottimizzazioni renderer", () => {
 
   test("#1 bulk e metadati invalidano la memoization della sidebar", async () => {
     const result=await page.evaluate(async()=>{
-      const first=window.piStore.state.sessions[0];
+      const activeCwd = window.piStore.state.settings.cwd;
+      const first = window.piStore.state.sessions.find((session) => session.cwd === activeCwd)
+        || window.piStore.state.sessions[0];
       window.piBulk.setBulkMode(true);
       const checkboxes=document.querySelectorAll('.session-item input[type="checkbox"]').length;
       window.piBulk.setBulkMode(false);
