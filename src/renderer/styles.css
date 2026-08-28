@@ -1857,14 +1857,16 @@ html[data-theme="dark"] #chat-tooltip {
 #btn-app-update.hidden { display: none !important; }
 .app-update-btn:disabled,
 #btn-app-update:disabled { opacity: .7; cursor: wait; }
-.app-update-btn.is-downloading svg,
-#btn-app-update.is-downloading svg { animation: spin 1s linear infinite; }
+.app-update-btn.is-downloading [data-lucide="loader-circle"],
+#btn-app-update.is-downloading [data-lucide="loader-circle"],
+.app-update-settings-btn.is-downloading [data-lucide="loader-circle"] { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .app-update-btn span:empty,
 #btn-app-update span:empty { display: none; }
 
 .app-update-row { display: flex; flex-direction: column; gap: 8px; }
 .app-update-settings-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.app-update-settings-btn svg { width: 14px; height: 14px; }
 .app-update-settings-status { min-height: 1.2em; }
 .bulk-undo-floating {
   position: fixed;

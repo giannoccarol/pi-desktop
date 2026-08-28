@@ -103,6 +103,16 @@ async function runMaintenance(kind) {
 // ---------------------------------------------------------------------------
 let appUpdateState = null;
 
+function setUpdateButtonIcon(button, name) {
+  const icon = button?.querySelector?.("[data-lucide]");
+  if (icon) icon.setAttribute("data-lucide", name);
+}
+
+function setUpdateButtonLabel(button, label) {
+  const text = button?.querySelector?.("span");
+  if (text) text.textContent = label;
+}
+
 function headerUpdateLabel(state, phase) {
   const version = state.availableVersion || "";
   if (phase === "download") return t("updates.app.headerDownload", { version });
@@ -153,7 +163,6 @@ async function performAppUpdateAction() {
 async function setupAppUpdates() {
   const btn = el.btnAppUpdate;
   const settingsBtn = el.btnCheckAppUpdate;
-  const settingsStatus = el.checkAppUpdateStatus;
   if (btn) {
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
@@ -173,12 +182,15 @@ async function setupAppUpdates() {
         await api.relaunchApp();
         return;
       }
+      if (settingsBtn.disabled) return;
       settingsBtn.disabled = true;
-      if (settingsStatus) settingsStatus.textContent = t("settings.checking");
-      const res = await api.checkAppUpdate();
-      if (res?.state) handleAppUpdateState(res.state);
-      else if (!res.success && res.error) toast(t("updates.app.failed", { error: res.error }), "error");
-      settingsBtn.disabled = false;
+      try {
+        await performAppUpdateAction();
+      } finally {
+        if (appUpdateState?.status !== "downloading" && appUpdateState?.status !== "checking") {
+          settingsBtn.disabled = false;
+        }
+      }
     });
   }
   api.on("update:state", handleAppUpdateState);
@@ -208,9 +220,8 @@ function updateActionPhase(state) {
   if (!state) return "check";
   if (state.status === "downloading") return "downloading";
   if (state.status === "checking") return "checking";
-  if (state.status === "downloaded" && state.cachedInstall && state.pendingPackagePath) return "install";
-  if (state.status === "available" || updateVersionIsNewer(state)) return "download";
   if (state.status === "downloaded") return "install";
+  if (state.status === "available" || updateVersionIsNewer(state)) return "download";
   return "check";
 }
 
@@ -230,33 +241,24 @@ function handleAppUpdateState(state) {
   const phase = updateActionPhase(state);
   const btn = el.btnAppUpdate;
   if (btn) {
-    const icon = btn.querySelector("i");
     const label = btn.querySelector("span");
     const visible = ["available", "downloading", "downloaded"].includes(String(state.status))
       || updateVersionIsNewer(state);
     btn.classList.toggle("hidden", !visible);
     btn.disabled = state.status === "downloading" || state.status === "checking";
     const headerLabel = headerUpdateLabel(state, phase);
-    if (state.status === "available" || (updateVersionIsNewer(state) && state.status !== "downloading")) {
-      if (icon) icon.setAttribute("data-lucide", "download");
-      if (label) label.textContent = headerLabel;
-      btn.title = manual ? manualUpdateHint(state) : headerLabel;
-      btn.classList.remove("is-downloading");
-      if (prev !== "available") {
-        toast(manual ? manualUpdateHint(state) : t("updates.app.availableVersion", { version: state.availableVersion || "" }), "info", manual ? 9000 : 5200);
-      }
-    } else if (state.status === "downloading") {
-      if (icon) icon.setAttribute("data-lucide", "loader-circle");
+    if (state.status === "downloading") {
+      setUpdateButtonIcon(btn, "loader-circle");
       if (label) label.textContent = headerLabel;
       btn.title = headerLabel;
       btn.classList.add("is-downloading");
     } else if (state.status === "downloaded") {
       if (cached) {
-        if (icon) icon.setAttribute("data-lucide", "package");
+        setUpdateButtonIcon(btn, "package");
       } else if (manual) {
-        if (icon) icon.setAttribute("data-lucide", "external-link");
+        setUpdateButtonIcon(btn, "external-link");
       } else {
-        if (icon) icon.setAttribute("data-lucide", "refresh-cw");
+        setUpdateButtonIcon(btn, "refresh-cw");
       }
       if (label) label.textContent = headerLabel;
       btn.title = cached ? manualUpdateHint(state) : manual ? manualUpdateHint(state) : t("updates.app.ready");
@@ -269,7 +271,20 @@ function handleAppUpdateState(state) {
           cached || manual ? 9000 : 5200
         );
       }
+    } else if (state.status === "available" || (phase === "download" && state.status !== "error")) {
+      setUpdateButtonIcon(btn, "download");
+      if (label) label.textContent = headerLabel;
+      btn.title = manual ? manualUpdateHint(state) : headerLabel;
+      btn.classList.remove("is-downloading");
+      if (prev !== "available") {
+        toast(manual ? manualUpdateHint(state) : t("updates.app.availableVersion", { version: state.availableVersion || "" }), "info", manual ? 9000 : 5200);
+      }
     } else if (state.status === "error" && state.error) {
+      btn.classList.remove("is-downloading");
+      if (phase === "download") {
+        setUpdateButtonIcon(btn, "download");
+        if (label) label.textContent = headerLabel;
+      }
       toast(t("updates.app.failed", { error: state.error }), "error");
     }
   } else if (state.status === "error" && state.error) {
@@ -278,17 +293,46 @@ function handleAppUpdateState(state) {
   if (el.appVersion) {
     el.appVersion.textContent = state.currentVersion ? `v${state.currentVersion}` : (appUpdateState?.currentVersion ? `v${appUpdateState.currentVersion}` : "—");
   }
-  if (el.checkAppUpdateStatus) {
-    if (state.status === "checking") el.checkAppUpdateStatus.textContent = t("settings.checking");
-    else if (state.status === "idle" && !updateVersionIsNewer(state)) el.checkAppUpdateStatus.textContent = t("settings.upToDate");
-    else if (state.status === "error" && state.error) el.checkAppUpdateStatus.textContent = state.error;
-    else if (["available", "downloading", "downloaded"].includes(String(state.status)) || updateVersionIsNewer(state)) {
-      el.checkAppUpdateStatus.textContent = t("settings.appUpdate.useHeader");
-    } else el.checkAppUpdateStatus.textContent = "";
-  }
-  if (el.btnCheckAppUpdate) {
-    el.btnCheckAppUpdate.textContent = t("settings.checkUpdate");
-    el.btnCheckAppUpdate.disabled = state.status === "checking";
+  const settingsBtn = el.btnCheckAppUpdate;
+  const settingsStatus = el.checkAppUpdateStatus;
+  if (settingsBtn && settingsStatus) {
+    const busy = state.status === "checking" || state.status === "downloading";
+    settingsBtn.disabled = busy || state.status === "disabled";
+    settingsBtn.classList.toggle("is-downloading", busy);
+    if (state.status === "checking") {
+      settingsStatus.textContent = t("settings.checking");
+      setUpdateButtonLabel(settingsBtn, t("settings.checking"));
+      setUpdateButtonIcon(settingsBtn, "loader-circle");
+    } else if (state.status === "downloading") {
+      const progressLabel = t("updates.app.downloading", { progress: state.progress || 0 });
+      settingsStatus.textContent = progressLabel;
+      setUpdateButtonLabel(settingsBtn, progressLabel);
+      setUpdateButtonIcon(settingsBtn, "loader-circle");
+    } else if (state.status === "available" || (phase === "download" && state.status !== "error")) {
+      settingsStatus.textContent = `${t("settings.updateAvailable")} (${state.availableVersion || "?"})`;
+      setUpdateButtonLabel(settingsBtn, manual ? t("settings.openRelease") : t("settings.downloadAvailable"));
+      setUpdateButtonIcon(settingsBtn, manual ? "external-link" : "download");
+    } else if (state.status === "downloaded") {
+      settingsStatus.textContent = cached
+        ? t("updates.app.cachedReady", { version: state.availableVersion || "?" })
+        : manual ? manualUpdateHint(state) : t("updates.app.ready");
+      setUpdateButtonLabel(settingsBtn,
+        cached ? t("updates.app.installPackage")
+          : manual ? t("updates.app.manualInstall") : t("settings.restartToUpdate"));
+      setUpdateButtonIcon(settingsBtn, cached ? "package" : manual ? "external-link" : "refresh-cw");
+    } else if (state.status === "error" && state.error) {
+      settingsStatus.textContent = state.error;
+      setUpdateButtonLabel(settingsBtn, phase === "download" ? t("settings.downloadAvailable") : t("settings.checkUpdate"));
+      setUpdateButtonIcon(settingsBtn, phase === "download" ? "download" : "refresh-cw");
+    } else if (state.status === "disabled") {
+      settingsStatus.textContent = t("settings.updateUnavailable");
+      setUpdateButtonLabel(settingsBtn, t("settings.checkUpdate"));
+      setUpdateButtonIcon(settingsBtn, "refresh-cw");
+    } else {
+      settingsStatus.textContent = t("settings.upToDate");
+      setUpdateButtonLabel(settingsBtn, t("settings.checkUpdate"));
+      setUpdateButtonIcon(settingsBtn, "refresh-cw");
+    }
   }
   refreshIcons();
 }

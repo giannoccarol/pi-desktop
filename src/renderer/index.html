@@ -312,7 +312,10 @@
           </div>
           <div class="app-update-settings-meta">
             <span class="settings-version"><span data-i18n="settings.appUpdate.label">Versione installata</span><code id="app-version" class="mono small">—</code></span>
-            <button id="btn-check-app-update" class="btn ghost small" type="button" data-i18n="settings.checkUpdate">Verifica aggiornamenti</button>
+            <button id="btn-check-app-update" class="btn ghost small app-update-settings-btn" type="button">
+              <i data-lucide="refresh-cw"></i>
+              <span data-i18n="settings.checkUpdate">Verifica aggiornamenti</span>
+            </button>
           </div>
           <span id="check-app-update-status" class="muted small app-update-settings-status" aria-live="polite"></span>
         </section>

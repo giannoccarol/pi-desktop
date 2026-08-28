@@ -44,9 +44,14 @@
         });
       }
       if (el.btnCheckAppUpdate) {
-        el.btnCheckAppUpdate.textContent = t("app.restartNow");
+        const label = el.btnCheckAppUpdate.querySelector("span");
+        const icon = el.btnCheckAppUpdate.querySelector("[data-lucide]");
+        if (label) label.textContent = t("app.restartNow");
+        else el.btnCheckAppUpdate.textContent = t("app.restartNow");
+        if (icon) icon.setAttribute("data-lucide", "refresh-cw");
         el.btnCheckAppUpdate.disabled = false;
         el.btnCheckAppUpdate.dataset.staleRestart = "1";
+        refreshIcons();
       }
     };
     api.on("app:stale-install", showStaleInstall);
