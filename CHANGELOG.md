@@ -1,3 +1,10 @@
+# [0.18.0](https://github.com/giannoccarol/pi-desktop/compare/v0.17.3...v0.18.0) (2026-08-28)
+
+
+### Features
+
+* **ui:** add right panel for Explorer and Changes view ([433727d](https://github.com/giannoccarol/pi-desktop/commit/433727d1a1528b34d26be4290c7e14697952e5b9))
+
 ## [0.17.2](https://github.com/giannoccarol/pi-desktop/compare/v0.17.1...v0.17.2) (2026-08-28)
 
 
