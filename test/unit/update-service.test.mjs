@@ -74,7 +74,7 @@ test("update-service: download on pacman uses electron-updater", async () => {
   assert.equal(downloaded, true);
 });
 
-test("update-service: unknown legacy Linux installs stay manual", () => {
+test("update-service: unknown legacy Linux installs stay manual", { skip: process.platform !== "linux" }, () => {
   const type = inferPackageType({
     getPath(name) {
       if (name === "exe") return "/opt/Pi Desktop/pi-desktop";
