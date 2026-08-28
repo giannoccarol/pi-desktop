@@ -812,12 +812,14 @@
             <p class="muted small">${hasDefault ? "Vuoi cambiare il nome predefinito?" : "Scegli un nome per personalizzare l'esperienza."}</p>
           </div>
         </div>
-        <label class="field">
-          <span>Il tuo nome</span>
-          <input id="welcome-name-input" type="text" maxlength="40" spellcheck="false"
-            placeholder="es. Mario, Anna, ..." />
-        </label>
-        <div class="modal-actions" style="display:flex;gap:10px;justify-content:flex-end;">
+        <section class="settings-section">
+          <label class="field">
+            <span>Il tuo nome</span>
+            <input id="welcome-name-input" type="text" maxlength="40" spellcheck="false"
+              placeholder="es. Mario, Anna, ..." />
+          </label>
+        </section>
+        <div class="row gap end settings-actions">
           <button id="welcome-skip" class="btn ghost">${hasDefault ? "Mantieni" : "Salta"}</button>
           <button id="welcome-ok" class="btn primary">Conferma</button>
         </div>

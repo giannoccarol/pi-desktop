@@ -211,9 +211,11 @@
         <span class="modal-icon"><i data-lucide="refresh-cw"></i></span>
         <div><h2 data-i18n="modal.pi.title">Agente Pi</h2><p class="muted small" data-i18n="modal.pi.subtitle">Installazione esterna e aggiornabile indipendentemente da Pi Desktop.</p></div>
       </div>
-      <div id="pi-status-box" class="status-box"><span class="muted" data-i18n="modal.pi.checking">Verifica in corso…</span></div>
-      <pre id="maintenance-log" class="log hidden"></pre>
-      <div class="row gap">
+      <section class="settings-section">
+        <div id="pi-status-box" class="status-box" style="box-shadow:none;background:var(--surface)"><span class="muted" data-i18n="modal.pi.checking">Verifica in corso…</span></div>
+        <pre id="maintenance-log" class="log hidden" style="margin-top:10px"></pre>
+      </section>
+      <div class="row gap end settings-actions">
         <button id="btn-pi-install" class="btn primary hidden"><i data-lucide="download"></i> <span data-i18n="btn.installNow">Installa ora</span></button>
         <button id="btn-pi-update" class="btn primary hidden"><i data-lucide="refresh-cw"></i> <span data-i18n="btn.updatePi">Aggiorna pi</span></button>
         <button id="btn-pi-recheck" class="btn ghost"><i data-lucide="rotate-cw"></i> <span data-i18n="btn.recheck">Ricontrolla</span></button>
@@ -475,12 +477,16 @@
 
   <dialog id="modal-ui">
     <div class="modal-body">
-      <h3 id="ui-title" data-i18n="modal.ui.title">pi chiede un input</h3>
-      <p id="ui-message" class="muted"></p>
-      <div id="ui-options" class="col gap"></div>
-      <label id="ui-input-wrap" class="field hidden"><input id="ui-input" type="text" spellcheck="false" /></label>
-      <textarea id="ui-editor" class="hidden" rows="10" spellcheck="false"></textarea>
-      <div class="row gap end">
+      <div class="modal-title-row">
+        <span class="modal-icon"><i data-lucide="message-circle-question"></i></span>
+        <div><h2 id="ui-title" data-i18n="modal.ui.title">pi chiede un input</h2><p id="ui-message" class="muted small"></p></div>
+      </div>
+      <section class="settings-section">
+        <div id="ui-options" class="col gap"></div>
+        <label id="ui-input-wrap" class="field hidden"><input id="ui-input" type="text" spellcheck="false" /></label>
+        <textarea id="ui-editor" class="hidden" rows="10" spellcheck="false" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);resize:vertical"></textarea>
+      </section>
+      <div class="row gap end settings-actions">
         <button id="ui-cancel" class="btn ghost" data-i18n="btn.cancel">Annulla</button>
         <button id="ui-ok" class="btn primary hidden" data-i18n="btn.ok">OK</button>
       </div>
@@ -494,11 +500,13 @@
         <div class="grow"><h2 data-i18n="modal.commands.title">Comandi Pi</h2><p class="muted small" data-i18n="modal.commands.subtitle">Estensioni, skill e prompt template caricati dal runtime corrente.</p></div>
         <button id="btn-commands-close" class="icon-btn borderless" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
       </div>
-      <div class="palette-search">
-        <i data-lucide="search"></i>
-        <input id="command-search" type="search" data-i18n-placeholder="commands.search.placeholder" spellcheck="false" />
-      </div>
-      <div id="command-list" class="command-list"><div class="menu-empty" data-i18n="commands.loading">Caricamento…</div></div>
+      <section class="settings-section" style="padding:10px;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
+        <div class="palette-search">
+          <i data-lucide="search"></i>
+          <input id="command-search" type="search" data-i18n-placeholder="commands.search.placeholder" spellcheck="false" />
+        </div>
+        <div id="command-list" class="command-list" style="flex:1;min-height:0"><div class="menu-empty" data-i18n="commands.loading">Caricamento…</div></div>
+      </section>
     </div>
   </dialog>
 
@@ -509,13 +517,15 @@
         <div class="grow"><h2 data-i18n="modal.tree.title">Albero sessione</h2><p class="muted small" data-i18n="modal.tree.subtitle">Cronologia completa, inclusi rami abbandonati. Puoi creare un fork da un messaggio utente.</p></div>
         <button id="btn-tree-close" class="icon-btn borderless" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
       </div>
-      <div class="tree-toolbar">
-        <span id="tree-summary" class="muted small grow"></span>
-        <button id="btn-tree-refresh" class="btn ghost small"><i data-lucide="rotate-cw"></i> <span data-i18n="btn.update">Aggiorna</span></button>
-        <button id="btn-child-session" class="btn ghost small"><i data-lucide="git-branch-plus"></i> <span data-i18n="btn.newChild">Nuova figlia</span></button>
-        <button id="btn-clone-session" class="btn ghost small"><i data-lucide="copy-plus"></i> <span data-i18n="btn.cloneBranch">Clona ramo attivo</span></button>
-      </div>
-      <div id="tree-list" class="tree-list"><div class="menu-empty" data-i18n="tree.loading">Caricamento…</div></div>
+      <section class="settings-section" style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
+        <div class="tree-toolbar">
+          <span id="tree-summary" class="muted small grow"></span>
+          <button id="btn-tree-refresh" class="btn ghost small"><i data-lucide="rotate-cw"></i> <span data-i18n="btn.update">Aggiorna</span></button>
+          <button id="btn-child-session" class="btn ghost small"><i data-lucide="git-branch-plus"></i> <span data-i18n="btn.newChild">Nuova figlia</span></button>
+          <button id="btn-clone-session" class="btn ghost small"><i data-lucide="copy-plus"></i> <span data-i18n="btn.cloneBranch">Clona ramo attivo</span></button>
+        </div>
+        <div id="tree-list" class="tree-list" style="flex:1;min-height:0"><div class="menu-empty" data-i18n="tree.loading">Caricamento…</div></div>
+      </section>
     </div>
   </dialog>
 
@@ -526,20 +536,28 @@
         <div class="grow"><h2 data-i18n="modal.sessionTools.title">Strumenti sessione</h2><p class="muted small" data-i18n="modal.sessionTools.subtitle">Azioni native sul runtime Pi corrente.</p></div>
         <button id="btn-session-tools-close" class="icon-btn borderless" data-i18n-aria-label="btn.close"><i data-lucide="x"></i></button>
       </div>
-      <label class="field"><span data-i18n="session.name.label">Nome sessione</span><div class="row gap"><input id="session-name-input" class="grow" type="text" maxlength="200" data-i18n-placeholder="session.name.placeholder" /><button id="btn-session-rename" class="btn primary" data-i18n="btn.saveName">Salva nome</button></div></label>
-      <div class="tool-setting-grid">
-        <label class="field"><span data-i18n="session.steering.label">Consegna messaggi steer</span><select id="steering-mode"><option value="one-at-a-time" data-i18n="session.delivery.one">Uno alla volta</option><option value="all" data-i18n="session.delivery.all">Tutti insieme</option></select></label>
-        <label class="field"><span data-i18n="session.followUp.label">Consegna follow-up</span><select id="follow-up-mode"><option value="one-at-a-time" data-i18n="session.delivery.one">Uno alla volta</option><option value="all" data-i18n="session.delivery.all">Tutti insieme</option></select></label>
-      </div>
-      <div class="toggle-row"><label><input id="auto-compaction" type="checkbox" /> <span data-i18n="settings.runtime.compactEnabled">Compattazione automatica</span></label><label><input id="auto-retry" type="checkbox" /> <span data-i18n="settings.runtime.retryEnabled">Retry automatico</span></label></div>
-      <label class="field"><span data-i18n="session.compact.instructions.label">Istruzioni opzionali per la compattazione</span><textarea id="compact-instructions" rows="3" data-i18n-placeholder="session.compact.instructions.placeholder"></textarea></label>
-      <div class="session-action-grid">
-        <button id="btn-compact" class="btn ghost"><i data-lucide="archive"></i> <span data-i18n="btn.compactNow">Compatta ora</span></button>
-        <button id="btn-copy-last" class="btn ghost"><i data-lucide="copy"></i> <span data-i18n="btn.copyLast">Copia ultima risposta</span></button>
-        <button id="btn-export-html" class="btn ghost"><i data-lucide="file-down"></i> <span data-i18n="btn.exportHtml">Esporta HTML</span></button>
-        <button id="btn-export-md" class="btn ghost"><i data-lucide="file-text"></i> Esporta Markdown</button>
-        <button id="btn-abort-retry" class="btn ghost"><i data-lucide="ban"></i> <span data-i18n="btn.abortRetry">Ferma retry</span></button>
-      </div>
+      <section class="settings-section">
+        <label class="field"><span data-i18n="session.name.label">Nome sessione</span><div class="row gap"><input id="session-name-input" class="grow" type="text" maxlength="200" data-i18n-placeholder="session.name.placeholder" /><button id="btn-session-rename" class="btn primary" data-i18n="btn.saveName">Salva nome</button></div></label>
+      </section>
+      <section class="settings-section">
+        <div class="settings-section-heading"><span class="settings-section-icon"><i data-lucide="workflow"></i></span><span><strong>Consegna e automazioni</strong><small>Steer, follow-up, compattazione e retry.</small></span></div>
+        <div class="tool-setting-grid">
+          <label class="field"><span data-i18n="session.steering.label">Consegna messaggi steer</span><select id="steering-mode"><option value="one-at-a-time" data-i18n="session.delivery.one">Uno alla volta</option><option value="all" data-i18n="session.delivery.all">Tutti insieme</option></select></label>
+          <label class="field"><span data-i18n="session.followUp.label">Consegna follow-up</span><select id="follow-up-mode"><option value="one-at-a-time" data-i18n="session.delivery.one">Uno alla volta</option><option value="all" data-i18n="session.delivery.all">Tutti insieme</option></select></label>
+        </div>
+        <div class="toggle-row" style="margin-top:12px"><label><input id="auto-compaction" type="checkbox" /> <span data-i18n="settings.runtime.compactEnabled">Compattazione automatica</span></label><label><input id="auto-retry" type="checkbox" /> <span data-i18n="settings.runtime.retryEnabled">Retry automatico</span></label></div>
+        <label class="field" style="margin-top:12px"><span data-i18n="session.compact.instructions.label">Istruzioni opzionali per la compattazione</span><textarea id="compact-instructions" rows="3" data-i18n-placeholder="session.compact.instructions.placeholder"></textarea></label>
+      </section>
+      <section class="settings-section">
+        <div class="settings-section-heading"><span class="settings-section-icon"><i data-lucide="wrench"></i></span><span><strong>Azioni rapide</strong><small>Operazioni sul runtime corrente.</small></span></div>
+        <div class="session-action-grid">
+          <button id="btn-compact" class="btn ghost"><i data-lucide="archive"></i> <span data-i18n="btn.compactNow">Compatta ora</span></button>
+          <button id="btn-copy-last" class="btn ghost"><i data-lucide="copy"></i> <span data-i18n="btn.copyLast">Copia ultima risposta</span></button>
+          <button id="btn-export-html" class="btn ghost"><i data-lucide="file-down"></i> <span data-i18n="btn.exportHtml">Esporta HTML</span></button>
+          <button id="btn-export-md" class="btn ghost"><i data-lucide="file-text"></i> Esporta Markdown</button>
+          <button id="btn-abort-retry" class="btn ghost"><i data-lucide="ban"></i> <span data-i18n="btn.abortRetry">Ferma retry</span></button>
+        </div>
+      </section>
     </div>
   </dialog>
 
@@ -549,10 +567,12 @@
         <span class="modal-icon"><i data-lucide="key-round"></i></span>
         <div class="grow"><h2 id="auth-title" data-i18n="modal.auth.title">Accesso provider</h2><p id="auth-subtitle" class="muted small" data-i18n="modal.auth.subtitle">Configurazione gestita dal runtime Pi installato.</p></div>
       </div>
-      <div id="auth-status" class="status-box"><span class="muted" data-i18n="auth.preparing">Preparazione…</span></div>
-      <div id="auth-options" class="col gap hidden"></div>
-      <label id="auth-input-wrap" class="field hidden"><span id="auth-input-label"></span><input id="auth-input" type="text" autocomplete="off" /></label>
-      <div class="row gap end"><button id="btn-auth-cancel" class="btn ghost" data-i18n="btn.cancel">Annulla</button><button id="btn-auth-ok" class="btn primary hidden" data-i18n="btn.continue">Continua</button></div>
+      <section class="settings-section">
+        <div id="auth-status" class="status-box" style="box-shadow:none;background:var(--surface)"><span class="muted" data-i18n="auth.preparing">Preparazione…</span></div>
+        <div id="auth-options" class="col gap hidden" style="margin-top:10px"></div>
+        <label id="auth-input-wrap" class="field hidden" style="margin-top:10px"><span id="auth-input-label"></span><input id="auth-input" type="text" autocomplete="off" /></label>
+      </section>
+      <div class="row gap end settings-actions"><button id="btn-auth-cancel" class="btn ghost" data-i18n="btn.cancel">Annulla</button><button id="btn-auth-ok" class="btn primary hidden" data-i18n="btn.continue">Continua</button></div>
     </div>
   </dialog>
 
