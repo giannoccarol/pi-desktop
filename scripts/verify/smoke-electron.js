@@ -33,6 +33,9 @@ function run() {
     const xvfb = process.platform === "linux" && !hasDisplay ? "xvfb-run" : null;
 
     const electronArgs = ["scripts/run-electron.js", ".", "--enable-logging"];
+    // GitHub-hosted Linux runners do not preserve Electron's SUID sandbox
+    // permissions after npm ci. Keep the smoke test focused on app startup.
+    if (process.platform === "linux" && process.env.CI) electronArgs.push("--no-sandbox");
     const args = xvfb ? ["-a", "node", ...electronArgs] : electronArgs;
     const cmd = xvfb ? "xvfb-run" : process.execPath;
     const env = { ...process.env, SMOKE_TIMEOUT: String(timeoutMs) };
