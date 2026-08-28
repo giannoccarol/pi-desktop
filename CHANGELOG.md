@@ -1,3 +1,10 @@
+## [0.17.2](https://github.com/giannoccarol/pi-desktop/compare/v0.17.1...v0.17.2) (2026-08-28)
+
+
+### Bug Fixes
+
+* **updates:** enable full update flow in settings ([6edbc28](https://github.com/giannoccarol/pi-desktop/commit/6edbc286c433755c636b93b7a761707ec64d95da))
+
 # [0.17.0](https://github.com/giannoccarol/pi-desktop/compare/v0.16.0...v0.17.0) (2026-08-28)
 
 
