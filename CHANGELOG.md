@@ -1,3 +1,10 @@
+## [0.18.1](https://github.com/giannoccarol/pi-desktop/compare/v0.18.0...v0.18.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **ui:** pin/delete/plus hit-test SVG, indicatore busy bianco unificato, debounce explorer/diffs ([2680a97](https://github.com/giannoccarol/pi-desktop/commit/2680a9791302986b45ffbea6ca8dca6a4b39ffb9))
+
 # [0.18.0](https://github.com/giannoccarol/pi-desktop/compare/v0.17.3...v0.18.0) (2026-08-28)
 
 
