@@ -46,10 +46,12 @@
     });
     return seen;
   }
+  const MAX_CHANGES_ROWS = 100;
   function refreshChanges(){
     const list=el().changesList, detail=el().changesDetail;
     if(!list) return;
-    const seen=collectSeen();
+    let seen;
+    try{ seen=collectSeen(); }catch{ seen=new Map(); }
     // also count git dirty not yet shown as diff (optional badge)
     if(!seen.size){
       list.innerHTML='<div class="menu-empty">Nessuna modifica rilevata.<br><span class="muted small">I diff con <span style="color:var(--green)">verde</span>/<span style="color:var(--red)">rosso</span> appaiono qui e in chat.</span></div>';
@@ -57,9 +59,12 @@
       updateBadge(0);
       return;
     }
-    updateBadge(seen.size);
+    const totalSeen = seen.size;
+    updateBadge(totalSeen);
     list.innerHTML="";
+    let count=0;
     for(const [path, view] of seen){
+      if(count++ >= MAX_CHANGES_ROWS) break;
       const added=view.querySelectorAll(".diff-line.added").length;
       const removed=view.querySelectorAll(".diff-line.removed").length;
       const row=document.createElement("div");
@@ -83,7 +88,10 @@
       row.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
       list.appendChild(row);
     }
-    root.piUi?.refreshIcons?.(list);
+    if(totalSeen > MAX_CHANGES_ROWS){
+      const more=document.createElement("div"); more.className="menu-empty"; more.textContent=`Mostrando ${MAX_CHANGES_ROWS} di ${totalSeen} modifiche`; list.appendChild(more);
+    }
+    try{ root.piUi?.refreshIcons?.(list); }catch{}
     try{ root.piDiffView?.attachDiffActions?.(list); }catch{}
   }
   function init(){
@@ -105,11 +113,18 @@
     }
     // observe chat for new diffs to update badge even when hidden
     const target=document.getElementById("messages");
+    let pending=null;
     const obs=new MutationObserver(()=>{
-      const n=new Set([...document.querySelectorAll(".diff-view .diff-path")].map(e=>e.textContent.trim())).size;
-      // if panel hidden, only badge; if open on changes, full refresh
-      if(isVisible() && activeTab==="changes") refreshChanges();
-      else updateBadge(n || document.querySelectorAll(".diff-view").length);
+      if(pending) return;
+      pending=setTimeout(()=>{
+        pending=null;
+        try{
+          const n=new Set([...document.querySelectorAll(".diff-view .diff-path")].map(e=>e.textContent.trim())).size;
+          const total=n || document.querySelectorAll(".diff-view").length;
+          if(isVisible() && activeTab==="changes") refreshChanges();
+          else updateBadge(total);
+        }catch{}
+      }, 300);
     });
     if(target) obs.observe(target,{childList:true,subtree:true});
     // keyboard: Ctrl+Shift+E explorer, Ctrl+Shift+D changes (non sovrascrive Cmd+K/B)

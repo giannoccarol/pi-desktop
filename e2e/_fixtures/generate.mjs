@@ -215,6 +215,8 @@ function main() {
     lastModel: null,
     lastThinkingLevel: null,
     sessionPreferences: {},
+    userName: "Tester",
+    userNamePromptSeen: true,
   }, null, 2));
 
   const totalSessions = manifest.projects.reduce((a, p) => a + p.sessionsCount, 0);

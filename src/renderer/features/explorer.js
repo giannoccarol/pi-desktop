@@ -59,6 +59,7 @@
     }
     return out;
   }
+  let explorerShowLimit = 150;
   function renderExplorer(entries){
     const e = el();
     if(!e.explorerList) return;
@@ -73,7 +74,9 @@
       if(a.isDirectory!==b.isDirectory) return a.isDirectory ? -1 : 1;
       return a.rel.localeCompare(b.rel);
     });
-    for(const ent of sorted){
+    const dirtySet = new Set(gitInfo?.dirtyFiles||[]);
+    const toRender = sorted.slice(0, explorerShowLimit);
+    for(const ent of toRender){
       const row = document.createElement("div");
       row.style.cssText = "display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer";
       row.title = ent.path;
@@ -106,7 +109,16 @@
       });
       e.explorerList.appendChild(row);
     }
-    root.piUi?.refreshIcons?.(e.explorerList);
+    if(sorted.length > explorerShowLimit){
+      const more=document.createElement("button");
+      more.className="project-more"; more.style.cssText="margin:8px auto;display:block";
+      more.textContent=`Mostra altri ${Math.min(50, sorted.length - explorerShowLimit)} di ${sorted.length}`;
+      more.addEventListener("click", ()=>{ explorerShowLimit += 50; renderExplorer(entries); });
+      e.explorerList.appendChild(more);
+    }
+    // ponytail: batch icon refresh once, not per-row
+    try{ root.piUi?.refreshIcons?.(e.explorerList); }catch{}
+    // reset limit when filter changes externally is handled by explorerFilter reset below
   }
   function formatSize(n){
     if(n==null) return "";
@@ -166,7 +178,7 @@
       });
       const search = document.createElement("input");
       search.type = "search"; search.placeholder = tr("explorer.filter","Filtra file…"); search.style.cssText="flex:1;min-width:120px;height:28px;padding:4px 8px;border:1px solid var(--hairline);border-radius:7px;font-size:12px";
-      search.addEventListener("input", ()=>{ explorerFilter = search.value.trim(); renderExplorer(state().explorerEntries); });
+      search.addEventListener("input", ()=>{ explorerFilter = search.value.trim(); explorerShowLimit = 150; renderExplorer(state().explorerEntries); });
       const depthSel = document.createElement("select");
       depthSel.style.cssText="height:28px;border-radius:7px;font-size:11px";
       [1,2,3,4].forEach(d=>{ const o=document.createElement("option"); o.value=d; o.textContent=`depth ${d}`; if(d===currentDepth) o.selected=true; depthSel.appendChild(o); });
@@ -175,7 +187,7 @@
       dotBtn.className="btn ghost small"; dotBtn.style.cssText="height:28px;padding:0 8px;font-size:11px";
       const syncDot = ()=> dotBtn.textContent = showDotfiles ? `• ${tr("explorer.dotfiles","dotfile")}` : tr("explorer.dotfiles","dotfile");
       syncDot();
-      dotBtn.addEventListener("click", ()=>{ showDotfiles=!showDotfiles; syncDot(); loadExplorer(currentDepth); });
+      dotBtn.addEventListener("click", ()=>{ showDotfiles=!showDotfiles; syncDot(); explorerShowLimit = 150; loadExplorer(currentDepth); });
       const refreshBtn = document.createElement("button");
       refreshBtn.className="icon-btn tiny"; refreshBtn.innerHTML=icon("refresh-cw"); refreshBtn.title=tr("explorer.refresh","Ricarica"); refreshBtn.setAttribute("aria-label",refreshBtn.title);
       refreshBtn.addEventListener("click", ()=> loadExplorer(currentDepth));

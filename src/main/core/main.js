@@ -1,6 +1,6 @@
 "use strict";
 
-const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, globalShortcut, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, clipboard, globalShortcut, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -414,6 +414,7 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, "..", "..", "renderer", "index.html"));
   attachNavigationPolicy(win);
+  attachContextMenu(win);
   if (!appUpdateService) {
     appUpdateService = new UpdateService(win);
   } else {
@@ -732,6 +733,7 @@ ipcMain.handle("window:popOutTab", async (_e, tabId) => {
     // pass tabId via query so renderer can activate it
     await pop.loadFile(url, { query: { popOutTabId: id } });
     attachNavigationPolicy(pop);
+    attachContextMenu(pop);
     return { ok:true, tabId:id };
   } catch (err) { return { ok:false, error: String(err?.message||err) }; }
 });
@@ -798,6 +800,55 @@ function isAllowedExternalUrl(url){
     return false;
   }catch{ return false; }
 }
+function tMenu(key){
+  const lang = (settings && settings.language === "en") ? "en" : "it";
+  const dict = {
+    it: { undo: "Annulla", redo: "Ripeti", cut: "Taglia", copy: "Copia", paste: "Incolla", del: "Elimina", selectAll: "Seleziona tutto", copyLink: "Copia indirizzo link", copyImageAddr: "Copia indirizzo immagine", inspect: "Ispeziona elemento" },
+    en: { undo: "Undo", redo: "Redo", cut: "Cut", copy: "Copy", paste: "Paste", del: "Delete", selectAll: "Select all", copyLink: "Copy link address", copyImageAddr: "Copy image address", inspect: "Inspect element" },
+  };
+  return (dict[lang] && dict[lang][key]) || dict.it[key] || key;
+}
+function buildContextMenuTemplate(params){
+  const f = params.editFlags || {};
+  const tpl = [];
+  if (params.isEditable) {
+    if (f.canUndo) tpl.push({ label: tMenu("undo"), role: "undo" });
+    if (f.canRedo) tpl.push({ label: tMenu("redo"), role: "redo" });
+    if (f.canUndo || f.canRedo) tpl.push({ type: "separator" });
+    if (f.canCut) tpl.push({ label: tMenu("cut"), role: "cut" });
+    if (f.canCopy) tpl.push({ label: tMenu("copy"), role: "copy" });
+    if (f.canPaste) tpl.push({ label: tMenu("paste"), role: "paste" });
+    if (f.canDelete) tpl.push({ label: tMenu("del"), role: "delete" });
+    if (f.canCut || f.canCopy || f.canPaste || f.canDelete) tpl.push({ type: "separator" });
+    if (f.canSelectAll) tpl.push({ label: tMenu("selectAll"), role: "selectAll" });
+  } else {
+    if (params.linkURL) tpl.push({ label: tMenu("copyLink"), click: () => clipboard.writeText(params.linkURL) });
+    if (params.srcURL && params.mediaType === "image") tpl.push({ label: tMenu("copyImageAddr"), click: () => clipboard.writeText(params.srcURL) });
+    if (params.selectionText && params.selectionText.trim()) tpl.push({ label: tMenu("copy"), role: "copy" });
+    // Always offer select all when there is selectable content, even if no selection yet
+    const hasCopy = tpl.some((i) => i.role === "copy");
+    if (hasCopy || params.linkURL || params.srcURL) tpl.push({ type: "separator" });
+    tpl.push({ label: tMenu("selectAll"), role: "selectAll" });
+    // Fallback: if nothing selectable (empty page), keep at least copy/paste disabled state hidden -> keep selectAll only
+    if (tpl.length === 1 && tpl[0].role === "selectAll" && !params.selectionText) {
+      // keep it, useful for chat history
+    }
+  }
+  return tpl;
+}
+function attachContextMenu(browserWindow){
+  const contents = browserWindow.webContents;
+  contents.on("context-menu", (_event, params) => {
+    const template = buildContextMenuTemplate(params);
+    // Add Inspect in dev (or always, cheap)
+    if (!app.isPackaged) {
+      template.push({ type: "separator" });
+      template.push({ label: tMenu("inspect"), click: () => contents.inspectElement(params.x, params.y) });
+    }
+    if (!template.length) return;
+    try { Menu.buildFromTemplate(template).popup({ window: browserWindow }); } catch {}
+  });
+}
 function attachNavigationPolicy(browserWindow){
   const contents=browserWindow.webContents;
   contents.setWindowOpenHandler(({url})=>{
@@ -820,6 +871,8 @@ function attachNavigationPolicy(browserWindow){
   contents.on("will-navigate",blockNavigation);
   contents.on("will-redirect",blockNavigation);
 }
+// Future windows (e.g. devtools popouts) get the same menu
+app.on("browser-window-created", (_e, bw) => { try{ attachContextMenu(bw); }catch{} });
 
 function realPath(value){
   const resolved=path.resolve(String(value||""));
