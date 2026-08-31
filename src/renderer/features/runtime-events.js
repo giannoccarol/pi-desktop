@@ -122,7 +122,7 @@
           break;
         case "message_update": streamApplyDelta(msg); break;
         case "message_end": endStreamAssistant(msg.message); break;
-        case "turn_end": refreshStats(); showNotification(msg); break;
+        case "turn_end": refreshStats(); break;
         case "tool_execution_start": { const name=msg.toolName||"tool"; const card=state.tools.get(msg.toolCallId)||makeToolCard(name, compactToolArgs(name,msg.args)); card.dataset.tool=name.toLowerCase(); card.querySelector(".tool-name").innerHTML=`${icon(toolIconName(name))} ${escapeHtml(name)}`; const a=card.querySelector(".tool-args"); a.textContent=compactToolArgs(name,msg.args); a.title=fullToolArgs(msg.args); state.tools.set(msg.toolCallId,card); refreshIcons(); break; }
         case "tool_execution_update": { const card=state.tools.get(msg.toolCallId); if(card){ card.querySelector(".tool-body pre").textContent=textOfBlocks(msg.partialResult?.content); renderBlockMedia(card.querySelector(".tool-body"), msg.partialResult?.content, "Anteprima"); } break; }
         case "tool_execution_end": { const card=state.tools.get(msg.toolCallId); if(card){ setToolCardResult(card, textOfBlocks(msg.result?.content), Boolean(msg.isError), msg.result?.content); state.tools.delete(msg.toolCallId); } break; }
@@ -198,7 +198,7 @@
           break;
         case "message_update": streamApplyDelta(msg); break;
         case "message_end": endStreamAssistant(msg.message); break;
-        case "turn_end": refreshStats(); showNotification(msg); break;
+        case "turn_end": refreshStats(); break;
         case "tool_execution_start": { const name=msg.toolName||"tool"; const card=state.tools.get(msg.toolCallId)||makeToolCard(name, compactToolArgs(name,msg.args)); card.dataset.tool=name.toLowerCase(); const nEl=card.querySelector(".tool-name"); if(nEl) nEl.innerHTML=`${icon(toolIconName(name))} ${escapeHtml(toolDisplayName(name))}`; const a=card.querySelector(".tool-args"); if(a){ a.textContent=compactToolArgs(name,msg.args); a.title=fullToolArgs(msg.args); } state.tools.set(msg.toolCallId,card); if(root.piUi) root.piUi.refreshIcons(); break; }
         case "tool_execution_update": { const card=state.tools.get(msg.toolCallId); if(card){ const pre=card.querySelector(".tool-body pre"); if(pre) pre.textContent=textOfBlocks(msg.partialResult?.content); renderBlockMedia(card.querySelector(".tool-body"), msg.partialResult?.content, "Anteprima"); } break; }
         case "tool_execution_end": { const card=state.tools.get(msg.toolCallId); if(card){ setToolCardResult(card, textOfBlocks(msg.result?.content), Boolean(msg.isError), msg.result?.content); state.tools.delete(msg.toolCallId); } break; }
