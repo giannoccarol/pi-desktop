@@ -1,3 +1,10 @@
+## [0.18.2](https://github.com/giannoccarol/pi-desktop/compare/v0.18.1...v0.18.2) (2026-08-31)
+
+
+### Bug Fixes
+
+* **notifications:** rimuovi doppia notifica turn_end, resta solo agent_settled in background ([c7d4c59](https://github.com/giannoccarol/pi-desktop/commit/c7d4c59fc887988359ffcfe2bb6b812be0656ff0))
+
 ## [0.18.1](https://github.com/giannoccarol/pi-desktop/compare/v0.18.0...v0.18.1) (2026-08-30)
 
 
