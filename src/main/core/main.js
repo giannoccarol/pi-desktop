@@ -9,6 +9,10 @@ const { fileURLToPath } = require("node:url");
 
 const { RuntimeTabs } = require("./runtime-tabs");
 const sessionsStore = require("../services/sessions");
+// Scansione sessioni fuori dall'event loop del main: le funzioni sync di
+// sessions.js (fs sincrono su migliaia di file JSONL) bloccavano tutte le
+// IPC, delta di streaming inclusi, a ogni re-scan della sidebar.
+const sessionsAsync = require("../services/session-worker-manager");
 const updater = require("../updates/updater");
 const providerStore = require("../services/provider-store");
 const packageStore = require("../services/package-store");
@@ -944,10 +948,10 @@ ipcMain.handle("shell:openTerminal", (_e, requestedCwd) => {
   return {ok:true};
 });
 
-ipcMain.handle("sessions:list", () => {
+ipcMain.handle("sessions:list", async () => {
   const now = Date.now();
   if (sessionsListCache && now - sessionsListCacheAt < SESSIONS_CACHE_TTL_MS) return sessionsListCache;
-  const listed = sessionsStore.listSessions(sessionsDir()).map((session) => ({
+  const listed = (await sessionsAsync.listSessions(sessionsDir())).map((session) => ({
     ...session,
     preference: {
       ...(session.preference || {}),
@@ -959,13 +963,13 @@ ipcMain.handle("sessions:list", () => {
   return listed;
 });
 
-ipcMain.handle("sessions:preview", (_e, file) => {
+ipcMain.handle("sessions:preview", async (_e, file) => {
   const resolvedRoot = path.resolve(sessionsDir());
   const resolvedFile = path.resolve(file);
   if (!resolvedFile.startsWith(resolvedRoot + path.sep) || !resolvedFile.endsWith(".jsonl")) {
     throw new Error("Percorso sessione non valido");
   }
-  return sanitizeMessagesForIpc(sessionsStore.readSessionMessages(resolvedFile));
+  return sanitizeMessagesForIpc(await sessionsAsync.readSessionMessages(resolvedFile));
 });
 
 // Endpoint paginato per la cronologia progressiva: restituisce gli ultimi N messaggi
@@ -979,19 +983,19 @@ function resolveSessionFile(file) {
   return resolvedFile;
 }
 
-ipcMain.handle("sessions:messagesPage", (_e, { file, limit = 2000 }) => {
+ipcMain.handle("sessions:messagesPage", async (_e, { file, limit = 2000 }) => {
   const resolvedFile = resolveSessionFile(file);
-  return sanitizeMessagesForIpc(sessionsStore.readSessionMessages(resolvedFile), Math.min(limit, 3000), 2_000_000);
+  return sanitizeMessagesForIpc(await sessionsAsync.readSessionMessages(resolvedFile), Math.min(limit, 3000), 2_000_000);
 });
 
-ipcMain.handle("sessions:messageCount", (_e, { file }) => {
+ipcMain.handle("sessions:messageCount", async (_e, { file }) => {
   const resolvedFile = resolveSessionFile(file);
-  return { count: sessionsStore.countSessionMessages(resolvedFile) };
+  return { count: await sessionsAsync.countSessionMessages(resolvedFile) };
 });
 
-ipcMain.handle("sessions:messagesRange", (_e, { file, start, end }) => {
+ipcMain.handle("sessions:messagesRange", async (_e, { file, start, end }) => {
   const resolvedFile = resolveSessionFile(file);
-  const messages = sessionsStore.readSessionMessagesSlice(resolvedFile, start, end);
+  const messages = await sessionsAsync.readSessionMessagesSlice(resolvedFile, start, end);
   return sanitizeMessagesForIpc({ messages }, messages.length, 2_000_000);
 });
 
@@ -1004,7 +1008,7 @@ ipcMain.handle("sessions:delete", async (_e, file) => {
   }
   const openTab = runtime.list().find((tab) => tab.sessionFile === resolvedFile);
   if (openTab) runtime.close(openTab.id);
-  sessionsStore.deleteSession(resolvedFile);
+  await sessionsAsync.deleteSession(resolvedFile);
   sessionsListCache = null;
   sessionsListCacheAt = 0;
   if (settings.sessionPreferences) delete settings.sessionPreferences[resolvedFile];
@@ -1013,14 +1017,14 @@ ipcMain.handle("sessions:delete", async (_e, file) => {
   return { ok: true };
 });
 
-ipcMain.handle("sessions:searchFullText", (_e, query) => {
+ipcMain.handle("sessions:searchFullText", async (_e, query) => {
   if (typeof query === "string") {
     const q = query.trim();
     if (!q) return [];
-    return sessionsStore.searchSessionsFullText(sessionsDir(), q, 80);
+    return sessionsAsync.searchSessionsFullText(sessionsDir(), q, 80);
   }
   if (!query || typeof query !== "object") return [];
-  return sessionsStore.searchSessionsFullText(sessionsDir(), query, 80);
+  return sessionsAsync.searchSessionsFullText(sessionsDir(), query, 80);
 });
 
 ipcMain.handle("sessions:bulkDelete", async (_e, files) => {
@@ -1032,7 +1036,7 @@ ipcMain.handle("sessions:bulkDelete", async (_e, files) => {
     const openTab = runtime.list().find((tab) => tab.sessionFile === path.resolve(String(f)));
     if (openTab) runtime.close(openTab.id);
   }
-  const result = sessionsStore.bulkDeleteSessions(toDelete, sessionsDir());
+  const result = await sessionsAsync.bulkDeleteSessions(toDelete, sessionsDir());
   sessionsListCache = null;
   sessionsListCacheAt = 0;
   for (const f of toDelete) {
@@ -1085,10 +1089,10 @@ ipcMain.handle("sessions:setMeta", (_e, { file, patch }) => {
 
 ipcMain.handle("sessions:getMeta", () => settings.sessionMeta || {});
 
-ipcMain.handle("fs:listExplorer", (_e, { cwd, depth, showDotfiles }) => {
+ipcMain.handle("fs:listExplorer", async (_e, { cwd, depth, showDotfiles }) => {
   const target = cwd ? path.resolve(String(cwd)) : path.resolve(settings.cwd || app.getPath("home"));
   if (!isDirectory(target) || !isAllowedProjectPath(target)) throw new Error("Cartella non disponibile");
-  return sessionsStore.listExplorerTree(target, Math.min(Math.max(Number(depth)||2,1),4), 800, { showDotfiles: Boolean(showDotfiles) });
+  return sessionsAsync.listExplorerTree(target, Math.min(Math.max(Number(depth)||2,1),4), 800, { showDotfiles: Boolean(showDotfiles) });
 });
 
 ipcMain.handle("fs:readTextFile", async (_e, filePath) => {
@@ -1112,8 +1116,8 @@ ipcMain.handle("sessions:bulkExport", async (_e, files) => {
     try {
       const resolved = path.resolve(String(f));
       if(!resolved.startsWith(root + path.sep) || !resolved.endsWith(".jsonl")) continue;
-      const msgs = sessionsStore.readSessionMessages(resolved);
-      const session = sessionsStore.parseSessionFile(resolved);
+      const msgs = await sessionsAsync.readSessionMessages(resolved);
+      const session = await sessionsAsync.parseSessionFile(resolved);
       if (msgs.messages) picked.push({ file: resolved, session, count: msgs.messages.length, messages: msgs.messages });
     } catch {}
   }
@@ -1142,11 +1146,11 @@ ipcMain.handle("pi:listTabs", () => runtime.list());
 ipcMain.handle("pi:activateTab", (_e, tabId) => runtime.activate(tabId));
 ipcMain.handle("pi:closeTab", (_e, tabId) => runtime.close(tabId));
 
-function checkBudgetForCwd(cwd, tabId){
+async function checkBudgetForCwd(cwd, tabId){
   try{
     const b = settings?.budgets?.[cwd];
     if(!b || (b.maxCost==null && b.maxTokens==null)) return { ok:true };
-    let sessions = sessionsStore.listSessions(sessionsDir()).filter(s=>s.cwd===cwd);
+    let sessions = (await sessionsAsync.listSessions(sessionsDir())).filter(s=>s.cwd===cwd);
     if(b.reset==="monthly"){
       const month = new Date().toISOString().slice(0,7);
       sessions = sessions.filter((session)=>String(session.timestamp || new Date(session.modified).toISOString()).slice(0,7)===month);
@@ -1168,21 +1172,21 @@ function checkBudgetForCwd(cwd, tabId){
 }
 ipcMain.handle("pi:prompt", async (_e, { message, images, streamingBehavior, tabId }) => {
   const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
-  const chk = checkBudgetForCwd(cwd, tabId);
+  const chk = await checkBudgetForCwd(cwd, tabId);
   if(!chk.ok) throw new Error(`Budget superato per ${cwd}: costo ${chk.cost?.toFixed?.(2)||chk.cost} / ${chk.budget.maxCost} o token ${chk.tokens} / ${chk.budget.maxTokens}. Aggiorna il budget in Impostazioni.`);
   await ensureRuntime();
   return runtime.prompt(message, images, streamingBehavior, tabId);
 });
 ipcMain.handle("pi:steer", async (_e, { message, images, tabId }) => {
   const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
-  const chk = checkBudgetForCwd(cwd, tabId);
+  const chk = await checkBudgetForCwd(cwd, tabId);
   if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.steer(message, images, tabId);
 });
 ipcMain.handle("pi:followUp", async (_e, { message, images, tabId }) => {
   const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
-  const chk = checkBudgetForCwd(cwd, tabId);
+  const chk = await checkBudgetForCwd(cwd, tabId);
   if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.followUp(message, images, tabId);
