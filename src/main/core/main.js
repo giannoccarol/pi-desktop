@@ -915,6 +915,11 @@ ipcMain.handle("shell:openExternal", (_e, url) => {
   if (isAllowedExternalUrl(url)) shell.openExternal(url);
   else console.warn("[openExternal] blocked:", String(url).slice(0,200));
 });
+// Shell di login dell'utente: usata solo per il badge del terminale dockato.
+ipcMain.handle("app:getShellInfo", () => {
+  if (process.platform === "win32") return { shell: "cmd" };
+  return { shell: path.basename(String(process.env.SHELL || "bash")) || "bash" };
+});
 ipcMain.handle("shell:openTerminal", (_e, requestedCwd) => {
   const cwd=realPath(requestedCwd || settings?.cwd);
   if(!isAllowedProjectPath(cwd) || !isDirectory(cwd)) throw new Error("Cartella terminale non valida");

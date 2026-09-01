@@ -232,6 +232,35 @@
     el.themeBtn.addEventListener("click", () => {
       applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
     });
+    // Menu "Altri strumenti": raggruppa i tasti secondari della topbar in una
+    // dropdown; fuori restano solo terminale e pannello di destra.
+    if (el.moreToolsBtn && el.moreMenu) {
+      const closeMoreMenu = () => {
+        el.moreMenu.classList.add("hidden");
+        el.moreToolsBtn.closest(".topbar-more")?.classList.remove("open");
+        el.moreToolsBtn.setAttribute("aria-expanded", "false");
+      };
+      el.moreToolsBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const willOpen = el.moreMenu.classList.contains("hidden");
+        el.moreMenu.classList.toggle("hidden", !willOpen);
+        el.moreToolsBtn.closest(".topbar-more")?.classList.toggle("open", willOpen);
+        el.moreToolsBtn.setAttribute("aria-expanded", String(willOpen));
+      });
+      el.moreMenu.addEventListener("click", (event) => {
+        // una voce del menu apre un pannello: chiudi sempre la dropdown
+        if (event.target.closest(".more-item")) closeMoreMenu();
+      });
+      document.addEventListener("click", (event) => {
+        if (!el.moreMenu.classList.contains("hidden") && !event.target.closest(".topbar-more")) closeMoreMenu();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !el.moreMenu.classList.contains("hidden")) {
+          closeMoreMenu();
+          el.moreToolsBtn.focus();
+        }
+      });
+    }
     // Controlli finestra: la titlebar nativa è disattivata e i pulsanti vivono in
     // topbar. Su macOS restano i traffic light di sistema: qui si nascondono.
     const syncMaximized = (maximized) => {
@@ -253,7 +282,7 @@
     // non lo fa nativamente (Windows/macOS sì: lì evitiamo il doppio toggle).
     if (/Linux/.test(navigator.platform || navigator.userAgent)) {
       document.getElementById("topbar")?.addEventListener("dblclick", (event) => {
-        if (event.target.closest("button, input, .chat-tabs, .win-controls, .menu")) return;
+        if (event.target.closest("button, input, .chat-tabs, .win-controls, .menu, .more-menu, .topbar-more")) return;
         api.toggleMaximizeWindow?.();
       });
     }

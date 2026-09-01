@@ -26,6 +26,8 @@
     toggleSidebar: $("#btn-toggle-sidebar"),
     chatTabs: $("#chat-tabs"),
     themeBtn: $("#btn-theme"),
+    moreToolsBtn: $("#btn-more-tools"),
+    moreMenu: $("#more-menu"),
     chat: $("#chat"),
     messages: $("#messages"),
     emptyState: $("#empty-state"),

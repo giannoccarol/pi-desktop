@@ -627,7 +627,6 @@ body.session-loading .session-item:not(.loading) { opacity: .45; }
 #topbar { border-bottom: 1px solid var(--hairline); box-shadow: none; }
 html[data-theme="dark"] #topbar { box-shadow: none; }
 #topbar #btn-toggle-sidebar { border-color: transparent; background: transparent; }
-#topbar #btn-theme { margin-left: 6px; }
 /* Finestra senza titlebar nativa: la topbar trascina la finestra (doppio clic =
    ingrandisci, gestito dal sistema); i pulsanti riduci/ingrandisci/chiudi sono
    in testa alla scheda, accanto agli altri tasti. */
@@ -661,6 +660,64 @@ html[data-theme="dark"] #topbar { box-shadow: none; }
 .win-btn.win-btn-close:hover { color: #ffffff; background: var(--red); }
 /* macOS: i traffic light nativi restano (titleBarStyle hidden) */
 .platform-mac .win-controls { display: none; }
+/* Menu "Altri strumenti": dropdown che raggruppa i tasti secondari della topbar
+   (comandi, albero, strumenti sessione, plugin, tema). */
+.topbar-more {
+  position: relative;
+  display: inline-flex;
+  -webkit-app-region: no-drag;
+}
+.more-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+.more-btn:hover, .topbar-more.open .more-btn { color: var(--text); background: var(--hover); }
+.more-btn svg { width: 15px; height: 15px; }
+.more-chevron { transition: transform var(--motion-fast) var(--ease-standard); }
+.topbar-more.open .more-chevron { transform: rotate(180deg); }
+.more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  min-width: 232px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--menu-shadow);
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+.more-item:hover { background: var(--hover); }
+.more-item svg { width: 15px; height: 15px; color: var(--muted); flex: 0 0 auto; }
+.more-item:hover svg { color: var(--text); }
 .chat-tabs {
   min-width: 0;
   max-width: min(58vw, 820px);
@@ -990,22 +1047,44 @@ details.think .think-body { margin: 0 0 4px 31px; padding: 2px 12px 6px; border-
 .diff-actions { margin-left: auto; display: flex; gap: 4px; }
 .diff-btn { padding: 2px 7px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--surface); color: var(--text); font: 10px var(--mono); cursor: pointer; }
 .diff-btn:hover { background: var(--hover); }
-.diff-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid var(--hairline); }
-.diff-col { min-width: 0; border-right: 1px solid var(--hairline); }
-.diff-col:last-child { border-right: 0; }
-.diff-col-header { padding: 4px 8px; font: 10px var(--mono); font-weight: 600; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--hairline); text-transform: uppercase; letter-spacing: .05em; }
 .diff-path { color: var(--text); font-weight: 600; }
-.diff-hunk-header { padding: 4px 10px; background: color-mix(in srgb, var(--blue) 7%, var(--surface-2)); color: var(--muted); font: 11px var(--mono); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+/* Corpo del diff, stile VS Code: griglia con numeri di riga per lato,
+   marker +/- e sfondo rosso/verde per riga. */
+.diff-body { font: 11.5px/1.55 var(--mono); overflow-x: auto; }
+.diff-hunk-header { padding: 3px 10px; background: color-mix(in srgb, var(--blue) 8%, var(--surface-2)); color: color-mix(in srgb, var(--blue) 65%, var(--text)); font: 11px var(--mono); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
 .diff-hunk-header:first-child { border-top: 0; }
-.diff-lines { font: 12px/1.5 var(--mono); }
-.diff-line { display: flex; gap: 8px; padding: 1px 10px; white-space: pre-wrap; word-break: break-all; }
-.diff-line.added { background: color-mix(in srgb, var(--green) 12%, transparent); }
-.diff-line.removed { background: color-mix(in srgb, var(--red) 10%, transparent); }
+.diff-line { display: grid; grid-template-columns: var(--diff-gutter,36px) var(--diff-gutter,36px) 14px 1fr; align-items: baseline; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-num { text-align: right; padding: 0 6px; font-size: 10px; color: var(--subtle); user-select: none; background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
+.diff-marker { text-align: center; font-weight: 700; user-select: none; }
+.diff-text { min-width: 0; padding-right: 10px; }
 .diff-line.context { color: var(--muted); }
-.diff-marker { flex: 0 0 10px; text-align: center; font-weight: 700; }
+.diff-line.added { background: color-mix(in srgb, var(--green) 13%, transparent); }
+.diff-line.removed { background: color-mix(in srgb, var(--red) 11%, transparent); }
+.diff-line.added .diff-num { background: color-mix(in srgb, var(--green) 17%, var(--surface-2)); color: color-mix(in srgb, var(--green) 65%, var(--text)); }
+.diff-line.removed .diff-num { background: color-mix(in srgb, var(--red) 15%, var(--surface-2)); color: color-mix(in srgb, var(--red) 65%, var(--text)); }
 .diff-line.added .diff-marker { color: var(--green); }
 .diff-line.removed .diff-marker { color: var(--red); }
-.diff-text { flex: 1; min-width: 0; }
+/* parola cambiata dentro la riga */
+.diff-word { border-radius: 2px; }
+.diff-line.added .diff-word, .diff-half.added .diff-word { background: color-mix(in srgb, var(--green) 40%, transparent); }
+.diff-line.removed .diff-word, .diff-half.removed .diff-word { background: color-mix(in srgb, var(--red) 38%, transparent); }
+/* vista affiancata: due metà allineati riga per riga */
+.diff-row-split { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid color-mix(in srgb, var(--hairline) 55%, transparent); }
+.diff-row-split:first-of-type { border-top: 0; }
+.diff-half { display: grid; grid-template-columns: var(--diff-gutter,36px) 14px 1fr; align-items: baseline; min-width: 0; border-right: 1px solid var(--hairline); white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-half:last-child { border-right: 0; }
+.diff-half .diff-text { padding-right: 10px; }
+.diff-half.context { color: var(--muted); }
+.diff-half.added { background: color-mix(in srgb, var(--green) 13%, transparent); }
+.diff-half.removed { background: color-mix(in srgb, var(--red) 11%, transparent); }
+.diff-half.empty { background: repeating-linear-gradient(45deg, transparent 0 5px, color-mix(in srgb, var(--surface-2) 60%, transparent) 5px 10px); }
+.diff-half.added .diff-num { background: color-mix(in srgb, var(--green) 17%, var(--surface-2)); color: color-mix(in srgb, var(--green) 65%, var(--text)); }
+.diff-half.removed .diff-num { background: color-mix(in srgb, var(--red) 15%, var(--surface-2)); color: color-mix(in srgb, var(--red) 65%, var(--text)); }
+.diff-half.added .diff-marker { color: var(--green); }
+.diff-half.removed .diff-marker { color: var(--red); }
+/* anteprima read/grep: testo intero, non una griglia diff */
+.diff-read .diff-header { border-bottom: 1px solid var(--hairline); }
+.diff-raw { margin: 0; padding: 8px 10px; font: 11.5px/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--muted); }
 /* Virtualization */
 .virtual-hidden { opacity: 0.35; max-height: 44px; overflow: hidden; pointer-events: none; }
 .virtual-hidden .tool-body, .virtual-hidden .md { display: none; }
@@ -1384,6 +1463,32 @@ details.think .think-body { margin: 0 0 4px 31px; padding: 2px 12px 6px; border-
 /* Explorer + Terminal panels */
 #explorer-panel.hidden,#terminal-panel.hidden,#health-banner.hidden{display:none !important;}
 #terminal-output::-webkit-scrollbar{width:6px;}
+/* Terminale dockato in fondo, a tutta larghezza (stile VS Code):
+   barra con titolo, badge shell e tab del progetto, output, riga di prompt. */
+#terminal-panel{
+  flex:0 0 auto;
+  display:flex;flex-direction:column;
+  height:250px;
+  border-top:1px solid var(--hairline);
+  background:#0f1115;color:#d4d4d4;
+}
+.term-head{display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid #23252a;flex:0 0 auto}
+.term-title{font-size:12px;font-weight:600;color:#fafafa}
+.term-shell,.term-tab{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;background:#1e2024;border:1px solid #2e3136;font-size:11px;color:#cfcfcf}
+.term-shell{text-transform:lowercase}
+.term-tab-name{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.term-tab-close{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;padding:0;border:0;background:transparent;color:#8a8d92;cursor:pointer;border-radius:4px}
+.term-tab-close:hover{color:#fff;background:#2e3136}
+#terminal-panel .term-tab-close svg{width:11px;height:11px}
+#terminal-panel .icon-btn.tiny.term-tool{width:22px;height:22px;color:#9a9da3;background:transparent}
+#terminal-panel .icon-btn.tiny.term-tool:hover{color:#fff;background:#26282c}
+#terminal-panel .term-tool svg{width:13px;height:13px}
+#terminal-output{flex:1;min-height:0;overflow:auto;margin:0;padding:8px 12px;font:12px var(--mono);white-space:pre-wrap;word-break:break-word;background:transparent;border:0;color:#d4d4d4}
+.term-input-row{display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid #23252a;flex:0 0 auto}
+.term-prompt{color:var(--blue);font:700 12px var(--mono);flex:0 0 auto}
+#terminal-input{flex:1;min-width:0;background:transparent;border:0;color:#fafafa;font:12px var(--mono);outline:none;padding:2px 0}
+#terminal-input::placeholder{color:#6b6e73}
+.term-exclude{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#8a8d92;cursor:pointer;flex:0 0 auto}
 /* Budgets */
 #budgets-list .icon-btn{opacity:.7;} #budgets-list .icon-btn:hover{opacity:1;}
 
@@ -2150,6 +2255,17 @@ body { font-size: 14px; }
 #right-explorer-pane,#right-changes-pane{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
 #right-explorer-pane.hidden,#right-changes-pane.hidden{display:none !important}
 #explorer-panel{border:0 !important;max-height:none !important;background:transparent !important}
+/* Explorer: breadcrumb del percorso nel progetto (mai sopra la radice) */
+#explorer-breadcrumbs{display:flex;align-items:center;gap:1px;flex-wrap:wrap;margin:2px 0 6px;min-width:0}
+.crumb{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit;padding:2px 6px;border-radius:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb:hover{color:var(--text);background:var(--hover)}
+.crumb.current{color:var(--text);font-weight:600;cursor:default;background:transparent}
+.crumb.current:hover{background:transparent}
+.crumb-sep{color:var(--subtle);font-size:11px;flex:0 0 auto}
+/* Explorer: icona per tipo di file, colorata per estensione */
+.fx-icon{display:inline-flex;flex:0 0 auto;width:15px;height:15px}
+.fx-icon svg{width:15px;height:15px}
+#explorer-toolbar button:disabled{opacity:.4;cursor:default;background:transparent;color:var(--muted)}
 #right-resizer{position:absolute;top:0;left:-3px;width:7px;height:100%;cursor:col-resize;z-index:20;background:transparent;border-right:1px solid transparent;transition:background .15s,border-color .15s}
 #right-resizer:hover,#right-resizer.dragging{background:color-mix(in srgb,var(--text) 6%,transparent);border-right-color:var(--border-strong)}
 .changes-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;transition:background .14s}

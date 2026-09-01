@@ -73,24 +73,21 @@
         <span class="flex-spacer"></span>
         <button id="btn-explorer" class="icon-btn" title="Explorer / Modifiche" aria-label="Explorer e modifiche" style="position:relative"><i data-lucide="panel-right"></i><span id="changes-badge" class="right-badge hidden">0</span></button>
         <button id="btn-terminal" class="icon-btn" title="Terminale" aria-label="Terminale"><i data-lucide="terminal"></i></button>
-        <button id="btn-commands" class="icon-btn" data-i18n-title="btn.commands.title" data-i18n-aria-label="btn.commands.aria">
-          <i data-lucide="command"></i>
-        </button>
-        <button id="btn-tree" class="icon-btn" data-i18n-title="btn.tree.title" data-i18n-aria-label="btn.tree.aria">
-          <i data-lucide="git-fork"></i>
-        </button>
-        <button id="btn-session-tools" class="icon-btn" data-i18n-title="btn.sessionTools.title" data-i18n-aria-label="btn.sessionTools.aria">
-          <i data-lucide="sliders-horizontal"></i>
-        </button>
-        <button id="btn-packages" class="icon-btn" data-i18n-title="btn.packages.title" data-i18n-aria-label="btn.packages.aria">
-          <i data-lucide="blocks"></i>
-        </button>
+        <div class="topbar-more">
+          <button id="btn-more-tools" class="more-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Altri strumenti" aria-label="Altri strumenti">
+            <i data-lucide="chevron-down" class="more-chevron"></i>
+          </button>
+          <div id="more-menu" class="more-menu hidden" role="menu">
+            <button id="btn-commands" class="more-item" type="button" role="menuitem" data-i18n-title="btn.commands.title"><i data-lucide="command"></i><span data-i18n="btn.commands.aria">Apri palette comandi</span></button>
+            <button id="btn-tree" class="more-item" type="button" role="menuitem" data-i18n-title="btn.tree.title"><i data-lucide="git-fork"></i><span data-i18n="btn.tree.aria">Apri albero sessione</span></button>
+            <button id="btn-session-tools" class="more-item" type="button" role="menuitem" data-i18n-title="btn.sessionTools.title"><i data-lucide="sliders-horizontal"></i><span data-i18n="btn.sessionTools.aria">Apri strumenti sessione</span></button>
+            <button id="btn-packages" class="more-item" type="button" role="menuitem" data-i18n-title="btn.packages.title"><i data-lucide="blocks"></i><span data-i18n="btn.packages.aria">Apri lo store plugin</span></button>
+            <button id="btn-theme" class="more-item" type="button" role="menuitem" data-i18n-title="btn.theme.title"><span data-theme-icon><i data-lucide="sun"></i></span><span data-i18n="btn.theme.aria">Cambia tema</span></button>
+          </div>
+        </div>
         <button id="btn-app-update" class="app-update-btn hidden" type="button" data-i18n-title="updates.app.checkTitle" data-i18n-aria-label="updates.app.checkAria" title="Aggiornamento app">
           <i data-lucide="download"></i>
           <span></span>
-        </button>
-        <button id="btn-theme" class="icon-btn" data-i18n-title="btn.theme.title" data-i18n-aria-label="btn.theme.aria">
-          <i data-lucide="sun"></i>
         </button>
         <div class="win-controls" role="group" aria-label="Controlli finestra">
           <button id="btn-win-minimize" class="win-btn" type="button" title="Riduci" aria-label="Riduci finestra"><i data-lucide="minus"></i></button>
@@ -101,8 +98,6 @@
 
       <div id="health-banner" class="hidden" style="padding:8px 16px;background:color-mix(in srgb,var(--amber) 12%,var(--surface));border-bottom:1px solid var(--hairline);display:flex;gap:8px;align-items:center;font-size:12px"><i data-lucide="alert-triangle" style="width:14px;height:14px;color:var(--amber)"></i><span id="health-banner-text" class="grow"></span><button id="btn-health-log" class="btn ghost small" type="button">Log</button></div>
       <div id="extension-statuses" class="extension-statuses hidden" aria-live="polite"></div>
-
-      <div id="terminal-panel" class="hidden" style="border-top:1px solid var(--hairline);background:#0f1115;color:#d4d4d4;padding:8px 12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><i data-lucide="terminal" style="width:14px;height:14px"></i><strong style="font-size:12px;color:#fafafa">Terminale</strong><span class="muted small" style="color:#888">bash nel progetto corrente</span><span class="flex-spacer"></span><button id="btn-terminal-close" class="icon-btn tiny" type="button" style="color:#888"><i data-lucide="x"></i></button></div><pre id="terminal-output" style="max-height:160px;overflow:auto;background:#161616;border-radius:6px;padding:8px;font:12px var(--mono);white-space:pre-wrap;word-break:break-word;margin:0 0 6px"></pre><div style="display:flex;gap:6px"><input id="terminal-input" type="text" placeholder="comando shell + Invio" spellcheck="false" style="flex:1;background:#1e1e1e;border:1px solid #333;color:#fafafa;border-radius:6px;padding:6px 8px;font:12px var(--mono)" /><button id="btn-terminal-run" class="btn small primary" type="button">Esegui</button></div><label style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:#888"><input id="terminal-exclude" type="checkbox" /> escludi dal contesto</label></div>
 
       <section id="chat" aria-live="polite">
         <div id="messages"></div>
@@ -197,6 +192,29 @@
           <span id="pi-chip-text">pi: …</span>
           <i data-lucide="chevron-right"></i>
         </button>
+      </div>
+
+      <div id="terminal-panel" class="hidden" role="region" aria-label="Terminale">
+        <div class="term-head">
+          <span class="term-title">Terminal</span>
+          <span id="term-shell-badge" class="term-shell" title="Shell">bash</span>
+          <span class="term-tab" id="term-tab">
+            <span id="term-tab-name" class="term-tab-name">—</span>
+            <button id="btn-terminal-tab-close" class="term-tab-close" type="button" data-i18n-title="terminal.close" data-i18n-aria-label="terminal.close" title="Chiudi" aria-label="Chiudi"><i data-lucide="x"></i></button>
+          </span>
+          <span class="flex-spacer"></span>
+          <button id="btn-term-copy" class="icon-btn tiny term-tool" type="button" data-i18n-title="terminal.copy" data-i18n-aria-label="terminal.copy" title="Copia" aria-label="Copia output"><i data-lucide="copy"></i></button>
+          <button id="btn-term-abort" class="icon-btn tiny term-tool" type="button" data-i18n-title="terminal.abort" data-i18n-aria-label="terminal.abort" title="Interrompi" aria-label="Interrompi comando"><i data-lucide="square"></i></button>
+          <button id="btn-term-external" class="icon-btn tiny term-tool" type="button" data-i18n-title="terminal.external" data-i18n-aria-label="terminal.external" title="Apri terminale esterno" aria-label="Apri terminale esterno"><i data-lucide="external-link"></i></button>
+          <button id="btn-term-new" class="icon-btn tiny term-tool" type="button" data-i18n-title="terminal.newSession" data-i18n-aria-label="terminal.newSession" title="Nuova sessione" aria-label="Nuova sessione"><i data-lucide="plus"></i></button>
+          <button id="btn-terminal-close" class="icon-btn tiny term-tool" type="button" data-i18n-title="terminal.close" data-i18n-aria-label="terminal.close" title="Chiudi" aria-label="Chiudi terminale"><i data-lucide="x"></i></button>
+        </div>
+        <pre id="terminal-output" tabindex="0"></pre>
+        <div class="term-input-row">
+          <span class="term-prompt" aria-hidden="true">❯</span>
+          <input id="terminal-input" type="text" placeholder="comando shell + Invio" spellcheck="false" aria-label="Comando da eseguire" />
+          <label class="term-exclude"><input id="terminal-exclude" type="checkbox" /> escludi dal contesto</label>
+        </div>
       </div>
 
       <footer id="statusbar">

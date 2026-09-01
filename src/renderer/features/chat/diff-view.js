@@ -94,6 +94,139 @@
     }
   }
 
+  // --- modello righe allineate, come il compare di VS Code -------------------
+
+  function parseHunkNums(header) {
+    const m = /@@\s*-(\d+)(?:\s*,\s*(\d+))?\s*\+(\d+)(?:\s*,\s*(\d+))?/.exec(String(header || ""));
+    if (!m) return null;
+    return { oldStart: Number(m[1]), newStart: Number(m[3]) };
+  }
+
+  // Righe normalizzate: le coppie rimosso/aggiunto consecutive vengono
+  // allineate sulla stessa riga (come la vista affiancata di VS Code).
+  function hunkRows(hunk) {
+    const nums = parseHunkNums(hunk.header);
+    let oldNo = nums ? nums.oldStart : null;
+    let newNo = nums ? nums.newStart : null;
+    const rows = [];
+    const L = hunk.lines;
+    let i = 0;
+    while (i < L.length) {
+      const line = L[i];
+      if (line.type === "context") {
+        rows.push({
+          kind: "context",
+          old: oldNo == null ? { no: null, text: line.text } : { no: oldNo++, text: line.text },
+          new: newNo == null ? { no: null, text: line.text } : { no: newNo++, text: line.text },
+        });
+        i++;
+        continue;
+      }
+      const rem = [], add = [];
+      while (i < L.length && L[i].type === "removed") rem.push({ no: oldNo == null ? null : oldNo++, text: L[i++].text });
+      while (i < L.length && L[i].type === "added") add.push({ no: newNo == null ? null : newNo++, text: L[i++].text });
+      const n = Math.max(rem.length, add.length) || 1;
+      for (let k = 0; k < n; k++) rows.push({ kind: "change", old: rem[k] || null, new: add[k] || null });
+    }
+    return rows;
+  }
+
+  // Evidenzia la parte cambiata dentro la riga (prefisso/suffisso comuni),
+  // così l'occhio vede subito cosa è cambiato senza leggere tutto.
+  function changeRange(a, b) {
+    const startMax = Math.min(a.length, b.length);
+    let start = 0;
+    while (start < startMax && a[start] === b[start]) start++;
+    let endA = a.length, endB = b.length;
+    while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+    return [start, endA, endB];
+  }
+  function escMark(text, range) {
+    if (!range || range[0] >= range[1]) return escapeHtml(text) || "&nbsp;";
+    return escapeHtml(text.slice(0, range[0])) +
+      `<span class="diff-word">${escapeHtml(text.slice(range[0], range[1]))}</span>` +
+      escapeHtml(text.slice(range[1]));
+  }
+  function escPlain(text) { return escapeHtml(text) || "&nbsp;"; }
+
+  function unifiedHunkHtml(hunk) {
+    let html = hunk.header ? `<div class="diff-hunk-header">${escapeHtml(hunk.header)}</div>` : "";
+    for (const row of hunkRows(hunk)) {
+      if (row.kind === "context") {
+        html += `<div class="diff-line context"><span class="diff-num">${row.old?.no ?? ""}</span><span class="diff-num">${row.new?.no ?? ""}</span><span class="diff-marker">&nbsp;</span><span class="diff-text">${escPlain(row.old?.text ?? "")}</span></div>`;
+        continue;
+      }
+      if (row.old && row.new) {
+        const [s, ea, eb] = changeRange(row.old.text, row.new.text);
+        html += `<div class="diff-line removed"><span class="diff-num">${row.old.no ?? ""}</span><span class="diff-num"></span><span class="diff-marker">−</span><span class="diff-text">${escMark(row.old.text, [s, ea])}</span></div>`;
+        html += `<div class="diff-line added"><span class="diff-num"></span><span class="diff-num">${row.new.no ?? ""}</span><span class="diff-marker">+</span><span class="diff-text">${escMark(row.new.text, [s, eb])}</span></div>`;
+      } else if (row.old) {
+        html += `<div class="diff-line removed"><span class="diff-num">${row.old.no ?? ""}</span><span class="diff-num"></span><span class="diff-marker">−</span><span class="diff-text">${escPlain(row.old.text)}</span></div>`;
+      } else if (row.new) {
+        html += `<div class="diff-line added"><span class="diff-num"></span><span class="diff-num">${row.new.no ?? ""}</span><span class="diff-marker">+</span><span class="diff-text">${escPlain(row.new.text)}</span></div>`;
+      }
+    }
+    return html;
+  }
+
+  function splitHunkHtml(hunk) {
+    let html = hunk.header ? `<div class="diff-hunk-header">${escapeHtml(hunk.header)}</div>` : "";
+    for (const row of hunkRows(hunk)) {
+      let left, right;
+      if (row.kind === "context") {
+        left = `<div class="diff-half context"><span class="diff-num">${row.old?.no ?? ""}</span><span class="diff-marker">&nbsp;</span><span class="diff-text">${escPlain(row.old?.text ?? "")}</span></div>`;
+        right = `<div class="diff-half context"><span class="diff-num">${row.new?.no ?? ""}</span><span class="diff-marker">&nbsp;</span><span class="diff-text">${escPlain(row.new?.text ?? "")}</span></div>`;
+      } else if (row.old && row.new) {
+        const [s, ea, eb] = changeRange(row.old.text, row.new.text);
+        left = `<div class="diff-half removed"><span class="diff-num">${row.old.no ?? ""}</span><span class="diff-marker">−</span><span class="diff-text">${escMark(row.old.text, [s, ea])}</span></div>`;
+        right = `<div class="diff-half added"><span class="diff-num">${row.new.no ?? ""}</span><span class="diff-marker">+</span><span class="diff-text">${escMark(row.new.text, [s, eb])}</span></div>`;
+      } else if (row.old) {
+        left = `<div class="diff-half removed"><span class="diff-num">${row.old.no ?? ""}</span><span class="diff-marker">−</span><span class="diff-text">${escPlain(row.old.text)}</span></div>`;
+        right = `<div class="diff-half empty"><span class="diff-num"></span><span class="diff-marker"></span><span class="diff-text"></span></div>`;
+      } else if (row.new) {
+        left = `<div class="diff-half empty"><span class="diff-num"></span><span class="diff-marker"></span><span class="diff-text"></span></div>`;
+        right = `<div class="diff-half added"><span class="diff-num">${row.new.no ?? ""}</span><span class="diff-marker">+</span><span class="diff-text">${escPlain(row.new.text)}</span></div>`;
+      }
+      html += `<div class="diff-row-split">${left}${right}</div>`;
+    }
+    return html;
+  }
+
+  function diffBodyHtml(parsed, mode) {
+    const perHunk = mode === "split" ? splitHunkHtml : unifiedHunkHtml;
+    return parsed.hunks.map(perHunk).join("");
+  }
+
+  function renderDiffInner(rawDiff, mode, opts) {
+    const parsed = parseUnifiedDiff(rawDiff);
+    if (!parsed.hunks.length) return null;
+    const o = opts || {};
+    let html = `<div class="diff-header">`;
+    if (o.path) html += `<span class="diff-path">${escapeHtml(o.path)}</span>`;
+    html += `<span class="diff-actions">` +
+      `<button class="diff-btn" data-action="copy-diff" title="Copia diff">Copia diff</button>` +
+      (o.path ? `<button class="diff-btn" data-action="open" data-path="${escapeHtml(o.path)}" title="Apri file">Apri</button>` : "") +
+      (o.newText ? `<button class="diff-btn" data-action="edit-inline" data-newtext="${escapeHtml(o.newText)}" title="Prepara una proposta nel composer">Proponi modifica</button>` : "") +
+      `<button class="diff-btn" data-action="toggle" title="Cambia vista">${mode === "split" ? "Unificato" : "Affiancato"}</button>` +
+      `</span></div>`;
+    html += `<div class="diff-body diff-${mode === "split" ? "split" : "unified"}">${diffBodyHtml(parsed, mode)}</div>`;
+    return html;
+  }
+
+  // Ridisegna una .diff-view esistente (anche nei cloni del pannello Modifiche):
+  // il diff grezzo vive in data-raw, quindi il toggle funziona subito.
+  function rerenderDiffView(view) {
+    if (!view || view.classList.contains("diff-read")) return false;
+    const raw = view.dataset.raw;
+    if (!raw) return false;
+    const mode = getDiffMode();
+    const inner = renderDiffInner(raw, mode, { path: view.dataset.path || "", newText: view.dataset.newtext || "" });
+    if (!inner) return false;
+    view.dataset.mode = mode;
+    view.innerHTML = inner;
+    return true;
+  }
+
   function renderReadPreview(toolName, args, output) {
     const name = String(toolName || "").toLowerCase();
     if (!["read", "grep", "find", "search", "ls"].includes(name)) return null;
@@ -113,7 +246,7 @@
       `<span class="diff-actions"><button class="diff-btn" data-action="copy" data-raw="${escapeHtml(outStr.slice(0,5000))}" title="Copia">Copia</button>` +
       (filePath ? `<button class="diff-btn" data-action="open" data-path="${escapeHtml(String(filePath))}" title="Apri file">Apri</button>` : "") +
       `</span></div>` +
-      `<div class="diff-lines"><div class="diff-line context"><span class="diff-text">${escaped}</span></div></div></div>`;
+      `<pre class="diff-raw">${escaped}</pre></div>`;
   }
 
   function renderDiff(toolName, args, output) {
@@ -153,63 +286,13 @@
       }
     }
     if (!rawDiff) return null;
-    const parsed = parseUnifiedDiff(rawDiff);
-    if (!parsed.hunks.length) return null;
     const mode = getDiffMode();
-    // Build HTML with toolbar
-    let html = `<div class="diff-view" data-mode="${mode}" data-raw="${escapeHtml(rawDiff.slice(0,8000))}">`;
     const p = parsedArgs.path || parsedArgs.file || parsedArgs.filePath;
-    const pEsc = p ? escapeHtml(String(p)) : "";
+    const pStr = p ? String(p) : "";
     const newTextForEdit = (()=>{ try{ const a = typeof parsedArgs==='object'?parsedArgs:JSON.parse(String(parsedArgs)); const v = a.newText ?? a.new_string ?? a.content ?? ""; return String(v).slice(0,8000); }catch{ return ""; } })();
-    html += `<div class="diff-header">`;
-    if (pEsc) html += `<span class="diff-path">${pEsc}</span>`;
-    html += `<span class="diff-actions">` +
-      `<button class="diff-btn" data-action="copy-diff" title="Copia diff">Copia diff</button>` +
-      (pEsc ? `<button class="diff-btn" data-action="open" data-path="${pEsc}" title="Apri file">Apri</button>` : "") +
-      (newTextForEdit ? `<button class="diff-btn" data-action="edit-inline" data-newtext="${escapeHtml(newTextForEdit)}" title="Prepara una proposta nel composer">Proponi modifica</button>` : "") +
-      `<button class="diff-btn" data-action="toggle" title="Toggle unified/split">${mode === "split" ? "Unificato" : "Split"}</button>` +
-      `</span></div>`;
-    if (mode === "split") {
-      // finto split: two columns
-      html += `<div class="diff-split">`;
-      html += `<div class="diff-col diff-col-removed"><div class="diff-col-header">Rimosso</div>`;
-      for (const hunk of parsed.hunks) {
-        if (hunk.header) html += `<div class="diff-hunk-header">${escapeHtml(hunk.header)}</div>`;
-        for (const line of hunk.lines) {
-          if (line.type === "removed" || line.type === "context") {
-            const cls = line.type === "removed" ? "removed" : "context";
-            const marker = line.type === "removed" ? "-" : " ";
-            html += `<div class="diff-line ${cls}"><span class="diff-marker">${marker}</span><span class="diff-text">${escapeHtml(line.text)}</span></div>`;
-          }
-        }
-      }
-      html += `</div>`;
-      html += `<div class="diff-col diff-col-added"><div class="diff-col-header">Aggiunto</div>`;
-      for (const hunk of parsed.hunks) {
-        if (hunk.header) html += `<div class="diff-hunk-header">${escapeHtml(hunk.header)}</div>`;
-        for (const line of hunk.lines) {
-          if (line.type === "added" || line.type === "context") {
-            const cls = line.type === "added" ? "added" : "context";
-            const marker = line.type === "added" ? "+" : " ";
-            html += `<div class="diff-line ${cls}"><span class="diff-marker">${marker}</span><span class="diff-text">${escapeHtml(line.text)}</span></div>`;
-          }
-        }
-      }
-      html += `</div></div>`;
-    } else {
-      for (const hunk of parsed.hunks) {
-        if (hunk.header) html += `<div class="diff-hunk-header">${escapeHtml(hunk.header)}</div>`;
-        html += `<div class="diff-lines">`;
-        for (const line of hunk.lines) {
-          const cls = line.type === "added" ? "added" : line.type === "removed" ? "removed" : "context";
-          const marker = line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          html += `<div class="diff-line ${cls}"><span class="diff-marker">${marker}</span><span class="diff-text">${escapeHtml(line.text)}</span></div>`;
-        }
-        html += `</div>`;
-      }
-    }
-    html += `</div>`;
-    return html;
+    const inner = renderDiffInner(rawDiff, mode, { path: pStr, newText: newTextForEdit });
+    if (!inner) return null;
+    return `<div class="diff-view" data-mode="${mode}" data-raw="${escapeHtml(rawDiff.slice(0,8000))}" data-path="${escapeHtml(pStr)}"${newTextForEdit ? ` data-newtext="${escapeHtml(newTextForEdit)}"` : ""}>${inner}</div>`;
   }
 
   function attachDiffActions(rootEl) {
@@ -264,20 +347,20 @@
           } catch {}
         }
       } else if (action === "toggle") {
-        const cur = getDiffMode();
-        const next = cur === "split" ? "unified" : "split";
+        const next = getDiffMode() === "split" ? "unified" : "split";
         setDiffMode(next);
-        if (view) {
-          view.dataset.mode = next;
-          btn.textContent = next === "split" ? "Unificato" : "Split";
-          // simple reload: toggle class, actual re-render will happen on next tool render; for now just toggle attribute
-          try { view.classList.toggle("diff-split-mode", next === "split"); } catch {}
+        // ridisegna subito la vista (vale anche per i cloni del pannello Modifiche)
+        if (!rerenderDiffView(view)) {
+          if (view) {
+            view.dataset.mode = next;
+            btn.textContent = next === "split" ? "Unificato" : "Affiancato";
+          }
         }
       }
     });
   }
 
-  const api = { parseUnifiedDiff, renderDiff, buildSyntheticDiff, renderReadPreview, getDiffMode, setDiffMode, attachDiffActions };
+  const api = { parseUnifiedDiff, renderDiff, buildSyntheticDiff, renderReadPreview, getDiffMode, setDiffMode, rerenderDiffView, attachDiffActions };
   root.piDiffView = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

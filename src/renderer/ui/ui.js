@@ -391,7 +391,9 @@
     }
     const el = getEl();
     if (el.themeBtn) {
-      el.themeBtn.innerHTML = icon(resolved === "dark" ? "moon" : "sun");
+      // solo l'icona: il tasto tema è una voce del menu "Altri strumenti" e ha un'etichetta
+      const iconHost = el.themeBtn.querySelector("[data-theme-icon]");
+      if (iconHost) iconHost.innerHTML = icon(resolved === "dark" ? "moon" : "sun");
       el.themeBtn.title = resolved === "dark" ? "Passa al tema chiaro" : "Passa al tema scuro";
     }
     refreshIcons();

@@ -38,8 +38,6 @@
     if(interactiveRe.test(commandExecutable(cmd))){ toast(`Comando interattivo non supportato nel terminale embedded (serve PTY). Usa terminale esterno.` , "warn", 4000); return; }
     const s = state();
     s.terminalBusy = true;
-    const btn = document.getElementById("btn-terminal-run");
-    if(btn) btn.disabled = true;
     appendOutput(`$ ${cmd}`, false, true);
     try{
       const res = await api().bash(cmd, !!exclude);
@@ -53,7 +51,6 @@
       toast(err.message, "error");
     }finally{
       s.terminalBusy = false;
-      if(btn) btn.disabled = false;
       el().terminalInput?.focus();
     }
   }
@@ -61,15 +58,32 @@
     const e = el(); const s = state();
     s.terminalVisible = !!v;
     if(e.terminalPanel) e.terminalPanel.classList.toggle("hidden", !v);
-    if(v) e.terminalInput?.focus();
+    if(v){ syncHeader(); e.terminalInput?.focus(); }
   }
   function toggle(){ setVisible(!state().terminalVisible); }
+  // Badge shell + nome del tab: la shell di login (da $SHELL via main) e il
+  // nome del progetto corrente, come i tab di un terminale dockato.
+  async function syncHeader(){
+    const badge = document.getElementById("term-shell-badge");
+    if(badge && !badge.dataset.loaded){
+      try{
+        const info = await api().getShellInfo?.();
+        if(info?.shell){ badge.textContent = info.shell; badge.dataset.loaded = "1"; }
+      }catch{}
+    }
+    const tabName = document.getElementById("term-tab-name");
+    if(tabName){
+      const cwd = String(state().settings?.cwd || "");
+      tabName.textContent = cwd.split(/[\\/]/).filter(Boolean).pop() || cwd || "—";
+    }
+  }
+  function clearScreen(){ const out = el().terminalOutput; if(out) out.innerHTML=""; }
   function init(){
     const e = el();
     e.terminalToggle?.addEventListener("click", toggle);
     e.terminalClose?.addEventListener("click", ()=> setVisible(false));
+    document.getElementById("btn-terminal-tab-close")?.addEventListener("click", ()=> setVisible(false));
     const inp = e.terminalInput;
-    const btn = document.getElementById("btn-terminal-run");
     const chk = document.getElementById("terminal-exclude");
     const out = e.terminalOutput;
     const exec = ()=>{
@@ -80,39 +94,6 @@
       histIndex = (state().terminalHistory||[]).length;
       runCommand(cmd, chk?.checked);
     };
-    btn?.addEventListener("click", exec);
-    // toolbar: clear / copy
-    const panel = e.terminalPanel;
-    if(panel && !panel.querySelector("#term-toolbar")){
-      const tb = document.createElement("div");
-      tb.id="term-toolbar";
-      tb.style.cssText="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px";
-      const copyBtn = document.createElement("button");
-      copyBtn.className="btn ghost small"; copyBtn.style.cssText="height:24px;font-size:11px;padding:0 6px";
-      copyBtn.textContent=tr("terminal.copy","Copia");
-      copyBtn.addEventListener("click", async ()=>{
-        try{ await navigator.clipboard.writeText(out ? out.innerText : ""); toast("Output copiato","info",1500);}catch{}
-      });
-      const clearBtn = document.createElement("button");
-      clearBtn.className="btn ghost small"; clearBtn.style.cssText="height:24px;font-size:11px;padding:0 6px";
-      clearBtn.textContent=tr("terminal.clear","Pulisci");
-      clearBtn.addEventListener("click", ()=>{ if(out) out.innerHTML=""; });
-      const abortBtn = document.createElement("button");
-      abortBtn.className="btn ghost small"; abortBtn.style.cssText="height:24px;font-size:11px;padding:0 6px;color:var(--red)";
-      abortBtn.textContent=tr("terminal.abort","Interrompi");
-      abortBtn.addEventListener("click", async()=>{
-        try{ await api().abortBash(); appendOutput(tr("terminal.stopped","Comando interrotto."),true,false); }catch(err){ toast(err.message,"error"); }
-      });
-      const openBtn = document.createElement("button");
-      openBtn.className="btn ghost small"; openBtn.style.cssText="height:24px;font-size:11px;padding:0 6px";
-      openBtn.textContent=tr("terminal.external","Apri terminale esterno");
-      openBtn.addEventListener("click", async ()=>{
-        const cwd = state().settings?.cwd || "";
-        try{ await api().openTerminal(cwd); }catch(err){ toast(err.message,"error"); }
-      });
-      tb.append(copyBtn, clearBtn, abortBtn, openBtn);
-      panel.insertBefore(tb, panel.querySelector("pre"));
-    }
     inp?.addEventListener("keydown", (ev)=>{
       const hist = state().terminalHistory || [];
       if(ev.key==="Enter"){
@@ -131,13 +112,29 @@
         if(inp.value) inp.value="";
         else setVisible(false);
       } else if((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==="l"){
-        ev.preventDefault(); if(out) out.innerHTML="";
+        ev.preventDefault(); clearScreen();
       }
+    });
+    // barra del terminale dockato: copia, interrompi, esterno, nuova sessione
+    document.getElementById("btn-term-copy")?.addEventListener("click", async ()=>{
+      try{ await navigator.clipboard.writeText(out ? out.innerText : ""); toast(tr("terminal.copied","Output copiato"),"info",1500);}catch{}
+    });
+    document.getElementById("btn-term-abort")?.addEventListener("click", async ()=>{
+      try{ await api().abortBash(); appendOutput(tr("terminal.stopped","Comando interrotto."),true,false); }catch(err){ toast(err.message,"error"); }
+    });
+    document.getElementById("btn-term-external")?.addEventListener("click", async ()=>{
+      const cwd = state().settings?.cwd || "";
+      try{ await api().openTerminal(cwd); }catch(err){ toast(err.message,"error"); }
+    });
+    document.getElementById("btn-term-new")?.addEventListener("click", ()=>{
+      clearScreen();
+      if(inp){ inp.value=""; inp.focus(); }
     });
     // Ctrl+` toggle
     document.addEventListener("keydown", (ev)=>{
       if((ev.ctrlKey||ev.metaKey) && ev.key==="`"){ ev.preventDefault(); toggle(); }
     });
+    syncHeader();
   }
   root.piTerminal = { runCommand, setVisible, toggle, init, appendOutput };
 })(typeof window!=="undefined"?window:globalThis);

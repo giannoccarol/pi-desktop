@@ -65,8 +65,9 @@
     let count=0;
     for(const [path, view] of seen){
       if(count++ >= MAX_CHANGES_ROWS) break;
-      const added=view.querySelectorAll(".diff-line.added").length;
-      const removed=view.querySelectorAll(".diff-line.removed").length;
+      // in split le righe sono .diff-half, in unificato .diff-line
+      const added=view.querySelectorAll(".diff-line.added,.diff-half.added").length;
+      const removed=view.querySelectorAll(".diff-line.removed,.diff-half.removed").length;
       const row=document.createElement("div");
       row.className="changes-row";
       row.tabIndex=0; row.setAttribute("role","button");

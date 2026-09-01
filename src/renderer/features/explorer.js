@@ -20,22 +20,72 @@
     return value.startsWith(rootPath+"/") || value.startsWith(rootPath+"\\") ? value.slice(rootPath.length+1).replace(/\\/g,"/") : value;
   }
 
-  const extIconMap = {
-    js:"file-code", ts:"file-code", tsx:"file-code", jsx:"file-code", py:"file-code", go:"file-code", rs:"file-code",
-    json:"braces", md:"file-text", txt:"file-text", html:"code", css:"palette", sh:"terminal", yml:"settings", yaml:"settings",
-    png:"image", jpg:"image", jpeg:"image", gif:"image", webp:"image", svg:"image"
+  // L'explorer naviga esclusivamente nelle cartelle del progetto: il main lo
+  // impone già (realpath + whitelist), qui lo rispettiamo come difesa e per UX.
+  function isInsideProject(p){
+    const rootPath=String(state().settings?.cwd||"").replace(/[\\/]+$/,"");
+    const value=String(p||"");
+    return !!rootPath && (value===rootPath || value.startsWith(rootPath+"/") || value.startsWith(rootPath+"\\"));
+  }
+
+  // Icona e colore per tipo di file: colori dai colori ufficiali dei linguaggi
+  // (GitHub Linguist), schiariti dove troppo scuri per il tema dark.
+  const FILE_TYPES = {
+    js:{i:"file-code",c:"#f1e051"}, mjs:{i:"file-code",c:"#f1e051"}, cjs:{i:"file-code",c:"#f1e051"}, jsx:{i:"file-code",c:"#61dafb"},
+    ts:{i:"file-code",c:"#4f9ad6"}, tsx:{i:"file-code",c:"#4f9ad6"}, mts:{i:"file-code",c:"#4f9ad6"}, cts:{i:"file-code",c:"#4f9ad6"},
+    py:{i:"file-code",c:"#5aa0d8"}, ipynb:{i:"file-code",c:"#e0742a"},
+    rb:{i:"file-code",c:"#cc3e44"}, go:{i:"file-code",c:"#00add8"}, rs:{i:"file-code",c:"#dea584"}, java:{i:"file-code",c:"#c98a3d"},
+    kt:{i:"file-code",c:"#a97bff"}, kts:{i:"file-code",c:"#a97bff"}, swift:{i:"file-code",c:"#f05138"},
+    c:{i:"file-code",c:"#a8b9cc"}, h:{i:"file-code",c:"#a8b9cc"}, cpp:{i:"file-code",c:"#f34b7d"}, cc:{i:"file-code",c:"#f34b7d"}, hpp:{i:"file-code",c:"#f34b7d"},
+    cs:{i:"file-code",c:"#4db56a"}, php:{i:"file-code",c:"#8d97cf"}, lua:{i:"file-code",c:"#5f7fbe"}, dart:{i:"file-code",c:"#35b5e5"},
+    vue:{i:"file-code",c:"#41b883"}, svelte:{i:"file-code",c:"#ff3e00"}, astro:{i:"file-code",c:"#ff5d01"},
+    sh:{i:"square-terminal",c:"#89e051"}, bash:{i:"square-terminal",c:"#89e051"}, zsh:{i:"square-terminal",c:"#89e051"}, fish:{i:"square-terminal",c:"#89e051"},
+    html:{i:"code",c:"#e34c26"}, htm:{i:"code",c:"#e34c26"}, xml:{i:"code",c:"#6aa5e8"},
+    css:{i:"palette",c:"#6c8fd8"}, scss:{i:"palette",c:"#d2709c"}, sass:{i:"palette",c:"#d2709c"}, less:{i:"palette",c:"#6a8fc0"},
+    json:{i:"file-json",c:"#cbcb41"}, jsonc:{i:"file-json",c:"#cbcb41"}, json5:{i:"file-json",c:"#cbcb41"},
+    yml:{i:"file-cog",c:"#a074c4"}, yaml:{i:"file-cog",c:"#a074c4"}, toml:{i:"file-cog",c:"#b8a68a"}, ini:{i:"file-cog",c:"#b8a68a"}, conf:{i:"file-cog",c:"#b8a68a"}, cfg:{i:"file-cog",c:"#b8a68a"},
+    env:{i:"variable",c:"#ecd53f"},
+    md:{i:"file-text",c:"#519aba"}, mdx:{i:"file-text",c:"#519aba"}, rst:{i:"file-text",c:"#519aba"}, txt:{i:"file-text",c:"var(--muted)"}, log:{i:"scroll-text",c:"var(--muted)"},
+    pdf:{i:"file-text",c:"#e05252"}, doc:{i:"file-text",c:"#6d9fdc"}, docx:{i:"file-text",c:"#6d9fdc"}, odt:{i:"file-text",c:"#6d9fdc"}, rtf:{i:"file-text",c:"#6d9fdc"},
+    xls:{i:"file-spreadsheet",c:"#4caf6e"}, xlsx:{i:"file-spreadsheet",c:"#4caf6e"}, ods:{i:"file-spreadsheet",c:"#4caf6e"},
+    csv:{i:"table",c:"#4caf6e"}, tsv:{i:"table",c:"#4caf6e"},
+    ppt:{i:"presentation",c:"#e0704a"}, pptx:{i:"presentation",c:"#e0704a"}, odp:{i:"presentation",c:"#e0704a"}, key:{i:"presentation",c:"#e0704a"},
+    png:{i:"image",c:"#b07ee0"}, jpg:{i:"image",c:"#b07ee0"}, jpeg:{i:"image",c:"#b07ee0"}, gif:{i:"image",c:"#b07ee0"}, webp:{i:"image",c:"#b07ee0"},
+    bmp:{i:"image",c:"#b07ee0"}, ico:{i:"image",c:"#b07ee0"}, tiff:{i:"image",c:"#b07ee0"}, avif:{i:"image",c:"#b07ee0"}, heic:{i:"image",c:"#b07ee0"},
+    svg:{i:"pen-tool",c:"#ffb13b"},
+    mp4:{i:"film",c:"#d48ab0"}, mov:{i:"film",c:"#d48ab0"}, avi:{i:"film",c:"#d48ab0"}, mkv:{i:"film",c:"#d48ab0"}, webm:{i:"film",c:"#d48ab0"},
+    mp3:{i:"music",c:"#5cb3d6"}, wav:{i:"music",c:"#5cb3d6"}, ogg:{i:"music",c:"#5cb3d6"}, flac:{i:"music",c:"#5cb3d6"}, aac:{i:"music",c:"#5cb3d6"}, m4a:{i:"music",c:"#5cb3d6"}, mid:{i:"music",c:"#5cb3d6"},
+    zip:{i:"file-archive",c:"#d9a441"}, tar:{i:"file-archive",c:"#d9a441"}, gz:{i:"file-archive",c:"#d9a441"}, bz2:{i:"file-archive",c:"#d9a441"}, xz:{i:"file-archive",c:"#d9a441"}, "7z":{i:"file-archive",c:"#d9a441"}, rar:{i:"file-archive",c:"#d9a441"}, zst:{i:"file-archive",c:"#d9a441"},
+    ttf:{i:"type",c:"#c99bd6"}, otf:{i:"type",c:"#c99bd6"}, woff:{i:"type",c:"#c99bd6"}, woff2:{i:"type",c:"#c99bd6"}, eot:{i:"type",c:"#c99bd6"},
+    sql:{i:"database",c:"#e0a55c"}, db:{i:"database",c:"#e0a55c"}, sqlite:{i:"database",c:"#e0a55c"}, sqlite3:{i:"database",c:"#e0a55c"},
+    lock:{i:"lock",c:"var(--muted)"},
+    exe:{i:"binary",c:"var(--muted)"}, dll:{i:"binary",c:"var(--muted)"}, bin:{i:"binary",c:"var(--muted)"}, so:{i:"binary",c:"var(--muted)"}, dylib:{i:"binary",c:"var(--muted)"}, deb:{i:"binary",c:"var(--muted)"}, rpm:{i:"binary",c:"var(--muted)"}, appimage:{i:"binary",c:"var(--muted)"},
+    prisma:{i:"database",c:"#7a9ec2"}, gql:{i:"database",c:"#e5a3b8"}, graphql:{i:"database",c:"#e5a3b8"},
   };
-  function iconFor(ent){
-    if(ent.isDirectory) return "folder";
-    const ext = (ent.name||"").split(".").pop().toLowerCase();
-    return extIconMap[ext] || "file-text";
+  // Nomi speciali che valgono più dell'estensione.
+  const FILE_NAMES = {
+    "package.json":{i:"package",c:"#8bc34a"}, "package-lock.json":{i:"lock",c:"var(--muted)"},
+    "yarn.lock":{i:"lock",c:"var(--muted)"}, "pnpm-lock.yaml":{i:"lock",c:"var(--muted)"}, "bun.lockb":{i:"lock",c:"var(--muted)"},
+    "makefile":{i:"wrench",c:"#9aa0a6"}, "dockerfile":{i:"container",c:"#2496ed"},
+    "readme.md":{i:"book-open",c:"#519aba"}, "license.md":{i:"scale",c:"#c9a227"},
+  };
+  function fileTypeFor(ent){
+    if(ent.isDirectory) return { i:"folder", c:"var(--blue)" };
+    const name=(ent.name||"").toLowerCase();
+    if(FILE_NAMES[name]) return FILE_NAMES[name];
+    if(name.startsWith(".env")) return FILE_TYPES.env;
+    if(name.startsWith(".git")) return { i:"git-branch", c:"#f05033" };
+    if(name.startsWith("docker")) return { i:"container", c:"#2496ed" };
+    if(name.startsWith("license")||name.startsWith("licence")||name==="copying") return { i:"scale", c:"#c9a227" };
+    const ext=name.includes(".")?name.split(".").pop():"";
+    return FILE_TYPES[ext] || { i:"file", c:"var(--muted)" };
   }
 
   async function loadExplorer(depth=currentDepth){
     const e = el();
     if(!e.explorerList) return;
     const projectCwd = state().settings?.cwd || "";
-    if(!currentDirectory || !(currentDirectory===projectCwd || currentDirectory.startsWith(projectCwd+"/") || currentDirectory.startsWith(projectCwd+"\\"))) currentDirectory=projectCwd;
+    if(!isInsideProject(currentDirectory)) currentDirectory=projectCwd;
     e.explorerList.innerHTML = `<div class="menu-empty">${esc(tr("explorer.loading","Caricamento…"))}</div>`;
     try{
       const [entries, git] = await Promise.all([
@@ -83,8 +133,9 @@
       row.tabIndex=0; row.setAttribute("role","button");
       const dirtyFiles=new Set(gitInfo?.dirtyFiles||[]);
       const gitBadge = (!ent.isDirectory && dirtyFiles.has(projectRelative(ent.path))) ? `<span title="git dirty" style="width:6px;height:6px;border-radius:50%;background:var(--amber);flex:0 0 6px"></span>` : "";
+      const ft = fileTypeFor(ent);
       const sizeLabel = ent.isDirectory ? `<span class="muted" style="font-size:10px">${(ent.rel.split("/").length>1?"↳":"")}</span>` : `<span class="muted" style="font-size:10px">${formatSize(ent.size)}</span>`;
-      row.innerHTML = `${icon(iconFor(ent))}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(ent.rel || ent.name)}</span>${gitBadge}${sizeLabel}<span style="display:flex;gap:2px;opacity:0" class="row-actions"><button data-act="copy" class="icon-btn tiny" title="${esc(tr("explorer.copyPath","Copia percorso"))}" aria-label="${esc(tr("explorer.copyPath","Copia percorso"))}" style="width:20px;height:20px"><i data-lucide="copy" style="width:12px;height:12px"></i></button><button data-act="open" class="icon-btn tiny" title="${esc(tr("explorer.openExternal","Apri esterno"))}" aria-label="${esc(tr("explorer.openExternal","Apri esterno"))}" style="width:20px;height:20px"><i data-lucide="external-link" style="width:12px;height:12px"></i></button></span>`;
+      row.innerHTML = `<span class="fx-icon" style="color:${ft.c}">${icon(ft.i)}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(ent.rel || ent.name)}</span>${gitBadge}${sizeLabel}<span style="display:flex;gap:2px;opacity:0" class="row-actions"><button data-act="copy" class="icon-btn tiny" title="${esc(tr("explorer.copyPath","Copia percorso"))}" aria-label="${esc(tr("explorer.copyPath","Copia percorso"))}" style="width:20px;height:20px"><i data-lucide="copy" style="width:12px;height:12px"></i></button><button data-act="open" class="icon-btn tiny" title="${esc(tr("explorer.openExternal","Apri esterno"))}" aria-label="${esc(tr("explorer.openExternal","Apri esterno"))}" style="width:20px;height:20px"><i data-lucide="external-link" style="width:12px;height:12px"></i></button></span>`;
       row.addEventListener("mouseenter", ()=>{ row.style.background="var(--hover)"; const a=row.querySelector(".row-actions"); if(a) a.style.opacity="1"; });
       row.addEventListener("mouseleave", ()=>{ row.style.background="transparent"; const a=row.querySelector(".row-actions"); if(a) a.style.opacity="0"; });
       row.addEventListener("focus",()=>{ const a=row.querySelector(".row-actions"); if(a) a.style.opacity="1"; });
@@ -92,6 +143,7 @@
       row.addEventListener("click", async (ev)=>{
         if(ev.target.closest("button")) return;
         if(ent.isDirectory){
+          if(!isInsideProject(ent.path)){ toast(tr("explorer.outsideProject","Solo cartelle del progetto"), "error", 2200); return; }
           currentDirectory=ent.path;
           await loadExplorer(currentDepth);
           return;
@@ -134,8 +186,9 @@
       const dlg = document.createElement("dialog");
       dlg.style.cssText = "max-width:780px;width:92vw;max-height:80vh";
       const lang = (ent.name.split(".").pop()||"").toLowerCase();
+      const ft = fileTypeFor(ent);
       const preview = esc(data.content.slice(0, 4000));
-      dlg.innerHTML = `<div class="modal-body"><div class="modal-title-row"><span class="modal-icon"><i data-lucide="file-text"></i></span><div class="grow"><h2 style="font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ent.rel)}</h2><p class="muted small">${formatSize(data.size)} · anteprima file</p></div><button data-close class="icon-btn borderless"><i data-lucide="x"></i></button></div><section class="settings-section" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto"><pre style="flex:1;overflow:auto;background:var(--surface);padding:10px;border-radius:8px;font:11px var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--hairline)">${preview}${data.content.length>4000?"\n… troncato":""}</pre></section><div class="row gap end settings-actions"><button data-at class="btn ghost small"><i data-lucide="at-sign"></i> Inserisci @</button><button data-copy class="btn ghost small"><i data-lucide="copy"></i> Copia</button><button data-close2 class="btn primary small">Chiudi</button></div></div>`;
+      dlg.innerHTML = `<div class="modal-body"><div class="modal-title-row"><span class="modal-icon" style="color:${ft.c}"><i data-lucide="${ft.i}"></i></span><div class="grow"><h2 style="font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ent.rel)}</h2><p class="muted small">${formatSize(data.size)} · anteprima file</p></div><button data-close class="icon-btn borderless"><i data-lucide="x"></i></button></div><section class="settings-section" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto"><pre style="flex:1;overflow:auto;background:var(--surface);padding:10px;border-radius:8px;font:11px var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--hairline)">${preview}${data.content.length>4000?"\n… troncato":""}</pre></section><div class="row gap end settings-actions"><button data-at class="btn ghost small"><i data-lucide="at-sign"></i> Inserisci @</button><button data-copy class="btn ghost small"><i data-lucide="copy"></i> Copia</button><button data-close2 class="btn primary small">Chiudi</button></div></div>`;
       const close = ()=>{ dlg.close(); dlg.remove(); };
       dlg.querySelectorAll("[data-close],[data-close2]").forEach(b=> b.addEventListener("click", close));
       dlg.addEventListener("close", ()=> dlg.remove());
@@ -158,6 +211,45 @@
       // also auto-insert @ on preview? no, user chooses
     }catch(err){ toast(err.message, "error"); }
   }
+  // Breadcrumb: mostra il percorso dalla radice del progetto alla cartella
+  // corrente; ogni segmento è cliccabile. Mai sopra la radice del progetto.
+  function renderBreadcrumbs(){
+    const panel = el().explorerPanel;
+    if(!panel) return;
+    let crumb = panel.querySelector("#explorer-breadcrumbs");
+    if(!crumb){
+      crumb = document.createElement("div");
+      crumb.id = "explorer-breadcrumbs";
+      const tb = panel.querySelector("#explorer-toolbar");
+      if(tb) panel.insertBefore(crumb, tb); else panel.appendChild(crumb);
+    }
+    crumb.replaceChildren();
+    const project = String(state().settings?.cwd||"").replace(/[\\/]+$/,"");
+    if(!project || !currentDirectory || !isInsideProject(currentDirectory)){ crumb.classList.add("hidden"); return; }
+    crumb.classList.remove("hidden");
+    const rel = projectRelative(currentDirectory);
+    const parts = rel===currentDirectory ? [] : rel.split(/[\\/]+/).filter(Boolean);
+    const sep = currentDirectory.charAt(project.length) || "/";
+    const seg = (label, path, isLast)=>{
+      const b=document.createElement("button");
+      b.type="button";
+      b.className="crumb"+(isLast?" current":"");
+      b.textContent=label;
+      b.title=path;
+      if(isLast) b.setAttribute("aria-current","location");
+      else b.addEventListener("click", ()=>{ currentDirectory=path; loadExplorer(currentDepth); });
+      crumb.appendChild(b);
+    };
+    seg(project.split(/[\\/]/).pop()||project, project, parts.length===0);
+    let acc=project;
+    parts.forEach((p,idx)=>{
+      const arrow=document.createElement("span");
+      arrow.className="crumb-sep"; arrow.textContent="›"; arrow.setAttribute("aria-hidden","true");
+      crumb.appendChild(arrow);
+      acc+=sep+p;
+      seg(p, acc, idx===parts.length-1);
+    });
+  }
   function updateToolbar(){
     const panel = el().explorerPanel;
     if(!panel) return;
@@ -167,13 +259,15 @@
       tb.id = "explorer-toolbar";
       tb.style.cssText = "display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap";
       const backBtn=document.createElement("button");
-      backBtn.className="icon-btn tiny"; backBtn.innerHTML=icon("arrow-up"); backBtn.title=tr("explorer.parent","Cartella superiore"); backBtn.setAttribute("aria-label",backBtn.title);
+      backBtn.className="icon-btn tiny"; backBtn.dataset.nav="back"; backBtn.innerHTML=icon("arrow-up"); backBtn.title=tr("explorer.parent","Cartella superiore"); backBtn.setAttribute("aria-label",backBtn.title);
       backBtn.addEventListener("click",()=>{
         const project=String(state().settings?.cwd||"").replace(/[\\/]+$/,"");
+        // risale un livello qualunque sia il separatore (/ o \), senza uscire dal progetto
+        if(!currentDirectory || !isInsideProject(currentDirectory)){ currentDirectory=project; loadExplorer(currentDepth); return; }
         if(currentDirectory===project) return;
-        const parts=currentDirectory.replace(/\\/g,"/").split("/"); parts.pop();
-        currentDirectory=parts.join("/") || project;
-        if(!currentDirectory.startsWith(project)) currentDirectory=project;
+        const cut=Math.max(currentDirectory.lastIndexOf("/"), currentDirectory.lastIndexOf("\\"));
+        const parent=cut>0?currentDirectory.slice(0,cut):project;
+        currentDirectory=isInsideProject(parent)?parent:project;
         loadExplorer(currentDepth);
       });
       const search = document.createElement("input");
@@ -203,6 +297,10 @@
       const hdr = panel.querySelector("strong");
       if(hdr) hdr.title = gitInfo.label || gitInfo.branch || "";
     }
+    // breadcrumb + stato del tasto "su" a ogni navigazione
+    const back = tb.querySelector("[data-nav=back]");
+    if(back) back.disabled = !currentDirectory || currentDirectory===String(state().settings?.cwd||"").replace(/[\\/]+$/,"");
+    renderBreadcrumbs();
   }
   function setVisible(v){
     if(root.piRightPanel){ root.piRightPanel.setVisible(!!v); if(v) root.piRightPanel.switchTab("explorer"); return; }

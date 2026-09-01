@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
   pickFiles: (kind) => ipcRenderer.invoke("dialog:pickFiles", kind),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   openTerminal: (cwd) => ipcRenderer.invoke("shell:openTerminal", cwd),
+  getShellInfo: () => ipcRenderer.invoke("app:getShellInfo"),
   searchFiles: (query) => ipcRenderer.invoke("fs:searchFiles", query),
   listDroppedFiles: (absPath) => ipcRenderer.invoke("fs:listDropped", absPath),
   addProject: () => ipcRenderer.invoke("projects:add"),
