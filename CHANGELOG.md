@@ -1,3 +1,10 @@
+# [0.21.0](https://github.com/giannoccarol/pi-desktop/compare/v0.20.0...v0.21.0) (2026-09-01)
+
+
+### Features
+
+* **ui:** animazioni direzionali per pannelli, menu e modali ([b7b386a](https://github.com/giannoccarol/pi-desktop/commit/b7b386a500437f72d8cf8dde9d016c13e5bb7855))
+
 # [0.20.0](https://github.com/giannoccarol/pi-desktop/compare/v0.19.0...v0.20.0) (2026-09-01)
 
 
