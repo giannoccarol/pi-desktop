@@ -5,8 +5,16 @@
   function isVisible(){ const p=el().rightPanel; return p && !p.classList.contains("hidden"); }
   function setVisible(v){
     const p=el().rightPanel; if(!p) return;
-    p.classList.toggle("hidden", !v);
-    if(v) refresh();
+    if(v){
+      // interrompe un'eventuale chiusura animata in corso
+      p._animCancel?.();
+      p.classList.remove("panel-closing");
+      p.classList.remove("hidden");
+      refresh();
+    } else {
+      // esce con l'animazione specchiata: rientra verso destra, poi .hidden
+      root.piUtils?.animateOut?.(p, "panel-closing", 220);
+    }
     try{ root.piUi?.refreshIcons?.(p); }catch{}
   }
   let activeTab="explorer";

@@ -2277,3 +2277,27 @@ body { font-size: 14px; }
 @media (max-width:1100px){#right-panel{--right-w:320px;width:320px;min-width:320px}}
 @media (max-width:920px){#right-panel{position:absolute;top:0;right:0;bottom:0;z-index:30;box-shadow:var(--menu-shadow)}}
 @media (max-width:700px){#right-panel{--right-w:100%;width:100%;min-width:0}}
+
+/* === Animazioni direzionali dei pannelli ===
+   Ogni superficie entra seguendo il senso di apertura: il terminale spinge da
+   sotto verso l'alto, il pannello destro entra dal bordo destro, i menu a
+   tendina si aprono verso il basso, le modali crescono dal centro. La chiusura
+   specchia l'entrata (classe .panel-closing gestita da piUtils.animateOut). */
+#app { overflow: clip; }
+@keyframes panel-rise-in { from { transform: translateY(100%); opacity: .5; } to { transform: translateY(0); opacity: 1; } }
+@keyframes panel-rise-out { to { transform: translateY(100%); opacity: .4; } }
+@keyframes panel-slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes panel-slide-out-right { to { transform: translateX(100%); } }
+@keyframes menu-drop-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pane-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+#terminal-panel { animation: panel-rise-in .26s cubic-bezier(.2, .8, .2, 1); }
+#terminal-panel.panel-closing { animation: panel-rise-out .2s ease-in forwards; }
+#right-panel { animation: panel-slide-in-right .24s cubic-bezier(.2, .8, .2, 1); }
+#right-panel.panel-closing { animation: panel-slide-out-right .2s ease-in forwards; }
+.more-menu, .menu { animation: menu-drop-in .16s cubic-bezier(.2, .8, .2, 1); transform-origin: top; }
+#right-explorer-pane, #right-changes-pane, #changes-detail { animation: pane-fade-in .18s ease-out; }
+dialog[open] { animation: modal-in .24s cubic-bezier(.16, 1, .3, 1); }
+dialog[open]::backdrop { animation: backdrop-in .24s ease; }

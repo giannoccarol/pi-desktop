@@ -218,6 +218,44 @@
     visit(messages);
     return { revision: `${messages.length}:${(hash >>> 0).toString(36)}`, bytes };
   }
+  // Chiusura animata di un pannello: applica la classe con l'animazione di
+  // uscita e aggiunge .hidden solo alla fine (o subito con reduced-motion).
+  // Se l'elemento viene riaperto durante l'uscita, _animCancel la interrompe.
+  function animateOut(el, cls, ms = 260) {
+    if (!el || el.classList.contains("hidden")) return Promise.resolve();
+    if (el._animCancel) el._animCancel();
+    return new Promise((resolve) => {
+      let reduce = false;
+      try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch {}
+      if (reduce) { el.classList.add("hidden"); resolve(); return; }
+      let finished = false;
+      const cleanup = () => {
+        clearTimeout(timer);
+        el.removeEventListener("animationend", onEnd);
+        el.classList.remove(cls);
+        delete el._animCancel;
+      };
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        el.classList.add("hidden");
+        cleanup();
+        resolve();
+      };
+      const cancel = () => {
+        if (finished) return;
+        finished = true;
+        cleanup();
+        resolve();
+      };
+      const onEnd = (ev) => { if (ev.target === el) finish(); };
+      el.addEventListener("animationend", onEnd);
+      el._animCancel = cancel;
+      el.classList.add(cls);
+      const timer = setTimeout(finish, ms);
+    });
+  }
+
   const api = {
     escapeHtml,
     formatBytes,
@@ -239,6 +277,7 @@
     isActivityOnly,
     toolIconName,
     messageListStats,
+    animateOut,
   };
 
   root.piUtils = api;

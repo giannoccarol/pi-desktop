@@ -57,8 +57,19 @@
   function setVisible(v){
     const e = el(); const s = state();
     s.terminalVisible = !!v;
-    if(e.terminalPanel) e.terminalPanel.classList.toggle("hidden", !v);
-    if(v){ syncHeader(); e.terminalInput?.focus(); }
+    const panel = e.terminalPanel;
+    if(!panel) return;
+    if(v){
+      // interrompe un'eventuale chiusura animata in corso
+      panel._animCancel?.();
+      panel.classList.remove("panel-closing");
+      panel.classList.remove("hidden");
+      syncHeader();
+      e.terminalInput?.focus();
+    } else {
+      // esce con l'animazione specchiata: scende verso il basso, poi .hidden
+      root.piUtils?.animateOut?.(panel, "panel-closing", 220);
+    }
   }
   function toggle(){ setVisible(!state().terminalVisible); }
   // Badge shell + nome del tab: la shell di login (da $SHELL via main) e il
