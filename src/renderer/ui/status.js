@@ -104,6 +104,14 @@ async function runMaintenance(kind) {
 let appUpdateState = null;
 
 function setUpdateButtonIcon(button, name) {
+  // retargetIcon sostituisce gli SVG gia' montati con una <i> pendente: il
+  // pass icone "pending-only" non ricrea gli svg esistenti. Senza piUi
+  // (test unitari) resta il setAttribute diretto.
+  if (window.piUi?.retargetIcon) {
+    window.piUi.retargetIcon(button, name);
+    refreshIcons();
+    return;
+  }
   const icon = button?.querySelector?.("[data-lucide]");
   if (icon) icon.setAttribute("data-lucide", name);
 }

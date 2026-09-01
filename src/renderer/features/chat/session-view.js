@@ -8,6 +8,12 @@
 
   const sessionMessageCache = new Map();
   const SESSION_CACHE_MAX = 60;
+  // I nodi DOM (tool card, SVG, listener) pesano molto piu' dei messaggi raw:
+  // l'LRU dei messaggi resta a 60, ma i nodi vivi vengono conservati solo per
+  // le sessioni piu' recenti. Al di fuori, restoreCachedSessionDom cade sul
+  // re-render dal canvas dei messaggi.
+  const SESSION_DOM_CACHE_MAX = 12;
+  const domCacheOrder = [];
   let openingSessionTimer = null;
   const OPENING_SESSION_TIMEOUT_MS = 120_000;
 
@@ -53,6 +59,15 @@
     const entry=getCachedSessionSnapshot(file,tabId,{allowDirty:true});
     if(!entry || !el.messages) return false;
     entry.nodes=[...el.messages.childNodes];
+    for(const k of cacheKeysFor(file,tabId)){
+      const idx=domCacheOrder.indexOf(k);
+      if(idx>=0) domCacheOrder.splice(idx,1);
+      domCacheOrder.push(k);
+    }
+    while(domCacheOrder.length > SESSION_DOM_CACHE_MAX){
+      const evicted=sessionMessageCache.get(domCacheOrder.shift());
+      if(evicted) evicted.nodes=null;
+    }
     return true;
   }
   function restoreCachedSessionDom(file, tabId=null){
@@ -62,6 +77,11 @@
     else { el.messages.innerHTML=""; state.streamAssistant=null; state.tools.clear(); }
     el.messages.replaceChildren(...entry.nodes);
     window.piUi?.jumpToBottom?.();
+    // la sessione appena ripristinata e' la piu' recente nell'LRU dei nodi
+    for(const k of cacheKeysFor(file,tabId)){
+      const idx=domCacheOrder.indexOf(k);
+      if(idx>=0){ domCacheOrder.splice(idx,1); domCacheOrder.push(k); }
+    }
     return entry.messages;
   }
   function markSessionCacheDirty(file,tabId=null){

@@ -45,10 +45,9 @@
       }
       if (el.btnCheckAppUpdate) {
         const label = el.btnCheckAppUpdate.querySelector("span");
-        const icon = el.btnCheckAppUpdate.querySelector("[data-lucide]");
         if (label) label.textContent = t("app.restartNow");
         else el.btnCheckAppUpdate.textContent = t("app.restartNow");
-        if (icon) icon.setAttribute("data-lucide", "refresh-cw");
+        window.piUi?.retargetIcon?.(el.btnCheckAppUpdate, "refresh-cw");
         el.btnCheckAppUpdate.disabled = false;
         el.btnCheckAppUpdate.dataset.staleRestart = "1";
         refreshIcons();
@@ -88,8 +87,6 @@
         });
       }
     }catch{}
-    // virtualization for chat tool cards
-    try { (window.piChat && window.piChat.initVirtualization && window.piChat.initVirtualization()) || (typeof initVirtualization === "function" && initVirtualization()); } catch {}
     // costs dashboard periodic refresh
     try { if (window.piCosts && window.piCosts.renderProjectCosts) setInterval(() => window.piCosts.renderProjectCosts(), 15000); } catch {}
     if (el.chat) {

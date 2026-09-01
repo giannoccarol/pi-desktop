@@ -304,6 +304,22 @@ async function refreshSessions() {
 // Prima veniva ricostruito TUTTO il DOM ad ogni chiamata (anche a ogni tick di
 // polling invariato ogni 10s): churn DOM, focus/locator instabili, costo O(n).
 // Le etichette relative al tempo si aggiornano comunque grazie al bucket minuto.
+// Il token per-sessione e' memoizzato su file+mtime: con decine di migliaia di
+// sessioni la firma non ri-serializza piu' l'intera lista a ogni chiamata.
+const sessionTokenCache = new Map(); // "file|mtime" -> token JSON
+function sessionToken(session) {
+  const key = `${session.file}|${session.modified}`;
+  let token = sessionTokenCache.get(key);
+  if (token === undefined) {
+    token = JSON.stringify([
+      session.file, session.modified, session.name || "", session.preview || "",
+      session.busy ? 1 : 0, session.tabId || "", session.hasName ? 1 : 0,
+    ]);
+    if (sessionTokenCache.size > 20000) sessionTokenCache.clear();
+    sessionTokenCache.set(key, token);
+  }
+  return token;
+}
 let lastProjectsSig = null;
 function projectsRenderSignature(q, projects) {
   const s = window.piStore ? window.piStore.state : {};
@@ -328,11 +344,7 @@ function projectsRenderSignature(q, projects) {
     [...(s.expandedProjects || [])].sort(),
     [...(s.projectLimits || new Map())].map(([k, v]) => [k, v]),
     (s.tabs || []).map((tb) => [tb.id, tb.sessionFile || "", Boolean(tb.busy)]),
-    projects.map((p) => [
-      p.path,
-      p.matchesProject ? 1 : 0,
-      p.sessions.map((x) => [x.file, x.modified, x.name || "", x.preview || "", x.busy ? 1 : 0, x.tabId || "", x.hasName ? 1 : 0]),
-    ]),
+    projects.map((p) => [p.path, p.matchesProject ? 1 : 0, p.sessions.map(sessionToken)]),
   ]);
 }
 

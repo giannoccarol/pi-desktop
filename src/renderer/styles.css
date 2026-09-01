@@ -1085,9 +1085,11 @@ details.think .think-body { margin: 0 0 4px 31px; padding: 2px 12px 6px; border-
 /* anteprima read/grep: testo intero, non una griglia diff */
 .diff-read .diff-header { border-bottom: 1px solid var(--hairline); }
 .diff-raw { margin: 0; padding: 8px 10px; font: 11.5px/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--muted); }
-/* Virtualization */
-.virtual-hidden { opacity: 0.35; max-height: 44px; overflow: hidden; pointer-events: none; }
-.virtual-hidden .tool-body, .virtual-hidden .md { display: none; }
+/* Virtualizzazione nativa: il browser salta il rendering degli elementi fuori
+   viewport. contain-intrinsic-size: auto memoizza l'ultima dimensione
+   renderizzata; il fallback 96px vale solo per contenuto mai visto, cosi' lo
+   scroll resta stabile senza observer JS. */
+#messages > * { content-visibility: auto; contain-intrinsic-size: auto 96px; }
 .tool-args { min-width: 0; max-width: none; flex: 1; overflow: hidden; color: var(--subtle); opacity: 1; text-overflow: ellipsis; white-space: nowrap; font-family: inherit; }
 .activity-only .tool-card, .activity-only details.think { margin: 0; }
 .activity-bundle .tool-card > summary { min-height: 28px; padding: 2px 8px; gap: 9px; }

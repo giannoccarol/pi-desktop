@@ -221,7 +221,7 @@ function beginStreamAssistant() {
   // Keep the shell detached until the first real block arrives. Pi can emit
   // empty assistant segments between internal steps; mounting those shells was
   // the source of repeated, content-less “PI” labels.
-  state.streamAssistant = { wrap, content: wrap.querySelector(".content"), blocks: new Map(), rafPending: false, mounted: false };
+  state.streamAssistant = { wrap, content: wrap.querySelector(".content"), blocks: new Map(), renderTimer: null, mounted: false };
   state.lastAssistantErrored = false;
 }
 
@@ -303,6 +303,7 @@ function streamApplyDelta(evt) {
   } else if (e.type === "text_end") {
     const b = sa.blocks.get(idx);
     if (b && b.type === "text") {
+      cancelStreamRenderTimer();
       b.node.dataset.raw = e.content ?? b.node.dataset.raw;
       renderStreamTextNode(b.node);
     }
@@ -310,19 +311,84 @@ function streamApplyDelta(evt) {
 }
 
 function renderStreamTextNode(node) {
+  // Rendering finale/autorevole: rimpiazza l'intero nodo e azzera lo stato
+  // incrementale (i contenitori stable/tail non sopravvivono all'innerHTML).
+  node.__streamStableEl = null;
+  node.__streamTailEl = null;
+  node.__streamStableLen = 0;
   node.innerHTML = md(node.dataset.raw || "");
   node.classList.remove("typing");
   scheduleScroll();
 }
 
+// Rendering incrementale durante lo streaming: il prefisso gia' completato si
+// renderizza una sola volta, ogni tick ri-parse solo il blocco aperto in coda.
+// Senza di questo il costo cumulato e' O(n^2) sul testo accumulato.
+function streamSplitPoint(raw) {
+  const lines = raw.split("\n");
+  let inFence = false;
+  let splitAt = 0;
+  let offset = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*```/.test(line)) inFence = !inFence;
+    if (!inFence && !line.trim()) splitAt = offset + line.length + 1;
+    offset += line.length + 1;
+  }
+  // Dentro un fence l'intero blocco aperto va ri-renderizzato: taglia prima
+  // della riga di apertura cosi' la coda contiene il fence completo.
+  if (inFence) {
+    splitAt = 0;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (/^\s*```/.test(lines[i])) {
+        splitAt = i ? lines.slice(0, i).join("\n").length + 1 : 0;
+        break;
+      }
+    }
+  }
+  return splitAt;
+}
+
+function renderStreamTextNodeIncremental(node) {
+  const raw = node.dataset.raw || "";
+  let stable = node.__streamStableEl;
+  let tail = node.__streamTailEl;
+  if (!tail || !tail.isConnected) {
+    stable = node.__streamStableEl = document.createElement("div");
+    tail = node.__streamTailEl = document.createElement("div");
+    node.textContent = "";
+    node.appendChild(stable);
+    node.appendChild(tail);
+    node.__streamStableLen = 0;
+  }
+  const splitAt = streamSplitPoint(raw);
+  if (splitAt !== (node.__streamStableLen || 0)) {
+    // Il confine si sposta solo in avanti (nuovi blocchi completati) oppure
+    // all'indietro quando si apre un fence nel prefisso: in entrambi i casi
+    // il parse del prefisso resta Amortized O(n), non per-tick.
+    stable.innerHTML = md(raw.slice(0, splitAt));
+    node.__streamStableLen = splitAt;
+  }
+  tail.innerHTML = md(raw.slice(splitAt));
+  scheduleScroll();
+}
+
+function cancelStreamRenderTimer() {
+  const sa = state.streamAssistant;
+  if (sa?.renderTimer) {
+    clearTimeout(sa.renderTimer);
+    sa.renderTimer = null;
+  }
+}
+
+const STREAM_RENDER_THROTTLE_MS = 90;
 function queueStreamRender(node) {
   const sa = state.streamAssistant;
-  if (!sa || sa.rafPending) return;
-  sa.rafPending = true;
-  requestAnimationFrame(() => {
-    sa.rafPending = false;
-    if (node.isConnected) renderStreamTextNode(node);
-  });
+  if (!sa || sa.renderTimer) return;
+  sa.renderTimer = setTimeout(() => {
+    if (sa) sa.renderTimer = null;
+    if (node.isConnected) renderStreamTextNodeIncremental(node);
+  }, STREAM_RENDER_THROTTLE_MS);
 }
 
 function smartTitle(text) {
@@ -362,6 +428,7 @@ function maybeAutoTitle(message) {
 function endStreamAssistant(message) {
   const sa = state.streamAssistant;
   if (!sa) return;
+  cancelStreamRenderTimer();
   const blocks = message?.content || [];
   sa.wrap.classList.toggle("activity-only", isActivityOnly(blocks));
   const hasVisibleContent = hasVisibleAssistantContent(blocks);
@@ -416,37 +483,14 @@ function endStreamAssistant(message) {
 
 
 // Extracted from app.js - clearChat + updateActivityBundle
-let virtualObserver = null;
 
-function initVirtualization() {
-  try {
-    if (virtualObserver) virtualObserver.disconnect();
-    const rootEl = el.messages || document.querySelector("#messages");
-    if (!rootEl || typeof IntersectionObserver === "undefined") return;
-    virtualObserver = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        const target = e.target;
-        if (e.isIntersecting) target.classList.remove("virtual-hidden");
-        else if (target.classList.contains("tool-card") || target.classList.contains("msg-assistant") || target.classList.contains("msg-user")) {
-          // keep placeholder height to avoid scroll jump: do not hide completely if near viewport
-          if (Math.abs(e.boundingClientRect.top) > 2000) target.classList.add("virtual-hidden");
-        }
-      }
-    }, { root: el.chat || rootEl.parentElement, rootMargin: "200px 0px 200px 0px", threshold: 0 });
-    const observeAll = () => {
-      for (const node of rootEl.children) {
-        try { virtualObserver.observe(node); } catch {}
-      }
-    };
-    observeAll();
-    // observe future nodes
-    const mo = new MutationObserver(() => observeAll());
-    try { mo.observe(rootEl, { childList: true }); } catch {}
-  } catch {}
-}
-
-function disableVirtualization(){ try{ virtualObserver&&virtualObserver.disconnect(); }catch{} virtualObserver=null; }
-function enableVirtualization(){ initVirtualization(); }
+// La virtualizzazione off-screen e' delegata al CSS (#messages > * con
+// content-visibility: auto in styles.css): il browser salta nativamente il
+// rendering fuori viewport, senza observer JS che ri-scanavano tutti i figli
+// a ogni mutazione. Le funzioni restano esportate come no-op per compat.
+function initVirtualization() {}
+function disableVirtualization() {}
+function enableVirtualization() {}
 
 function clearChat() {
   // delegated via piStore globals - same as app.js

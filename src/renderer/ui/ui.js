@@ -29,16 +29,69 @@
     iconRefreshPaused = Math.max(0, iconRefreshPaused - 1);
     if (iconRefreshPaused === 0) refreshIcons();
   }
+  // Replica di lucide.toPascalCase: "refresh-cw" -> "RefreshCw".
+  function toPascalCaseIcon(string) {
+    const camelCase = String(string).replace(/^([A-Z])|[\s-_]+(\w)/g, (_m, p1, p2) => (p2 ? p2.toUpperCase() : p1.toLowerCase()));
+    return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
+  }
+  // Sostituisce solo le <i data-lucide> pendenti. lucide.createIcons() matcha
+  // anche gli svg[data-lucide] gia' montati e li ricostruisce tutti: con
+  // centinaia di icone nel documento costava una ricostruzione full-DOM a
+  // ogni chiamata (streaming, toast, sidebar).
+  function replacePendingIcons() {
+    const pending = document.querySelectorAll("i[data-lucide]");
+    if (!pending.length) return 0;
+    const icons = root.lucide.icons || {};
+    let replaced = 0;
+    for (const el of pending) {
+      const name = el.getAttribute("data-lucide");
+      const iconNode = icons[toPascalCaseIcon(name)];
+      if (!iconNode) continue;
+      const attrs = {};
+      let hasA11y = false;
+      for (const attr of el.getAttributeNames()) {
+        if (attr === "data-lucide") continue;
+        attrs[attr] = el.getAttribute(attr);
+        if (attr === "aria-hidden" || attr === "aria-label" || attr === "role" || attr === "aria-labelledby") hasA11y = true;
+      }
+      attrs["data-lucide"] = name;
+      attrs.class = ["lucide", `lucide-${name}`, attrs.class || ""].filter(Boolean).join(" ");
+      if (!hasA11y) attrs["aria-hidden"] = "true";
+      const svg = root.lucide.createElement(iconNode, attrs);
+      el.parentNode?.replaceChild(svg, el);
+      replaced += 1;
+    }
+    return replaced;
+  }
   function refreshIcons() {
     if (iconRefreshPaused) return;
     try {
-      if (root.lucide) root.lucide.createIcons({ icons: root.lucide.icons });
+      if (!root.lucide) return;
+      if (typeof root.lucide.createElement === "function" && root.lucide.icons) replacePendingIcons();
+      else root.lucide.createIcons({ icons: root.lucide.icons });
     } catch (err) {
       console.warn(t("icon.lucide.warn"), err);
     }
   }
 
   function icon(name) { return `<i data-lucide="${name}"></i>`; }
+
+  // Re-target del nome icona su un elemento che puo' essere gia' un SVG montato:
+  // il pass "pending-only" non tocca gli svg, quindi lo si rimpiazza con una
+  // <i> fresca (stesse classi) che il prossimo refreshIcons convertira'.
+  function retargetIcon(host, name) {
+    const current = host?.querySelector?.("[data-lucide]");
+    if (!current) return;
+    if (current.tagName === "I") {
+      current.setAttribute("data-lucide", name);
+      return;
+    }
+    const fresh = document.createElement("i");
+    fresh.setAttribute("data-lucide", name);
+    const cls = current.getAttribute("class");
+    if (cls) fresh.setAttribute("class", cls);
+    current.replaceWith(fresh);
+  }
 
   function prefersReducedMotion() {
     try { return root.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true; }
@@ -410,7 +463,7 @@
   }
 
   const api = {
-    toast, refreshIcons, pauseIconRefresh, resumeIconRefresh, icon,
+    toast, refreshIcons, pauseIconRefresh, resumeIconRefresh, icon, retargetIcon,
     prefersReducedMotion, animateChatEntry, cancelAnimatedChatScroll,
     chatBottomDistance, captureChatScrollState, restoreChatScrollState, noteChatScroll,
     scrollBottom, jumpToBottom, waitUntilPinnedToBottom, isNearBottom, updateScrollBottomVisibility,
