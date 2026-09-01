@@ -1,3 +1,10 @@
+# [0.20.0](https://github.com/giannoccarol/pi-desktop/compare/v0.19.0...v0.20.0) (2026-09-01)
+
+
+### Features
+
+* **ui:** menu strumenti a dropdown, explorer nel progetto con icone, terminale dockato, diff stile VS Code ([0bf3847](https://github.com/giannoccarol/pi-desktop/commit/0bf384795be77c865b7f471d46b6f9edcba08db2))
+
 # [0.19.0](https://github.com/giannoccarol/pi-desktop/compare/v0.18.2...v0.19.0) (2026-09-01)
 
 
