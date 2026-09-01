@@ -75,15 +75,23 @@ test("update-service: download on pacman uses electron-updater", async () => {
 });
 
 test("update-service: unknown legacy Linux installs stay manual", { skip: process.platform !== "linux" }, () => {
-  const type = inferPackageType({
-    getPath(name) {
-      if (name === "exe") return "/opt/Pi Desktop/pi-desktop";
-      return "";
-    },
-  });
-  assert.equal(type, "native");
-  assert.equal(supportsAutoInstall("linux", type), false);
-  assert.equal(supportsCachedPackageInstall("linux", type), false);
+  // Il test deve essere ermetico: se la shell eredita APPIMAGE (es. lanciata
+  // da un'app AppImage) l'inferenza lo raccoglierebbe e il risultato cambierebbe.
+  const prevAppImage = process.env.APPIMAGE;
+  delete process.env.APPIMAGE;
+  try {
+    const type = inferPackageType({
+      getPath(name) {
+        if (name === "exe") return "/opt/Pi Desktop/pi-desktop";
+        return "";
+      },
+    });
+    assert.equal(type, "native");
+    assert.equal(supportsAutoInstall("linux", type), false);
+    assert.equal(supportsCachedPackageInstall("linux", type), false);
+  } finally {
+    if (prevAppImage !== undefined) process.env.APPIMAGE = prevAppImage;
+  }
 });
 
 test("update-service: getState keeps downloaded when pending pacman exists", () => {

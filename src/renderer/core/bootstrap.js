@@ -232,6 +232,31 @@
     el.themeBtn.addEventListener("click", () => {
       applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
     });
+    // Controlli finestra: la titlebar nativa è disattivata e i pulsanti vivono in
+    // topbar. Su macOS restano i traffic light di sistema: qui si nascondono.
+    const syncMaximized = (maximized) => {
+      if (!el.btnWinMaximize) return;
+      el.btnWinMaximize.querySelector(".icon-max")?.classList.toggle("hidden", Boolean(maximized));
+      el.btnWinMaximize.querySelector(".icon-restore")?.classList.toggle("hidden", !maximized);
+      el.btnWinMaximize.title = maximized ? "Ripristina dimensione" : "Ingrandisci";
+    };
+    el.btnWinMinimize?.addEventListener("click", () => api.minimizeWindow?.());
+    el.btnWinMaximize?.addEventListener("click", () => api.toggleMaximizeWindow?.());
+    el.btnWinClose?.addEventListener("click", () => api.closeWindow?.());
+    if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
+      document.body.classList.add("platform-mac");
+    } else if (api && typeof api.on === "function") {
+      api.on("window:state", (payload) => syncMaximized(Boolean(payload?.maximized)));
+      api.isMaximized?.().then(syncMaximized).catch(() => {});
+    }
+    // Doppio clic sulla topbar = ingrandisci/ripristina. Su Linux il drag-region
+    // non lo fa nativamente (Windows/macOS sì: lì evitiamo il doppio toggle).
+    if (/Linux/.test(navigator.platform || navigator.userAgent)) {
+      document.getElementById("topbar")?.addEventListener("dblclick", (event) => {
+        if (event.target.closest("button, input, .chat-tabs, .win-controls, .menu")) return;
+        api.toggleMaximizeWindow?.();
+      });
+    }
     el.addProject.addEventListener("click", async () => {
       try {
         const updated = await api.addProject();
@@ -791,7 +816,21 @@
       (window.refreshPiStatus||window.piStatus?.refreshPiStatus)?.(false),
       (window.refreshGitStatus||window.piStatus?.refreshGitStatus)?.()
     ]);
-    el.emptyState.classList.remove("hidden");
+    // Riapertura finestra (tray/hotkey/launcher): il main conserva tab e runtime pi,
+    // ma il renderer riparte senza messaggi e il tab attivo appare vuoto finche'
+    // non si switcha di chat. Se il tab attivo ha una sessione, ricaricala subito.
+    const activeTab = (state.tabs || []).find((tab) => tab.id === state.activeTabId);
+    if (!popOutTabId && activeTab?.sessionFile) {
+      try {
+        await (window.reloadConversationFromRuntime || window.piSessionView?.reloadConversationFromRuntime)?.({
+          restoreTab: true,
+          pinToBottom: true,
+        });
+      } catch (err) {
+        console.warn("[boot] ripristino conversazione attiva:", err);
+      }
+    }
+    if (!el.messages?.childNodes?.length) el.emptyState.classList.remove("hidden");
     el.input.focus();
 
     // Primo avvio: chiedi il nome una sola volta finche' l'utente non conferma o salta

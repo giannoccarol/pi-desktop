@@ -401,6 +401,11 @@ function createWindow() {
     backgroundColor: "#0f1115",
     autoHideMenuBar: true,
     icon: windowIcon,
+    // Titlebar nativa esclusa: la finestra si trascina dalla topbar del renderer
+    // e i pulsanti riduci/ingrandisci/chiudi sono disegnati dall'app (win-controls).
+    // Su macOS si mantiene la barra nascosta con i traffic light di sistema.
+    frame: process.platform === "darwin" ? undefined : false,
+    titleBarStyle: process.platform === "darwin" ? "hidden" : undefined,
     webPreferences: {
       preload: path.join(__dirname, "..", "..", "preload", "preload.js"),
       contextIsolation: true,
@@ -722,6 +727,8 @@ ipcMain.handle("window:popOutTab", async (_e, tabId) => {
       backgroundColor: "#0f1115",
       autoHideMenuBar: true,
       icon: resolveWindowIcon(),
+      frame: process.platform === "darwin" ? undefined : false,
+      titleBarStyle: process.platform === "darwin" ? "hidden" : undefined,
       webPreferences: {
         preload: path.join(__dirname, "..", "..", "preload", "preload.js"),
         contextIsolation: true,
@@ -736,6 +743,25 @@ ipcMain.handle("window:popOutTab", async (_e, tabId) => {
     attachContextMenu(pop);
     return { ok:true, tabId:id };
   } catch (err) { return { ok:false, error: String(err?.message||err) }; }
+});
+
+// --- controlli finestra (titlebar nativa disattivata) -----------------------
+// Ogni comando agisce sulla finestra chiamante: la stessa UI serve a main e pop-out.
+ipcMain.handle("window:minimize", (e) => { BrowserWindow.fromWebContents(e.sender)?.minimize(); });
+ipcMain.handle("window:toggleMaximize", (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w) return false;
+  if (w.isMaximized()) w.unmaximize(); else w.maximize();
+  return w.isMaximized();
+});
+ipcMain.handle("window:close", (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); });
+ipcMain.handle("window:isMaximized", (e) => Boolean(BrowserWindow.fromWebContents(e.sender)?.isMaximized()));
+// Lo stato ingrandisci/ripristina può cambiare anche fuori dal renderer (WM,
+// doppio clic sulla topbar): lo si ripete a ogni transizione.
+app.on("browser-window-created", (_e, w) => {
+  const sendState = () => { try { w.webContents.send("window:state", { maximized: w.isMaximized() }); } catch {} };
+  w.on("maximize", sendState);
+  w.on("unmaximize", sendState);
 });
 
 ipcMain.handle("projects:add", async () => {

@@ -100,6 +100,12 @@ contextBridge.exposeInMainWorld("piDesktop", {
   getGitStatus: (cwd) => ipcRenderer.invoke("git:getStatus", cwd),
   popOutTab: (tabId) => ipcRenderer.invoke("window:popOutTab", tabId),
 
+  // window controls (titlebar nativa disattivata)
+  minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
+  toggleMaximizeWindow: () => ipcRenderer.invoke("window:toggleMaximize"),
+  closeWindow: () => ipcRenderer.invoke("window:close"),
+  isMaximized: () => ipcRenderer.invoke("window:isMaximized"),
+
   // package store managed by the external pi installation
   searchPackages: (query) => ipcRenderer.invoke("packages:search", query),
   listInstalledPackages: () => ipcRenderer.invoke("packages:listInstalled"),
@@ -113,7 +119,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
 
   // events from main
   on(channel, cb) {
-    const ALLOWED_CHANNELS = ["pi:event", "pi:maintenance-output", "pi:package-output", "pi:auth-request", "pi:tray-new-chat", "update:state", "app:stale-install", "sessions:changed"];
+    const ALLOWED_CHANNELS = ["pi:event", "pi:maintenance-output", "pi:package-output", "pi:auth-request", "pi:tray-new-chat", "update:state", "app:stale-install", "sessions:changed", "window:state"];
     if (!ALLOWED_CHANNELS.includes(channel)) return () => {};
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on(channel, handler);

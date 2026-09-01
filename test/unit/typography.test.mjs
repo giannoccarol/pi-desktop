@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const styles = fs.readFileSync(path.join(root, "src/renderer/styles.css"), "utf8");
 
-test("typography: Inter is the UI font and monospace is reserved for technical content", () => {
-  assert.match(styles, /font:\s*14px\/1\.5\s+"Inter"/);
+test("typography: DM Sans is the UI font (Inter fallback) and monospace is reserved for technical content", () => {
+  assert.match(styles, /font:\s*14px\/1\.5\s+"DM Sans",\s*"Inter"/);
   assert.match(styles, /--mono:\s*ui-monospace/);
 });
 

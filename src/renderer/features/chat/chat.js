@@ -61,9 +61,10 @@ function renderFinalMessage(message, resultMap) {
   if (message.role === "branchSummary" || message.role === "compactionSummary") {
     const det = document.createElement("details");
     det.className = "think";
-    det.innerHTML = `<summary>riepilogo automatico</summary><div class="think-body"></div>`;
+    det.innerHTML = `<summary>${icon("scroll-text")}<span>riepilogo automatico</span></summary><div class="think-body"></div>`;
     det.querySelector(".think-body").textContent = message.summary || "";
     el.messages.appendChild(det);
+    refreshIcons();
     return;
   }
   if (message.role === "toolResult") {
@@ -194,7 +195,7 @@ function renderContentBlocks(container, blocks, resultMap) {
       if (!String(block.thinking || "").trim()) continue;
       const det = document.createElement("details");
       det.className = "think";
-      det.innerHTML = `<summary>${escapeHtml(t("tool.thinking"))}</summary><div class="think-body"></div>`;
+      det.innerHTML = `<summary>${icon("brain")}<span>${escapeHtml(t("tool.thinking"))}</span></summary><div class="think-body"></div>`;
       det.querySelector(".think-body").textContent = block.thinking || "";
       container.appendChild(det);
     } else if (block.type === "toolCall") {
@@ -247,8 +248,9 @@ function streamEnsureBlock(idx, type) {
     } else if (type === "thinking") {
       node = document.createElement("details");
       node.className = "think";
-      node.innerHTML = `<summary>${escapeHtml(t("tool.thinking"))}</summary><div class="think-body"></div>`;
+      node.innerHTML = `<summary>${icon("brain")}<span>${escapeHtml(t("tool.thinking"))}</span></summary><div class="think-body"></div>`;
       sa.content.appendChild(node);
+      refreshIcons();
     } else if (type === "toolcall") {
       node = makeToolCard("…", "", sa.content);
       node.dataset.args = "";

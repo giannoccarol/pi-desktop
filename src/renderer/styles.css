@@ -1,4 +1,18 @@
 @font-face {
+  font-family: "DM Sans";
+  src: url("fonts/DMSansVariable.woff2") format("woff2");
+  font-weight: 100 1000;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("fonts/DMSansVariable-Italic.woff2") format("woff2");
+  font-weight: 100 1000;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
   font-family: "Inter";
   src: url("fonts/InterVariable.woff2") format("woff2");
   font-weight: 100 900;
@@ -19,7 +33,7 @@
   --surface: #ffffff;
   --surface-2: #f6f6f6;
   --surface-3: #eeeeee;
-  --sidebar: #fafafa;
+  --sidebar: #f3f3f0;
   --border: transparent;
   --border-strong: #d5d5d5;
   --hairline: #e6e6e6;
@@ -50,11 +64,11 @@
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #18191a;
+  --bg: #1d1e1f;
   --surface: #1e1f20;
   --surface-2: #242526;
   --surface-3: #2d2e30;
-  --sidebar: #1b1c1d;
+  --sidebar: #131415;
   --border: transparent;
   --border-strong: #434548;
   --hairline: #303234;
@@ -81,7 +95,7 @@ body {
   overflow: hidden;
   color: var(--text);
   background: var(--bg);
-  font: 14px/1.5 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  font: 14px/1.5 "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
 }
@@ -89,7 +103,7 @@ button, input, textarea { font: inherit; }
 button { color: inherit; }
 svg { width: 17px; height: 17px; stroke-width: 1.8; }
 
-#app { display: flex; height: 100vh; min-height: 0; }
+#app { display: flex; height: 100vh; min-height: 0; background: var(--sidebar); }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
@@ -507,7 +521,9 @@ input[type="search"]::-webkit-search-cancel-button { opacity: .55; }
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: color-mix(in srgb, var(--surface) 60%, var(--sidebar));
+  /* stesso colore del rail: una fascia di tinta diversa qui romperebbe la
+     continuità della sidebar accanto alla scheda arrotondata della chat */
+  background: transparent;
 }
 .profile { flex: 1; display: flex; align-items: center; gap: 9px; min-width: 0; font-weight: 550; font-size: 12.5px; }
 .avatar {
@@ -590,8 +606,17 @@ body.session-loading .session-item:not(.loading) { opacity: .45; }
 .btn:disabled { opacity: .45; cursor: default; }
 .btn svg { width: 15px; height: 15px; }
 
-/* Main */
-#main { min-width: 0; flex: 1; display: flex; flex-direction: column; background: var(--bg); }
+/* Main — la chat è una "scheda" appoggiata alla sidebar: angoli arrotondati
+   a sinistra e tinta lievemente diversa dal rail (vedi --sidebar in :root). */
+#main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: 18px 0 0 18px;
+  overflow: hidden;
+}
 #topbar {
   min-height: 65px;
   display: flex;
@@ -603,6 +628,39 @@ body.session-loading .session-item:not(.loading) { opacity: .45; }
 html[data-theme="dark"] #topbar { box-shadow: none; }
 #topbar #btn-toggle-sidebar { border-color: transparent; background: transparent; }
 #topbar #btn-theme { margin-left: 6px; }
+/* Finestra senza titlebar nativa: la topbar trascina la finestra (doppio clic =
+   ingrandisci, gestito dal sistema); i pulsanti riduci/ingrandisci/chiudi sono
+   in testa alla scheda, accanto agli altri tasti. */
+#topbar { -webkit-app-region: drag; }
+#topbar :is(button, input, select, .chat-tabs) { -webkit-app-region: no-drag; }
+.win-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+  -webkit-app-region: no-drag;
+}
+/* Tasti finestra: stessa geometria e stessi colori degli .icon-btn della
+   topbar, così tutti i tasti in alto hanno lo stesso sfondo. */
+.win-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+.win-btn svg { width: 15px; height: 15px; }
+.win-btn:hover { color: var(--text); background: var(--hover); }
+.win-btn:active { transform: scale(.96); }
+.win-btn.win-btn-close:hover { color: #ffffff; background: var(--red); }
+/* macOS: i traffic light nativi restano (titleBarStyle hidden) */
+.platform-mac .win-controls { display: none; }
 .chat-tabs {
   min-width: 0;
   max-width: min(58vw, 820px);
@@ -666,6 +724,8 @@ body.session-loading .chat-tab:not(.loading):not(.active) { opacity: .45; }
 .session-item.running .session-title::after { content: ""; width: 6px; height: 6px; display: inline-block; margin-left: 7px; border-radius: 50%; background: var(--text); vertical-align: 1px; animation: tab-pulse 1.4s ease-in-out infinite; }
 @keyframes tab-pulse { 50% { opacity: .38; } }
 #main { position: relative; }
+/* Sidebar collassata: la scheda diventa full-bleed (niente raggio inutile) */
+#app:has(#sidebar.collapsed) #main { border-radius: 0; }
 #chat {
   min-height: 0;
   flex: 1;
@@ -835,23 +895,25 @@ html[data-theme="dark"] .hero-img--dark { display: block; }
 .msg-assistant.activity-only + .msg-assistant.activity-only { margin-top: 0; }
 .activity-bundle { margin: -2px 0; color: var(--muted); }
 .activity-bundle > summary {
-  min-height: 27px;
+  min-height: 30px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 3px;
+  padding: 3px 8px;
+  border-radius: 8px;
   list-style: none;
   cursor: pointer;
   user-select: none;
-  font-size: 12px;
+  font-size: 12.5px;
 }
+.activity-bundle > summary:hover { background: var(--hover); }
 .activity-bundle > summary::-webkit-details-marker { display: none; }
 .activity-bundle > summary::after { width: 7px; height: 7px; margin-left: 2px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); content: ""; }
 .activity-bundle:not([open]) > summary::after { transform: rotate(-45deg); }
 .activity-bundle > summary > svg { width: 13px; height: 13px; opacity: .8; }
 .activity-label { color: var(--muted); }
 .activity-count { margin-left: auto; color: var(--subtle); font-size: var(--font-caption); }
-.activity-list { padding: 1px 3px 3px 21px; }
+.activity-list { padding: 1px 4px 4px 10px; }
 .activity-bundle[open] > .activity-list,
 details.think[open] > .think-body,
 .tool-card[open] > .tool-body { animation: disclosure-in var(--motion-base) var(--ease-out); }
@@ -877,22 +939,51 @@ details.think[open] > .think-body,
 .md table { max-width: 100%; display: block; overflow-x: auto; margin: .65em 0; border-collapse: collapse; }
 .md th, .md td { padding: 6px 10px; border: 0; border-bottom: 1px solid var(--hairline); text-align: left; }
 .md th { background: var(--surface-2); }
-details.think { margin: 0; padding: 0; border: 0; border-radius: 4px; color: var(--muted); }
-details.think summary { min-height: 27px; padding: 3px 4px; cursor: pointer; user-select: none; font-size: var(--font-caption); line-height: 20px; }
-details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-left: 1px solid var(--hairline); white-space: pre-wrap; font-size: 12px; }
-.tool-card { margin: 0; overflow: hidden; border: 0; border-radius: 4px; background: transparent; }
+/* Righe attività (comandi / ragionamento): etichette in sans, righe alte e
+   allineate al contenuto, corpo indentato sotto la colonna degli argomenti. */
+details.think { margin: 0; padding: 0; border: 0; border-radius: 8px; color: var(--muted); }
+details.think > summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12.5px;
+  line-height: 20px;
+}
+details.think > summary::-webkit-details-marker { display: none; }
+details.think > summary::after { width: 6px; height: 6px; flex: 0 0 auto; margin-left: 1px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); content: ""; opacity: .65; transition: transform var(--motion-fast) var(--ease-standard); }
+details.think[open] > summary::after { transform: rotate(45deg); }
+details.think > summary:hover { background: var(--hover); }
+details.think > summary > svg { width: 13px; height: 13px; color: var(--subtle); }
+details.think .think-body { margin: 0 0 4px 31px; padding: 2px 12px 6px; border-left: 2px solid var(--hairline); white-space: pre-wrap; font-size: 12.5px; line-height: 1.6; }
+.tool-card { margin: 0; overflow: hidden; border: 0; border-radius: 8px; background: transparent; }
 .tool-card:hover { background: var(--hover); }
-.tool-card > summary { min-height: 27px; display: flex; align-items: center; gap: 7px; padding: 2px 4px; list-style: none; cursor: pointer; user-select: none; font: var(--font-caption) var(--mono); }
+.tool-card > summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 3px 8px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  font-family: inherit;
+  font-size: 12.5px;
+}
 .tool-card > summary::-webkit-details-marker { display: none; }
 .tool-card[open] > summary { border-bottom-color: transparent; }
-.tool-name { min-width: 118px; flex: 0 0 auto; color: var(--muted); font-family: inherit; }
-.tool-name svg { width: 13px; height: 13px; vertical-align: -2px; }
-.tool-state { margin-left: auto; color: var(--muted); font-size: var(--font-caption); }
+.tool-name { min-width: 0; flex: 0 0 auto; color: var(--muted); font-family: inherit; font-weight: 550; letter-spacing: .002em; }
+.tool-name svg { width: 14px; height: 14px; vertical-align: -2px; color: var(--subtle); }
+.tool-state { margin-left: auto; flex: 0 0 auto; color: var(--subtle); font-size: var(--font-caption); }
 .tool-state.err { color: var(--red); }
 .tool-state.ok { width: 6px; height: 6px; overflow: hidden; border-radius: 50%; color: transparent; background: var(--green); font-size: 0; }
 .tool-state.interrupted { color: var(--amber); }
-.tool-body { max-height: 260px; overflow: auto; margin-left: 121px; padding: 5px 7px 8px; border-left: 1px solid var(--hairline); }
-.tool-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 var(--mono); }
+.tool-body { max-height: 280px; overflow: auto; margin: 0 0 5px 31px; padding: 6px 12px 8px; border-left: 2px solid var(--hairline); }
+.tool-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.55 var(--mono); }
 /* Diff view */
 .diff-view { margin: 6px 0 8px; overflow: hidden; border: 1px solid var(--hairline); border-radius: 8px; background: var(--surface); }
 .diff-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); font: 11px var(--mono); color: var(--muted); }
@@ -918,20 +1009,18 @@ details.think .think-body { margin-left: 121px; padding: 5px 7px 8px; border-lef
 /* Virtualization */
 .virtual-hidden { opacity: 0.35; max-height: 44px; overflow: hidden; pointer-events: none; }
 .virtual-hidden .tool-body, .virtual-hidden .md { display: none; }
-.tool-args { min-width: 0; max-width: none; flex: 1; overflow: hidden; color: var(--muted); opacity: .82; text-overflow: ellipsis; white-space: nowrap; }
+.tool-args { min-width: 0; max-width: none; flex: 1; overflow: hidden; color: var(--subtle); opacity: 1; text-overflow: ellipsis; white-space: nowrap; font-family: inherit; }
 .activity-only .tool-card, .activity-only details.think { margin: 0; }
-.activity-bundle .tool-card { border: 0; border-radius: 4px; background: transparent; }
-.activity-bundle .tool-card:hover { background: var(--hover); }
-.activity-bundle .tool-card > summary { min-height: 25px; padding: 2px 4px; gap: 7px; }
+.activity-bundle .tool-card > summary { min-height: 28px; padding: 2px 8px; gap: 9px; }
 .activity-bundle .tool-card[open] > summary { border-bottom-color: transparent; }
-.activity-bundle .tool-name { min-width: 118px; color: var(--muted); font-family: inherit; }
-.activity-bundle .tool-name svg { width: 12px; height: 12px; color: var(--subtle); }
-.activity-bundle .tool-args { color: var(--muted); font-family: inherit; opacity: 1; }
+.activity-bundle .tool-name { min-width: 0; color: var(--muted); font-family: inherit; }
+.activity-bundle .tool-name svg { width: 13px; height: 13px; color: var(--subtle); }
+.activity-bundle .tool-args { color: var(--subtle); font-family: inherit; opacity: 1; }
 .activity-bundle .tool-state.ok { width: 6px; height: 6px; overflow: hidden; border-radius: 50%; color: transparent; background: var(--green); font-size: 0; }
 .activity-bundle .tool-state.err { font-size: var(--font-micro); }
-.activity-bundle .tool-body { margin-left: 121px; padding: 5px 7px 8px; border-left: 1px solid var(--hairline); }
-.activity-bundle details.think { border: 0; border-radius: 4px; }
-.activity-bundle details.think > summary { min-height: 25px; padding: 3px 4px; line-height: 18px; }
+.activity-bundle .tool-body { margin-left: 31px; padding: 5px 12px 8px; border-left: 2px solid var(--hairline); }
+.activity-bundle details.think { border: 0; border-radius: 8px; }
+.activity-bundle details.think > summary { min-height: 28px; padding: 3px 9px; line-height: 18px; }
 .error-box { margin: 6px 0; padding: 9px 12px; border-radius: 10px; color: var(--red); background: color-mix(in srgb, var(--red) 8%, transparent); white-space: pre-wrap; }
 .error-box.interrupted { color: var(--amber); background: color-mix(in srgb, var(--amber) 7%, transparent); }
 .typing::after { content: "▍"; color: var(--text); animation: blink 1s steps(1) infinite; }
@@ -1903,7 +1992,8 @@ body { font-size: 14px; }
 /* Sidebar */
 #sidebar {
   --sidebar-w: 280px;
-  border-right: 1px solid var(--hairline);
+  /* niente bordo destro: la scheda della chat si separa dal rail con la sola
+   variazione di tinta e la stondatura (effetto "scheda figlia") */
 }
 .side-head { padding: 18px 14px 12px; gap: 12px; }
 .brand-row { min-height: 30px; padding: 0 5px; }
@@ -1935,7 +2025,7 @@ body { font-size: 14px; }
 .project-chats .session-item { padding-left: 30px; }
 .session-title { font-size: 12.5px; }
 .session-meta { font-size: 11px; }
-.side-foot { min-height: 52px; padding: 9px 13px; border-top-color: var(--hairline); }
+.side-foot { min-height: 52px; padding: 9px 13px; }
 
 /* Topbar and open-chat navigation */
 #topbar { min-height: 56px; padding: 10px 18px; gap: 4px; }

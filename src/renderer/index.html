@@ -92,6 +92,11 @@
         <button id="btn-theme" class="icon-btn" data-i18n-title="btn.theme.title" data-i18n-aria-label="btn.theme.aria">
           <i data-lucide="sun"></i>
         </button>
+        <div class="win-controls" role="group" aria-label="Controlli finestra">
+          <button id="btn-win-minimize" class="win-btn" type="button" title="Riduci" aria-label="Riduci finestra"><i data-lucide="minus"></i></button>
+          <button id="btn-win-maximize" class="win-btn" type="button" title="Ingrandisci" aria-label="Ingrandisci finestra"><i data-lucide="square" class="icon-max"></i><i data-lucide="copy" class="icon-restore hidden"></i></button>
+          <button id="btn-win-close" class="win-btn win-btn-close" type="button" title="Chiudi" aria-label="Chiudi finestra"><i data-lucide="x"></i></button>
+        </div>
       </header>
 
       <div id="health-banner" class="hidden" style="padding:8px 16px;background:color-mix(in srgb,var(--amber) 12%,var(--surface));border-bottom:1px solid var(--hairline);display:flex;gap:8px;align-items:center;font-size:12px"><i data-lucide="alert-triangle" style="width:14px;height:14px;color:var(--amber)"></i><span id="health-banner-text" class="grow"></span><button id="btn-health-log" class="btn ghost small" type="button">Log</button></div>
