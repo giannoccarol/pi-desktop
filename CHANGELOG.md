@@ -1,3 +1,10 @@
+# [0.19.0](https://github.com/giannoccarol/pi-desktop/compare/v0.18.2...v0.19.0) (2026-09-01)
+
+
+### Features
+
+* **ui:** chat a scheda, DM Sans, attivita' ridisegnata, finestra frameless ([0e75fb5](https://github.com/giannoccarol/pi-desktop/commit/0e75fb5eb5d335fdf3c191a83b6153e226780eae)), closes [#main](https://github.com/giannoccarol/pi-desktop/issues/main)
+
 ## [0.18.2](https://github.com/giannoccarol/pi-desktop/compare/v0.18.1...v0.18.2) (2026-08-31)
 
 
