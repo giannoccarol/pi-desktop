@@ -150,6 +150,43 @@
     if(window.piSidebar?.renderProjects) window.piSidebar.renderProjects();
   }
   function nextFrame(){ return new Promise(r=>requestAnimationFrame(()=>r())); }
+  // Appende in coda i soli messaggi nuovi (chat cresciuta in background durante
+  // lo streaming) invece di ri-renderizzare l'intera conversazione. Restituisce
+  // false se il tail non e' autocontenuto: un toolResult il cui toolCall sta
+  // nel prefisso richiederebbe l'aggancio a una card gia' montata, quindi si
+  // cade sul full render.
+  async function appendConversationTail(tailMessages, isCurrent){
+    if(!Array.isArray(tailMessages) || !tailMessages.length) return false;
+    const tailCallIds=new Set();
+    for(const m of tailMessages){
+      if(m.role!=="assistant" || !Array.isArray(m.content)) continue;
+      for(const block of m.content){
+        if(block?.type==="toolCall"){
+          const callId=block.id||block.toolCallId;
+          if(callId) tailCallIds.add(callId);
+        }
+      }
+    }
+    for(const m of tailMessages){
+      if(m.role==="toolResult" && m.toolCallId && !tailCallIds.has(m.toolCallId)) return false;
+    }
+    const renderFn=window.piChat?.renderFinalMessage||window.renderFinalMessage;
+    if(typeof renderFn!=="function") return false;
+    const results=new Map();
+    const consumed=new Set();
+    for(const m of tailMessages) if(m.role==="toolResult" && m.toolCallId) results.set(m.toolCallId,m);
+    window.piChat?.beginBulkRender?.();
+    try{
+      for(const m of tailMessages){
+        try { renderFn(m,{results,consumed}); }
+        catch(err){ console.error("renderFinalMessage fallita (tail)", err); }
+      }
+    }finally{
+      window.piChat?.endBulkRender?.();
+    }
+    window.piUi?.refreshIcons?.();
+    return isCurrent();
+  }
   async function renderConversation(displayMessages, isCurrent=()=>true){
     const results=new Map();
     for(const m of displayMessages) if(m.role==="toolResult" && m.toolCallId) results.set(m.toolCallId,m);
@@ -212,8 +249,17 @@
     const domEmpty = !el.messages?.childNodes?.length || Boolean(el.messages?.querySelector?.(".chat-loading"));
     const identical = Array.isArray(paintedCache) && messagesEqual(paintedCache, displayMessages) && !domEmpty;
     if(!identical){
-      const painted=await renderConversation(displayMessages,isCurrent);
-      if(painted===false||!isCurrent()) return false;
+      let appended=false;
+      if(!domEmpty && Array.isArray(paintedCache) && paintedCache.length
+        && Array.isArray(displayMessages) && displayMessages.length>paintedCache.length
+        && messagesEqual(paintedCache, displayMessages.slice(0,paintedCache.length))){
+        // La lista e' cresciuta solo in coda: appendi i soli messaggi nuovi.
+        appended=await appendConversationTail(displayMessages.slice(paintedCache.length),isCurrent);
+      }
+      if(!appended){
+        const painted=await renderConversation(displayMessages,isCurrent);
+        if(painted===false||!isCurrent()) return false;
+      }
     }
     cacheSessionMessages(state.activeSessionFile, displayMessages, state.activeTabId);
     cacheSessionDom(state.activeSessionFile, state.activeTabId);
