@@ -1,3 +1,16 @@
+# [0.23.0](https://github.com/giannoccarol/pi-desktop/compare/v0.22.1...v0.23.0) (2026-09-03)
+
+
+### Bug Fixes
+
+* **linux:** install multi-size hicolor icons so launcher shows icon when app is closed ([d957e04](https://github.com/giannoccarol/pi-desktop/commit/d957e04542221de369bbe505936b72afca326e78))
+
+
+### Features
+
+* **mobile:** endpoint web via Tailscale + link nei settings ([f0b3d69](https://github.com/giannoccarol/pi-desktop/commit/f0b3d692d4178fd4065481358ecc6b534769fbd0))
+* **renderer:** todo list in stile Codex con dock fisso sopra il composer ([5459e0d](https://github.com/giannoccarol/pi-desktop/commit/5459e0d6fba763d948550ac6d3245e5205aca717))
+
 ## [0.22.1](https://github.com/giannoccarol/pi-desktop/compare/v0.22.0...v0.22.1) (2026-09-03)
 
 
