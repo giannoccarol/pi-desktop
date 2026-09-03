@@ -1,3 +1,10 @@
+## [0.21.3](https://github.com/giannoccarol/pi-desktop/compare/v0.21.2...v0.21.3) (2026-09-03)
+
+
+### Bug Fixes
+
+* **models:** live opencode fallback for stale pi.dev catalog ([51fd7a5](https://github.com/giannoccarol/pi-desktop/commit/51fd7a5992ae520c8b1986147c64cc0b16ca6d30))
+
 ## [0.21.2](https://github.com/giannoccarol/pi-desktop/compare/v0.21.1...v0.21.2) (2026-09-03)
 
 
