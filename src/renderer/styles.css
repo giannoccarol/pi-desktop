@@ -1804,6 +1804,13 @@ dialog::backdrop { background: rgba(0, 0, 0, .42); backdrop-filter: blur(2px); }
   max-height: 350px;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /* Righe alte quanto il contenuto e packate in alto: senza align-content:start
+     la griglia ad altezza fissa (max-height raggiunto con 40+ provider di pi)
+     distribuisce i 350px equamente tra le righe e .provider-card (overflow:hidden,
+     quindi min automatico a 0) viene schiacciata a ~10px, mostrando solo
+     strisce grigie. Stesso pattern di .package-list. */
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 8px;
   overflow-y: auto;
   padding-right: 3px;

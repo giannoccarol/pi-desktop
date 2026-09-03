@@ -156,6 +156,44 @@ class RuntimeTabs {
     return this._active().runtime.running;
   }
 
+  /**
+   * True se un'operazione mutante e' in volo (prompt, bash, compact...).
+   * Usato da main.js prima di riavviare il runtime per un aggiornamento
+   * del binario pi: con i tab, basta un tab occupato per saltare il restart
+   * globale ed evitare di killare agenti in background.
+   * Non crea un tab come effetto collaterale quando non ce ne sono.
+   */
+  isBusy(tabId) {
+    if (tabId && this.tabs.has(tabId)) {
+      const tab = this.tabs.get(tabId);
+      try {
+        if (tab.busy || tab.runtime?.isBusy?.()) return true;
+      } catch { /* ignora: considera idle */ }
+      return false;
+    }
+    for (const tab of this.tabs.values()) {
+      if (tab.busy) return true;
+      try {
+        if (tab.runtime?.isBusy?.()) return true;
+      } catch { /* ignora e controlla gli altri tab */ }
+    }
+    return false;
+  }
+
+  /**
+   * Delega al runtime del tab attivo: true se il binario pi su disco
+   * e' cambiato rispetto al processo RPC avviato (catalogo modelli stale).
+   */
+  async piBinaryChanged(tabId) {
+    const tab = tabId && this.tabs.has(tabId) ? this.tabs.get(tabId) : this.tabs.get(this.activeId);
+    if (!tab?.runtime?.piBinaryChanged) return false;
+    try {
+      return await tab.runtime.piBinaryChanged();
+    } catch {
+      return false;
+    }
+  }
+
   async ensureStarted(opts = {}) {
     const tab = this._active();
     if (opts.cwd) tab.cwd = opts.cwd;
