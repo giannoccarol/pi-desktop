@@ -1,3 +1,10 @@
+## [0.21.2](https://github.com/giannoccarol/pi-desktop/compare/v0.21.1...v0.21.2) (2026-09-03)
+
+
+### Bug Fixes
+
+* **runtime,ui:** menu modelli e lista provider rotti ([3076e73](https://github.com/giannoccarol/pi-desktop/commit/3076e73d39def9dd96e14d014d09c512e88303fd))
+
 ## [0.21.1](https://github.com/giannoccarol/pi-desktop/compare/v0.21.0...v0.21.1) (2026-09-03)
 
 
