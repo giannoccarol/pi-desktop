@@ -58,7 +58,7 @@ dmg:
   title: Pi Desktop ${version}
 
 linux:
-  icon: build/icon.png
+  icon: build/icons
   category: Development
   executableName: pi-desktop
   synopsis: Desktop companion for the Pi coding agent
