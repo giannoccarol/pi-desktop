@@ -778,7 +778,7 @@ html[data-theme="dark"] .chat-tab.active { background: var(--surface); border-co
 .chat-tab.loading .chat-tab-title { color: var(--muted); font-style: italic; }
 .chat-tab.loading .chat-tab-close { display: none; }
 body.session-loading .chat-tab:not(.loading):not(.active) { opacity: .45; }
-.session-item.running .session-title::after { content: ""; width: 6px; height: 6px; display: inline-block; margin-left: 7px; border-radius: 50%; background: var(--text); vertical-align: 1px; animation: tab-pulse 1.4s ease-in-out infinite; }
+.session-item.running::before { background: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 18%, transparent); animation: tab-pulse 1.4s ease-in-out infinite; }
 @keyframes tab-pulse { 50% { opacity: .38; } }
 #main { position: relative; }
 /* Sidebar collassata: la scheda diventa full-bleed (niente raggio inutile) */
@@ -2156,7 +2156,10 @@ body { font-size: 14px; }
   background: transparent;
 }
 .chat-tab:hover { border-color: transparent; box-shadow: none; }
-.chat-tab.active { border-color: transparent; background: var(--surface-2); box-shadow: none; }
+.chat-tab:not(.active) { opacity: .68; }
+.chat-tab:not(.active):hover, .chat-tab.busy { opacity: 1; }
+.chat-tab.active { border-color: var(--border-strong); background: var(--surface); box-shadow: var(--shadow-card); color: var(--text); opacity: 1; }
+.chat-tab.active .chat-tab-title { font-weight: 700; }
 .chat-tab-title { font-size: 12px; }
 .chat-tab-subtitle { font-size: 11px; }
 
