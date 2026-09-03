@@ -114,6 +114,7 @@ function toolDisplayName(toolName) {
   if (["grep", "find", "search"].includes(name)) return t("tool.display.search");
   if (name === "ls") return t("tool.display.ls");
   if (["bash", "shell", "powershell"].some((value) => name.startsWith(value))) return t("tool.display.bash");
+  if (name === "todo") return t("tool.display.todo");
   return toolName || t("tool.display.tool");
 }
 
@@ -509,6 +510,7 @@ function clearChat() {
   el.messages.innerHTML = "";
   state.streamAssistant = null;
   state.activeUserMessage = null;
+  if (window.piMedia?.clearTodoDock) window.piMedia.clearTodoDock();
   state.lastAssistantErrored = false;
   state.lastAssistantErrorWrap = null;
   state.retryAttempt = 0;

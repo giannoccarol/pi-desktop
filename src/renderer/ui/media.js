@@ -218,6 +218,93 @@
     if (gallery.childElementCount) parent.appendChild(gallery);
   }
 
+  function todoDockListItems(list, items) {
+    list.replaceChildren();
+    for (const item of items) {
+      const li = document.createElement("li");
+      li.className = `todo-item ${item.status}`;
+      const box = document.createElement("span");
+      box.className = "todo-box";
+      box.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.className = "todo-text";
+      label.textContent = item.title;
+      li.append(box, label);
+      list.appendChild(li);
+    }
+  }
+
+  const TODO_DOCK_COLLAPSED_KEY = "pi-todo-dock-collapsed";
+  let todoDockBound = false;
+  function ensureTodoDock() {
+    const dock = document.getElementById("todo-dock");
+    if (!dock || todoDockBound) return dock;
+    todoDockBound = true;
+    try {
+      if (window.localStorage?.getItem(TODO_DOCK_COLLAPSED_KEY) === "1") dock.classList.add("collapsed");
+    } catch {}
+    dock.querySelector("#todo-dock-head")?.addEventListener("click", () => {
+      const collapsed = dock.classList.toggle("collapsed");
+      dock.querySelector("#todo-dock-head")?.setAttribute("aria-expanded", String(!collapsed));
+      try { window.localStorage?.setItem(TODO_DOCK_COLLAPSED_KEY, collapsed ? "1" : "0"); } catch {}
+    });
+    return dock;
+  }
+
+  // Pannello fisso sopra il box messaggi: mostra sempre l'ultima lista,
+  // resta visibile durante lo scroll e si richiude dall'header.
+  function updateTodoDock(items) {
+    const dock = ensureTodoDock();
+    if (!dock || !Array.isArray(items) || !items.length) return;
+    const done = items.filter((i) => i.status === "completed").length;
+    const count = dock.querySelector("#todo-dock-count");
+    if (count) count.textContent = t("tool.todo.progress", { done, total: items.length });
+    const bar = dock.querySelector("#todo-dock-bar");
+    if (bar) bar.style.width = `${Math.round((done / items.length) * 100)}%`;
+    const list = dock.querySelector("#todo-dock-list");
+    if (list) todoDockListItems(list, items);
+    dock.classList.remove("hidden");
+    refreshIcons();
+  }
+
+  function clearTodoDock() {
+    const dock = document.getElementById("todo-dock");
+    if (!dock) return;
+    dock.classList.add("hidden");
+    dock.querySelector("#todo-dock-list")?.replaceChildren();
+  }
+
+  function renderTodoView(card, items) {
+    const body = card.querySelector(".tool-body");
+    if (!body) return;
+    body.querySelector(".todo-view")?.remove();
+    const done = items.filter((i) => i.status === "completed").length;
+    const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+    const wrap = document.createElement("div");
+    wrap.className = "todo-view";
+    const head = document.createElement("div");
+    head.className = "todo-head";
+    const title = document.createElement("span");
+    title.className = "todo-title";
+    title.textContent = t("tool.display.todo");
+    const count = document.createElement("span");
+    count.className = "todo-count";
+    count.textContent = t("tool.todo.progress", { done, total: items.length });
+    head.append(title, count);
+    const bar = document.createElement("div");
+    bar.className = "todo-bar";
+    const fill = document.createElement("i");
+    fill.style.width = `${pct}%`;
+    bar.appendChild(fill);
+    const list = document.createElement("ul");
+    list.className = "todo-list";
+    todoDockListItems(list, items);
+    wrap.append(head, bar, list);
+    const pre = body.querySelector("pre");
+    body.insertBefore(wrap, pre);
+    body.classList.add("has-todo-view");
+  }
+
   function setToolCardResult(card, text, isError, content) {
     const st = card.querySelector(".tool-state");
     st.textContent = isError ? t("tool.error") : t("tool.ok");
@@ -225,6 +312,18 @@
     st.className = `tool-state ${isError ? "err" : t("tool.ok")}`;
     const pre = card.querySelector(".tool-body pre");
     pre.textContent = text || t("tool.noOutput");
+    // To-do in stile Codex: la card mostra la checklist con stati e avanzamento
+    // invece del JSON grezzo. Il risultato vince sugli args (stato post-azione).
+    try {
+      const tool = String(card.dataset.tool || "").toLowerCase();
+      if (tool === "todo" && window.piUtils?.parseTodoItems) {
+        const fromResult = window.piUtils.parseTodoItems(text);
+        let fromArgs = [];
+        try { fromArgs = window.piUtils.parseTodoItems(JSON.parse(card.dataset.args || "null")); } catch {}
+        const items = fromResult.length ? fromResult : fromArgs;
+        if (items.length) { renderTodoView(card, items); updateTodoDock(items); }
+      }
+    } catch {}
     // diff view for edit/write/read/grep
     try {
       const tool = String(card.dataset.tool || "").toLowerCase();
@@ -255,6 +354,7 @@
   const apiExport = {
     USER_STATUS, messageTime, setUserMessageStatus, addUserMessage, makeToolCard,
     escapeHtml, safeImageSource, renderMediaBlock, renderBlockMedia, setToolCardResult,
+    updateTodoDock, clearTodoDock,
   };
   window.piMedia = apiExport;
   // expose globals for legacy code paths
@@ -269,5 +369,7 @@
   window.renderMediaBlock = renderMediaBlock;
   window.renderBlockMedia = renderBlockMedia;
   window.setToolCardResult = setToolCardResult;
+  window.updateTodoDock = updateTodoDock;
+  window.clearTodoDock = clearTodoDock;
   if (typeof module !== "undefined" && module.exports) module.exports = apiExport;
 })();

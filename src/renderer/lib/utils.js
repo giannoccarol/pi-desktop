@@ -192,7 +192,45 @@
     if (["grep", "find", "search"].includes(name)) return "search";
     if (["bash", "shell", "powershell"].some((value) => name.startsWith(value))) return "terminal";
     if (name === "ls") return "folder-open";
+    if (name === "todo") return "list-checks";
     return "wrench";
+  }
+
+  // To-do in stile Codex: estrae una lista di attivita' da args/risultati del
+  // tool "todo" in forma tollerante (chiavi e stati diversi a seconda del backend).
+  // Ritorna [{title, status}] con status in pending|in_progress|completed.
+  function normalizeTodoStatus(value) {
+    const s = String(value ?? "").toLowerCase().replace(/[\s-]+/g, "_");
+    if (["completed", "complete", "done", "closed", "finished", "success", "checked", "true"].includes(s)) return "completed";
+    if (["in_progress", "inprogress", "doing", "running", "active", "started"].includes(s)) return "in_progress";
+    return "pending";
+  }
+
+  function parseTodoItems(value) {
+    let root = value;
+    if (typeof root === "string") {
+      const trimmed = root.trim();
+      if (!trimmed) return [];
+      try { root = JSON.parse(trimmed); } catch { return []; }
+    }
+    if (!root || typeof root !== "object") return [];
+    const list = Array.isArray(root)
+      ? root
+      : (root.tasks ?? root.todos ?? root.items ?? root.list ?? root.entries ?? root.children ?? null);
+    const raw = Array.isArray(list) ? list : (list != null ? [list] : [root]);
+    return raw.map((entry) => {
+      if (typeof entry === "string") return { title: entry, status: "pending" };
+      if (!entry || typeof entry !== "object") return null;
+      const title = entry.subject ?? entry.title ?? entry.name ?? entry.label ?? entry.text ?? entry.content ?? entry.task ?? "";
+      const flag = entry.completed ?? entry.done ?? entry.checked ?? entry.isDone ?? entry.isCompleted;
+      const status = flag === true ? "completed" : normalizeTodoStatus(entry.status ?? entry.state ?? entry.phase);
+      return { title: String(title ?? ""), status };
+    }).filter((item) => item && item.title.trim()).slice(0, 50);
+  }
+
+  function todoProgress(items) {
+    const list = Array.isArray(items) ? items : [];
+    return { done: list.filter((i) => i.status === "completed").length, total: list.length };
   }
 
 
@@ -290,6 +328,9 @@
     textOfBlocks,
     isActivityOnly,
     toolIconName,
+    normalizeTodoStatus,
+    parseTodoItems,
+    todoProgress,
     messageListStats,
     animateOut,
   };

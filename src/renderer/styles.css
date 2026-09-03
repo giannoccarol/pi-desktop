@@ -1041,6 +1041,41 @@ details.think .think-body { margin: 0 0 4px 31px; padding: 2px 12px 6px; border-
 .tool-state.interrupted { color: var(--amber); }
 .tool-body { max-height: 280px; overflow: auto; margin: 0 0 5px 31px; padding: 6px 12px 8px; border-left: 2px solid var(--hairline); }
 .tool-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.55 var(--mono); }
+/* To-do fisso sopra il box messaggi: ultima lista sempre visibile, richiudibile. */
+.todo-dock { width: min(720px, 100%); margin: 0 auto 8px; overflow: hidden; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-card); }
+.todo-dock-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12.5px; font-weight: 600; }
+.todo-dock-head:hover { background: var(--hover); }
+.todo-dock-head > svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.todo-dock-title { flex: 0 0 auto; }
+.todo-dock-head .todo-count { flex: 1; text-align: left; font-weight: 400; }
+.todo-dock-caret { margin-left: auto; transition: transform var(--motion-fast) var(--ease-standard); }
+.todo-dock.collapsed .todo-dock-caret { transform: rotate(-90deg); }
+.todo-dock.collapsed .todo-dock-body { display: none; }
+.todo-dock-body { padding: 0 12px 10px; }
+.todo-dock-body .todo-bar { margin: 0 0 6px; }
+.todo-dock-list { max-height: 180px; overflow: auto; }
+/* To-do in stile Codex: checklist con stati, conteggio e barra di avanzamento. */
+.tool-body.has-todo-view > pre { display: none; }
+.todo-view { margin: 2px 0 4px; font-size: 12.5px; }
+.todo-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--muted); }
+.todo-title { font-weight: 600; }
+.todo-count { font-size: 11.5px; color: var(--subtle); font-variant-numeric: tabular-nums; }
+.todo-bar { height: 4px; margin: 5px 0 7px; overflow: hidden; border-radius: 2px; background: var(--surface-3); }
+.todo-bar i { display: block; height: 100%; border-radius: 2px; background: var(--green); }
+.todo-list { margin: 0; padding: 0; list-style: none; }
+.todo-item { display: flex; align-items: baseline; gap: 8px; padding: 2.5px 0; }
+.todo-box { position: relative; flex: 0 0 auto; width: 13px; height: 13px; align-self: center; border: 1.5px solid var(--subtle); border-radius: 50%; }
+.todo-item.completed .todo-box { border-color: var(--green); background: var(--green); }
+.todo-item.completed .todo-box::after { position: absolute; inset: 0; color: #fff; content: "✓"; font-size: 10px; line-height: 11px; text-align: center; }
+.todo-item.completed .todo-text { color: var(--muted); text-decoration: line-through; }
+.todo-item.in_progress .todo-text { color: var(--text); font-weight: 600; }
+.todo-item.in_progress .todo-box { border-color: var(--blue); border-top-color: transparent; animation: spin 1s linear infinite; }
+.todo-item.pending .todo-text { color: var(--muted); }
+/* Checklist markdown "- [ ] / - [x]": checkbox reali invece di testo grezzo. */
+.md ul:has(> li.task-list-item) { padding-left: .3em; }
+.md li.task-list-item { display: flex; align-items: baseline; gap: .55em; list-style: none; }
+.md li.task-list-item input[type="checkbox"] { flex: 0 0 auto; width: 13px; height: 13px; align-self: center; accent-color: var(--green); }
+.md li.task-list-item.done span { color: var(--muted); text-decoration: line-through; }
 /* Diff view */
 .diff-view { margin: 6px 0 8px; overflow: hidden; border: 1px solid var(--hairline); border-radius: 8px; background: var(--surface); }
 .diff-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); font: 11px var(--mono); color: var(--muted); }

@@ -122,6 +122,18 @@
       <div id="extension-widgets-above" class="extension-widgets hidden"></div>
       <div id="queued-note" class="hidden"></div>
       <div id="composer-wrap">
+        <div id="todo-dock" class="todo-dock hidden" aria-live="polite">
+          <button id="todo-dock-head" class="todo-dock-head" type="button" aria-expanded="true">
+            <i data-lucide="list-checks"></i>
+            <span class="todo-dock-title" data-i18n="tool.display.todo">To do</span>
+            <span id="todo-dock-count" class="todo-count"></span>
+            <i data-lucide="chevron-down" class="todo-dock-caret"></i>
+          </button>
+          <div class="todo-dock-body">
+            <div class="todo-bar"><i id="todo-dock-bar"></i></div>
+            <ul id="todo-dock-list" class="todo-list todo-dock-list"></ul>
+          </div>
+        </div>
         <div id="composer">
           <textarea id="input" rows="2" data-i18n-placeholder="composer.placeholder" spellcheck="false"></textarea>
           <div id="slash-suggestions" class="slash-suggestions hidden" role="listbox" data-i18n-aria-label="composer.slash.aria"></div>

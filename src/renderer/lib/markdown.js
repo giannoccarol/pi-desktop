@@ -155,6 +155,14 @@
           // The browser owns list markers. Adding a literal bullet here caused
           // indented items to render with duplicated markers ("• •").
           const nested = it.indent >= 2 ? ' class="nested"' : "";
+          // Checklist in stile Codex: "- [ ]" / "- [x]" diventano checkbox reali.
+          const task = !ordered && it.content.match(/^\[([ xX])\]\s+([\s\S]*)$/);
+          if (task) {
+            const checked = task[1].toLowerCase() === "x";
+            const cls = nested ? ' class="nested task-list-item' + (checked ? " done" : "") + '"' : ' class="task-list-item' + (checked ? " done" : "") + '"';
+            html += `<li${cls}><input type="checkbox" disabled${checked ? " checked" : ""} tabindex="-1"><span>${renderInline(esc(task[2]))}</span></li>`;
+            continue;
+          }
           html += `<li${nested}>${renderInline(esc(it.content))}</li>`;
         }
         html += `</${tag}>`;
