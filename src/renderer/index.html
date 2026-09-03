@@ -361,6 +361,24 @@
           <button id="btn-budgets-add" class="btn ghost small settings-section-action" type="button"><i data-lucide="plus"></i> <span data-i18n="settings.budgets.add">Aggiungi un budget al progetto corrente</span></button>
         </section>
 
+        <section class="settings-section">
+          <div class="settings-section-heading">
+            <span class="settings-section-icon"><i data-lucide="smartphone"></i></span>
+            <span><strong data-i18n="settings.mobile.title">Accesso mobile (Tailscale)</strong><small data-i18n="settings.mobile.help">Continua le sessioni dal telefono aprendo il link qui sotto.</small></span>
+          </div>
+          <div class="toggle-row">
+            <label><input id="setting-mobile-enabled" type="checkbox" /> <span data-i18n="settings.mobile.enabled">Abilita accesso mobile</span></label>
+          </div>
+          <div class="row gap">
+            <code id="mobile-web-link" class="grow mono ellipsis settings-value">—</code>
+            <button id="btn-mobile-copy" class="btn ghost small" type="button"><i data-lucide="copy"></i> <span data-i18n="settings.mobile.copy">Copia link</span></button>
+          </div>
+          <div class="row gap" style="margin-top:8px">
+            <small id="mobile-web-hint" class="muted grow"></small>
+            <button id="btn-mobile-token" class="btn ghost small" type="button"><span data-i18n="settings.mobile.newToken">Nuovo token</span></button>
+          </div>
+        </section>
+
         <section class="settings-section app-update-row">
           <div class="settings-section-heading">
             <span class="settings-section-icon"><i data-lucide="refresh-cw"></i></span>

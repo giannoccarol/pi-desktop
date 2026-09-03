@@ -611,6 +611,8 @@
     el.btnSettingsOpen.addEventListener("click", () => {
       try{ window.piBudgets?.render?.(); }catch{}
       el.settingCwd.textContent = state.settings.cwd || "";
+      if (el.settingMobileEnabled) el.settingMobileEnabled.checked = state.settings.mobileWebEnabled !== false;
+      refreshMobileLink();
       el.settingPiPath.value = state.settings.piPath || "";
       el.settingSessionsDir.value = state.settings.sessionsDir || "";
       if (el.settingLanguage) el.settingLanguage.value = (i18n && i18n.getLang()) || state.settings.language || "it";
@@ -683,6 +685,36 @@
     });
     el.packageType.addEventListener("change", () => (window.loadPackageStore||window.piPackageView?.loadPackageStore)?.({ resetPage: true }));
     el.packageSort.addEventListener("change", () => (window.loadPackageStore||window.piPackageView?.loadPackageStore)?.({ resetPage: true }));
+    async function refreshMobileLink() {
+      try {
+        const info = await api.mobileWebGet();
+        if (info && info.token) state.settings.mobileWebToken = info.token;
+        if (el.mobileWebLink) el.mobileWebLink.textContent = (info && info.url) || "—";
+        if (el.mobileWebHint) {
+          if (info && !info.running && !info.url) el.mobileWebHint.textContent = t("settings.mobile.off");
+          else {
+            const parts = [];
+            if (info && info.tailscaleIp) parts.push("Tailscale " + info.tailscaleIp);
+            if (info && info.lanIp) parts.push(t("settings.mobile.lan", { lan: info.lanIp }));
+            el.mobileWebHint.textContent = parts.join(" · ");
+          }
+        }
+      } catch { if (el.mobileWebLink) el.mobileWebLink.textContent = "—"; }
+    }
+    el.btnMobileCopy.addEventListener("click", async () => {
+      const link = (el.mobileWebLink.textContent || "").trim();
+      if (!link || link === "—") return;
+      try { await navigator.clipboard.writeText(link); toast(t("settings.mobile.copied")); }
+      catch (err) { toast(err.message, "error"); }
+    });
+    el.btnMobileToken.addEventListener("click", async () => {
+      try { await api.mobileWebRegenerate(); await refreshMobileLink(); toast(t("settings.mobile.tokenDone")); }
+      catch (err) { toast(err.message, "error"); }
+    });
+    el.settingMobileEnabled.addEventListener("change", async () => {
+      try { state.settings = await api.setSettings({ mobileWebEnabled: el.settingMobileEnabled.checked }); await refreshMobileLink(); }
+      catch (err) { toast(err.message, "error"); }
+    });
     el.btnPickCwd.addEventListener("click", async () => {
       const dir = await api.pickDirectory(t("dialog.pickCwd"));
       if (dir) el.settingCwd.textContent = dir;

@@ -22,6 +22,7 @@ const authService = require("../services/auth-service");
 const { createMentionService } = require("../services/mention-service");
 const gitService = require("../services/git-service");
 const ipcSanitize = require("../services/ipc-sanitize");
+const mobileWeb = require("../services/mobile-web");
 const { UpdateService } = require("../updates/update-service");
 const { shouldHandoverToSecondInstance } = require("./single-instance");
 const { startStaleInstallWatch, performHandoverRelaunch } = require("./version-watch");
@@ -109,6 +110,9 @@ function loadSettings() {
     composerAutoRetry: true,
     onboardingSeen: false,
     terminalHistory: [],
+    mobileWebEnabled: true,
+    mobileWebPort: 3923,
+    mobileWebToken: "",
   };
   try {
     const loaded = { ...defaults, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) };
@@ -133,6 +137,10 @@ function loadSettings() {
     }
     if (loaded.onboardingSeen === undefined) loaded.onboardingSeen = false;
     if (!Array.isArray(loaded.terminalHistory)) loaded.terminalHistory = [];
+    if (loaded.mobileWebEnabled === undefined) loaded.mobileWebEnabled = true;
+    const webPort = Number(loaded.mobileWebPort);
+    loaded.mobileWebPort = Number.isFinite(webPort) ? Math.max(1024, Math.min(65535, Math.round(webPort))) : 3923;
+    if (typeof loaded.mobileWebToken !== "string") loaded.mobileWebToken = "";
     return loaded;
   } catch {
     return defaults;
@@ -189,6 +197,19 @@ function resolveProjectPath(value) {
 
 function publicSettings() {
   return { ...settings, sessionsDirResolved: sessionsDir() };
+}
+
+function mobileWebDeps() {
+  return {
+    settings,
+    saveSettings,
+    sessionsDir,
+    sessionsAsync,
+    sanitize: sanitizeMessagesForIpc,
+    runtime,
+    ensureRuntime,
+    notifySessionsChanged,
+  };
 }
 
 async function listProviderSettings() {
@@ -502,6 +523,8 @@ if (!app.requestSingleInstanceLock({ version: APP_VERSION })) {
     // Warm start: pre-spawn an ephemeral pi process so the first "nuova chat"
     // appears instantly instead of waiting for a cold spawn.
     ensureRuntime().catch((err) => console.warn("[warm-start] fallito:", err.message));
+    // Endpoint web mobile (Tailscale): http://<ip-tailscale>:3923/?token=…
+    try { mobileWeb.start(mobileWebDeps()); } catch (err) { console.warn("[mobile-web] avvio fallito:", err.message); }
   });
 }
 
@@ -517,6 +540,7 @@ app.on("before-quit", closeSessionsWatchers);
 
 app.on("will-quit", () => {
   stopStaleInstallWatch();
+  try { mobileWeb.stop(); } catch {}
   unregisterGlobalShortcut();
   destroyTray();
   appUpdateService?.destroy();
@@ -608,11 +632,14 @@ ipcMain.handle("settings:set", async (_e, patch) => {
   const allowed = [
     "cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language", "sessionMeta", "budgets", "notificationPrefs", "onboardingSeen", "terminalHistory",
     "userName", "userNamePromptSeen", "theme", "notificationsEnabled", "notificationsSound",
-    "sidebarWidth", "diffMode", "expandedProjects", "composerAutoRetry",
+    "sidebarWidth", "diffMode", "expandedProjects", "composerAutoRetry", "mobileWebEnabled",
+    "mobileWebPort",
   ];
   const previousCwd = settings.cwd;
   const previousPiPath = settings.piPath;
   const previousSessionsDir = settings.sessionsDir;
+  const previousWebEnabled = settings.mobileWebEnabled;
+  const previousWebPort = settings.mobileWebPort;
   for (const k of allowed) {
     if (!(k in patch)) continue;
     if (k === "cwd") settings[k] = resolveProjectPath(patch[k]);
@@ -633,6 +660,11 @@ ipcMain.handle("settings:set", async (_e, patch) => {
       settings[k] = Number.isFinite(n) ? Math.max(210, Math.min(520, Math.round(n))) : null;
     } else if (k === "diffMode") {
       settings[k] = patch[k] === "split" ? "split" : "unified";
+    } else if (k === "mobileWebEnabled") {
+      settings[k] = Boolean(patch[k]);
+    } else if (k === "mobileWebPort") {
+      const n = Number(patch[k]);
+      settings[k] = Number.isFinite(n) ? Math.max(1024, Math.min(65535, Math.round(n))) : 3923;
     } else if (k === "expandedProjects") {
       settings[k] = Array.isArray(patch[k])
         ? [...new Set(patch[k].filter((value) => typeof value === "string" && value.trim()))]
@@ -647,7 +679,20 @@ ipcMain.handle("settings:set", async (_e, patch) => {
     await runtime.restart({ piPath: settings.piPath || undefined }).catch(() => runtime.stop());
   }
   try{ restartSessionsWatcher(); }catch{}
+  if (previousWebEnabled !== settings.mobileWebEnabled || previousWebPort !== settings.mobileWebPort) {
+    try { mobileWeb.restart(mobileWebDeps()); } catch (err) { console.warn("[mobile-web] restart fallito:", err.message); }
+  }
   return { ...publicSettings(), saveOk };
+});
+
+ipcMain.handle("mobileWeb:get", () => ({ ...mobileWeb.info(settings), token: settings.mobileWebToken || "" }));
+
+ipcMain.handle("mobileWeb:regenerateToken", () => {
+  const crypto = require("crypto");
+  settings.mobileWebToken = crypto.randomBytes(24).toString("hex");
+  saveSettings();
+  try { mobileWeb.restart(mobileWebDeps()); } catch {}
+  return { ...mobileWeb.info(settings), token: settings.mobileWebToken };
 });
 
 ipcMain.handle("dialog:pickDirectory", async (_e, title) => {

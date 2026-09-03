@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("piDesktop", {
   // settings
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setSettings: (patch) => ipcRenderer.invoke("settings:set", patch),
+  mobileWebGet: () => ipcRenderer.invoke("mobileWeb:get"),
+  mobileWebRegenerate: () => ipcRenderer.invoke("mobileWeb:regenerateToken"),
   pickDirectory: (title) => ipcRenderer.invoke("dialog:pickDirectory", title),
   pickFiles: (kind) => ipcRenderer.invoke("dialog:pickFiles", kind),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
