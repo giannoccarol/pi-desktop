@@ -1,3 +1,10 @@
+## [0.22.1](https://github.com/giannoccarol/pi-desktop/compare/v0.22.0...v0.22.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **tabs:** tab attivo riconoscibile, pallino busy unificato con sidebar ([831096f](https://github.com/giannoccarol/pi-desktop/commit/831096f5e49d2764312e21d106763f7272d40bf6))
+
 # [0.22.0](https://github.com/giannoccarol/pi-desktop/compare/v0.21.3...v0.22.0) (2026-09-03)
 
 
