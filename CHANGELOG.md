@@ -1,3 +1,10 @@
+# [0.22.0](https://github.com/giannoccarol/pi-desktop/compare/v0.21.3...v0.22.0) (2026-09-03)
+
+
+### Features
+
+* **chat:** token al secondo nel footer del messaggio ([99444fb](https://github.com/giannoccarol/pi-desktop/commit/99444fbad9338a543e2ab16285074e7680b7b9fc))
+
 ## [0.21.3](https://github.com/giannoccarol/pi-desktop/compare/v0.21.2...v0.21.3) (2026-09-03)
 
 
