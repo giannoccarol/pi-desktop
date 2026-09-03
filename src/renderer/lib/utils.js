@@ -41,6 +41,19 @@
     return String(Math.trunc(v));
   }
 
+  // Meta poco intrusiva per il footer del messaggio completato: ["2.7s", "1200.0 tok/s"].
+  // I secondi ci sono sempre, tok/s solo con output>0 e durata>0.
+  function speedMeta(usage, startedAtMs, nowMs = Date.now()) {
+    const start = Number(startedAtMs);
+    const now = Number(nowMs);
+    if (!Number.isFinite(start) || !Number.isFinite(now)) return [];
+    const secs = Math.max(0, (now - start) / 1000);
+    const meta = [`${secs.toFixed(1)}s`];
+    const out = Number(usage?.output ?? usage?.totalTokens);
+    if (Number.isFinite(out) && out > 0 && secs > 0) meta.push(`${(out / secs).toFixed(1)} tok/s`);
+    return meta;
+  }
+
   function cacheHitStats(tokens) {
     const input = Math.max(0, Number(tokens?.input) || 0);
     const cacheRead = Math.max(0, Number(tokens?.cacheRead) || 0);
@@ -261,6 +274,7 @@
     formatBytes,
     fmtCost,
     fmtTokens,
+    speedMeta,
     cacheHitStats,
     basename,
     truncate,

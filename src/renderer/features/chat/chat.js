@@ -12,6 +12,7 @@ function icon(n){ return window.piUi ? window.piUi.icon(n) : `<i data-lucide="${
 function refreshIcons(){ return window.piUi ? window.piUi.refreshIcons() : void 0; }
 function escapeHtml(s){ return window.piUtils ? window.piUtils.escapeHtml(s) : String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 function fmtCost(c){ return window.piUtils ? window.piUtils.fmtCost(c) : ""; }
+function speedMeta(u,s,n){ return window.piUtils?.speedMeta ? window.piUtils.speedMeta(u,s,n) : []; }
 function textOfBlocks(c){ return window.piUtils ? window.piUtils.textOfBlocks(c) : (typeof c==="string"?c:""); }
 function isActivityOnly(b){ return window.piUtils ? window.piUtils.isActivityOnly(b) : false; }
 function hasVisibleAssistantContent(b){ return window.piChatUtils ? window.piChatUtils.hasVisibleAssistantContent(b) : false; }
@@ -221,7 +222,7 @@ function beginStreamAssistant() {
   // Keep the shell detached until the first real block arrives. Pi can emit
   // empty assistant segments between internal steps; mounting those shells was
   // the source of repeated, content-less “PI” labels.
-  state.streamAssistant = { wrap, content: wrap.querySelector(".content"), blocks: new Map(), renderTimer: null, mounted: false };
+  state.streamAssistant = { wrap, content: wrap.querySelector(".content"), blocks: new Map(), renderTimer: null, mounted: false, startedAt: Date.now() };
   state.lastAssistantErrored = false;
 }
 
@@ -472,6 +473,14 @@ function endStreamAssistant(message) {
     err.className = "error-box";
     err.textContent = message.errorMessage || t("error.unknown");
     sa.wrap.appendChild(err);
+  }
+  const tag = sa.wrap.querySelector(".role-tag");
+  if (tag) {
+    const meta = [];
+    if (message?.model) meta.push(message.model);
+    if (message?.usage?.cost?.total != null) meta.push(fmtCost(message.usage.cost.total));
+    meta.push(...speedMeta(message?.usage, sa.startedAt));
+    tag.textContent = `pi${meta.length ? " · " + meta.join(" · ") : ""}`;
   }
   state.lastAssistantErrored = message?.stopReason === "error";
   state.lastAssistantErrorWrap = state.lastAssistantErrored ? sa.wrap : null;
