@@ -1,3 +1,17 @@
+## [0.21.1](https://github.com/giannoccarol/pi-desktop/compare/v0.21.0...v0.21.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **runtime:** catalogo modelli e provider aggiornati dopo update di pi a app aperta ([8ddf490](https://github.com/giannoccarol/pi-desktop/commit/8ddf490c00813450aef52abbf8510fee1ed7e051))
+
+
+### Performance Improvements
+
+* **chat:** append dei soli messaggi nuovi nello switch quando la cache e' un prefisso, spec e2e [@perf](https://github.com/perf) streaming long-tasks ([8e4208c](https://github.com/giannoccarol/pi-desktop/commit/8e4208cd0f37fd3d7c32650e73f1d599b44cdeca))
+* **main:** scansione sessioni in worker thread (fs sync fuori dall'event loop) con fallback sincrono ([16447aa](https://github.com/giannoccarol/pi-desktop/commit/16447aa5047922db177900a1da309bed9c5bf127))
+* **renderer:** markdown incrementale in streaming, icone lucide pending-only, content-visibility CSS, LRU nodi DOM e firma sidebar memoizzata ([fa33645](https://github.com/giannoccarol/pi-desktop/commit/fa336454fbf62a982e83fad71ad195ce577a0ef7))
+
 # [0.21.0](https://github.com/giannoccarol/pi-desktop/compare/v0.20.0...v0.21.0) (2026-09-01)
 
 
