@@ -1249,6 +1249,13 @@ ipcMain.handle("pi:getMessages", async (_e, tabId) => {
 });
 ipcMain.handle("pi:getAvailableModels", async () => {
   await ensureRuntime();
+  // Il catalogo modelli vive nel processo pi avviato: se pi e' stato aggiornato
+  // a app aperta, riavvia il runtime (a streaming fermo) prima di rispondere,
+  // altrimenti il menu modelli mostra per sempre il catalogo della vecchia versione.
+  if (!runtime.isBusy() && (await runtime.piBinaryChanged().catch(() => false))) {
+    console.log("[runtime] binario pi aggiornato: riavvio del runtime per aggiornare il catalogo modelli");
+    await runtime.restart().catch(() => {});
+  }
   return runtime.getAvailableModels();
 });
 ipcMain.handle("pi:setModel", async (_e, { provider, modelId }) => {

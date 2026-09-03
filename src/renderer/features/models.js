@@ -162,34 +162,7 @@ function closeMenus(){ return window.piUi.closeMenus(); }
 function setSidebarVisible(v){ return window.piUi.setSidebarVisible(v); }
 function applyTheme(th){ return window.piUi.applyTheme(th); }
 
-async function loadProviderSettings() {
-  try {
-    state.providers = await api.listProviders();
-    renderProviderSettings();
-  } catch (err) {
-    el.providerSettingsList.innerHTML = `<div class="menu-empty">Impossibile leggere i provider: ${escapeHtml(err.message)}</div>`;
-  }
-}
-
-async function startProviderLogin(provider, authType) {
-  state.authFlow = { providerId: provider.id, providerName: provider.name, authType, requestId: null };
-  el.authTitle.textContent = `Accedi a ${provider.name}`;
-  el.authSubtitle.textContent = authType === "oauth" ? "Accesso OAuth gestito nativamente da Pi." : "Configurazione credenziale gestita nativamente da Pi.";
-  el.authStatus.innerHTML = `<span class="muted">Avvio procedura…</span>`;
-  resetAuthPrompt();
-  el.modalAuth.showModal();
-  try {
-    state.providers = await api.loginProvider(provider.id, authType);
-    state.modelsCache = null;
-    renderProviderSettings();
-    toast(`${provider.name} configurato.`);
-    el.modalAuth.close();
-  } catch (err) {
-    if (!/annullato/i.test(err.message)) toast(`Accesso fallito: ${err.message}`, "error", 8000);
-  } finally {
-    state.authFlow = null;
-  }
-}
+// loadProviderSettings / startProviderLogin / renderProviderSettings vivono in features/auth.js.
 
 window.loadModels=loadModels; window.renderModelMenu=renderModelMenu; window.renderProviderMenu=renderProviderMenu; window.updateModelLabel=updateModelLabel; window.refreshHeaderFromState=refreshHeaderFromState; window.refreshThinkingLevels=refreshThinkingLevels; window.renderThinkingMenu=renderThinkingMenu; window.piModels={loadModels,renderModelMenu,renderProviderMenu,updateModelLabel,refreshHeaderFromState,refreshThinkingLevels,renderThinkingMenu};
 })();

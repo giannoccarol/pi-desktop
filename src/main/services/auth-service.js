@@ -7,6 +7,7 @@ const { whichPi } = require("../updates/updater");
 
 let cachedModule = null;
 let cachedRoot = null;
+let cachedEntryMtimeMs = null;
 
 async function findPackageRoot(settings) {
   const bin = await whichPi(settings.piPath || undefined);
@@ -35,11 +36,26 @@ async function findPackageRoot(settings) {
   throw new Error("Installazione di pi non compatibile con il login integrato");
 }
 
+function moduleNeedsReload(cached, next) {
+  if (!cached?.module) return true;
+  if (cached.root !== next.root) return true;
+  if (cached.mtimeMs == null || next.mtimeMs == null) return false;
+  return cached.mtimeMs !== next.mtimeMs;
+}
+
 async function loadModule(settings) {
   const root = await findPackageRoot(settings);
-  if (cachedModule && cachedRoot === root) return cachedModule;
-  cachedModule = await import(pathToFileURL(path.join(root, "dist", "index.js")).href);
+  const entry = path.join(root, "dist", "index.js");
+  let mtimeMs = null;
+  try { mtimeMs = fs.statSync(entry).mtimeMs; } catch {}
+  const cached = { module: cachedModule, root: cachedRoot, mtimeMs: cachedEntryMtimeMs };
+  if (!moduleNeedsReload(cached, { root, mtimeMs })) return cachedModule;
+  // Il cache degli ESM e' keyed per URL: senza query un re-import dello stesso
+  // path restituirebbe il modulo vecchio anche dopo un update di pi su disco.
+  const bust = mtimeMs != null ? `?mtime=${mtimeMs}` : "";
+  cachedModule = await import(pathToFileURL(entry).href + bust);
   cachedRoot = root;
+  cachedEntryMtimeMs = mtimeMs;
   return cachedModule;
 }
 
@@ -79,4 +95,4 @@ async function logout(settings, providerId) {
   await runtime.logout(providerId, { signal: AbortSignal.timeout(15000) });
 }
 
-module.exports = { findPackageRoot, listProviders, login, logout };
+module.exports = { findPackageRoot, listProviders, login, logout, moduleNeedsReload };

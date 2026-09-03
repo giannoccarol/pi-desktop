@@ -1,7 +1,24 @@
 "use strict";
 
+const fs = require("fs");
 const { PiRpcClient } = require("./pi-rpc");
 const { whichPi } = require("../updates/updater");
+
+function binIdentity(bin) {
+  // realpath: i shim (mise/npm) sono symlink; l'update di pi riscrive il file reale.
+  try {
+    return { bin, mtimeMs: fs.statSync(fs.realpathSync(bin)).mtimeMs };
+  } catch {
+    return { bin, mtimeMs: null };
+  }
+}
+
+function piBinaryIdentityChanged(spawned, current) {
+  if (!spawned?.bin || !current?.bin) return false;
+  if (spawned.bin !== current.bin) return true;
+  if (spawned.mtimeMs == null || current.mtimeMs == null) return false;
+  return spawned.mtimeMs !== current.mtimeMs;
+}
 
 /**
  * Owns the external `pi --mode rpc` process and bridges it to the renderer.
@@ -24,6 +41,8 @@ class PiRuntime {
     this._opChain = Promise.resolve();
     this._recentLogs = [];
     this._exitCount = 0;
+    this.spawnedBinIdentity = null;
+    this.mutatingOps = 0;
   }
 
   getRecentLogs() { return this._recentLogs.slice(-120); }
@@ -89,6 +108,7 @@ class PiRuntime {
       err.code = "PI_NOT_INSTALLED";
       throw err;
     }
+    this.spawnedBinIdentity = binIdentity(bin);
     const args = [];
     if (!wanted.persist) args.push("--no-session");
     if (wanted.provider) args.push("--provider", wanted.provider);
@@ -184,6 +204,23 @@ class PiRuntime {
 
   get running() {
     return Boolean(this.client && this.client.proc && !this.exitInfo);
+  }
+
+  /** True mentre una operazione che genera output (prompt, bash, compact…) e' in volo. */
+  isBusy() {
+    return this.mutatingOps > 0;
+  }
+
+  /**
+   * True se il binario pi sul disco e' cambiato rispetto a quello del processo
+   * RPC attivo (es. `npm update` a app aperta): il catalogo modelli del processo
+   * corrente e' quello della versione avviata, non della versione installata.
+   */
+  async piBinaryChanged() {
+    if (!this.running) return false;
+    const bin = await whichPi(this.startOpts?.piPath).catch(() => null);
+    if (!bin) return false;
+    return piBinaryIdentityChanged(this.spawnedBinIdentity, binIdentity(bin));
   }
 
   /** Send a user prompt; guarantees a persisted session for real content. */
@@ -468,7 +505,12 @@ class PiRuntime {
   async _request(command, timeoutMs) {
     const readOnly = new Set(["get_state","get_messages","get_available_models","get_available_thinking_levels","get_session_stats","get_commands","get_tree","get_entries","get_fork_messages","get_last_assistant_text"]).has(command.type);
     if(readOnly) return this._requestUnlocked(command, timeoutMs);
-    return this._withLock(() => this._requestUnlocked(command, timeoutMs));
+    this.mutatingOps++;
+    try {
+      return await this._withLock(() => this._requestUnlocked(command, timeoutMs));
+    } finally {
+      this.mutatingOps--;
+    }
   }
 
   stop() {
@@ -478,4 +520,4 @@ class PiRuntime {
   }
 }
 
-module.exports = { PiRuntime };
+module.exports = { PiRuntime, piBinaryIdentityChanged, binIdentity };
