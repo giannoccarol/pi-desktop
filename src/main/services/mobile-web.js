@@ -144,7 +144,7 @@ function shimJs() {
     "pickDirectory", "pickFiles", "openExternal", "openTerminal", "addProject",
     "popOutTab", "minimizeWindow", "toggleMaximizeWindow", "closeWindow",
     "isMaximized", "exportHtml"];
-  const fns = methods.map((m) => `  ${m}(...a){return call(${JSON.stringify(m)},a);}`).join("\n");
+  const fns = methods.map((m) => `  ${m}(...a){return call(${JSON.stringify(m)},a);}`).join(",\n");
   return `"use strict";
 (function(){
 const token=new URLSearchParams(location.search).get("token")||"";
@@ -159,7 +159,7 @@ function ensureEs(){
   es.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);const set=subs.get(m.channel);if(set)set.forEach((cb)=>{try{cb(m.payload)}catch{}});}catch{}};
 }
 window.piDesktop={
-${fns}
+${fns},
   on(channel,cb){
     if(!${JSON.stringify(EVENT_CHANNELS)}.includes(channel))return ()=>{};
     ensureEs();
@@ -338,6 +338,9 @@ function start(deps) {
   server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url || "/", "http://x");
+      if (req.method === "GET" && url.pathname === "/favicon.ico") {
+        res.writeHead(204); res.end(); return;
+      }
       // Asset statici pubblici (CSS/JS/font/icone: niente segreti). Devono
       // restare senza token perché <link>/<script> del browser non inviano
       // il ?token=… dell'URL della pagina — altrimenti 401 su tutto e UI spoglia.
