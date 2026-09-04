@@ -338,6 +338,15 @@ function start(deps) {
   server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url || "/", "http://x");
+      // Asset statici pubblici (CSS/JS/font/icone: niente segreti). Devono
+      // restare senza token perché <link>/<script> del browser non inviano
+      // il ?token=… dell'URL della pagina — altrimenti 401 su tutto e UI spoglia.
+      if (req.method === "GET" && url.pathname === "/shim.js") {
+        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+        res.end(shimJs());
+        return;
+      }
+      if (req.method === "GET" && serveStatic(url.pathname, res)) return;
       if (!isAuthed(req, url, token)) {
         res.writeHead(401, { "content-type": "text/plain; charset=utf-8" });
         res.end("401: serve ?token=… (vedi log avvio o Impostazioni)");
@@ -352,11 +361,6 @@ function start(deps) {
       if (req.method === "GET" && url.pathname === "/simple") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         res.end(mobileHtml());
-        return;
-      }
-      if (req.method === "GET" && url.pathname === "/shim.js") {
-        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
-        res.end(shimJs());
         return;
       }
       // Eventi live (streaming chat, gericht): un EventSource per tab browser.
@@ -424,7 +428,6 @@ function start(deps) {
         const r = await runtime.newSession({ cwd: body.cwd || settings.cwd, sessionDir: sessionsDir() || undefined });
         return sendJson(res, 200, { ok: true, tabId: r?.tabId || null });
       }
-      if (req.method === "GET" && serveStatic(url.pathname, res)) return;
       return sendJson(res, 404, { error: "Not found" });
     } catch (err) {
       return sendJson(res, 500, { error: String(err?.message || err) });
