@@ -236,18 +236,33 @@
 
   const TODO_DOCK_COLLAPSED_KEY = "pi-todo-dock-collapsed";
   let todoDockBound = false;
+  // Il pulsante "vai in fondo" e' ancorato al fondo: quando il dock e'
+  // visibile va alzato sopra dock + composer, altrimenti torna al CSS.
+  function adjustScrollButton() {
+    const btn = document.getElementById("btn-scroll-bottom");
+    if (!btn) return;
+    const wrap = document.getElementById("composer-wrap");
+    const dock = document.getElementById("todo-dock");
+    if (!wrap || !dock || dock.classList.contains("hidden")) { btn.style.bottom = ""; return; }
+    btn.style.bottom = `${wrap.offsetHeight + dock.offsetHeight + 12}px`;
+  }
   function ensureTodoDock() {
     const dock = document.getElementById("todo-dock");
     if (!dock || todoDockBound) return dock;
     todoDockBound = true;
     try {
-      if (window.localStorage?.getItem(TODO_DOCK_COLLAPSED_KEY) === "1") dock.classList.add("collapsed");
+      if (window.localStorage?.getItem(TODO_DOCK_COLLAPSED_KEY) === "1") {
+        dock.classList.add("collapsed");
+        dock.querySelector("#todo-dock-head")?.setAttribute("aria-expanded", "false");
+      }
     } catch {}
     dock.querySelector("#todo-dock-head")?.addEventListener("click", () => {
       const collapsed = dock.classList.toggle("collapsed");
       dock.querySelector("#todo-dock-head")?.setAttribute("aria-expanded", String(!collapsed));
       try { window.localStorage?.setItem(TODO_DOCK_COLLAPSED_KEY, collapsed ? "1" : "0"); } catch {}
+      adjustScrollButton();
     });
+    window.addEventListener("resize", adjustScrollButton);
     return dock;
   }
 
@@ -264,6 +279,8 @@
     const list = dock.querySelector("#todo-dock-list");
     if (list) todoDockListItems(list, items);
     dock.classList.remove("hidden");
+    document.getElementById("composer-wrap")?.classList.add("has-todo");
+    adjustScrollButton();
     refreshIcons();
   }
 
@@ -272,6 +289,8 @@
     if (!dock) return;
     dock.classList.add("hidden");
     dock.querySelector("#todo-dock-list")?.replaceChildren();
+    document.getElementById("composer-wrap")?.classList.remove("has-todo");
+    adjustScrollButton();
   }
 
   function renderTodoView(card, items) {

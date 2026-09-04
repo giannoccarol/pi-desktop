@@ -1041,8 +1041,12 @@ details.think .think-body { margin: 0 0 4px 31px; padding: 2px 12px 6px; border-
 .tool-state.interrupted { color: var(--amber); }
 .tool-body { max-height: 280px; overflow: auto; margin: 0 0 5px 31px; padding: 6px 12px 8px; border-left: 2px solid var(--hairline); }
 .tool-body pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.55 var(--mono); }
-/* To-do fisso sopra il box messaggi: ultima lista sempre visibile, richiudibile. */
-.todo-dock { width: min(720px, 100%); margin: 0 auto 8px; overflow: hidden; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-card); }
+/* To-do ancorato al composer: overlay sopra i messaggi, non ruba spazio al layout. */
+#composer-wrap { position: relative; }
+.todo-dock { position: absolute; bottom: 100%; left: 50%; z-index: 11; width: min(var(--content-max), calc(100% - 48px)); margin: 0; overflow: hidden; border: 1px solid var(--hairline); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--surface-2); box-shadow: var(--shadow-card); transform: translateX(-50%); }
+#composer-wrap.has-todo #composer { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+@media (max-width: 920px) { .todo-dock { width: min(var(--content-max), calc(100% - 32px)); } }
+@media (max-width: 700px) { .todo-dock { width: calc(100% - 20px); } }
 .todo-dock-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12.5px; font-weight: 600; }
 .todo-dock-head:hover { background: var(--hover); }
 .todo-dock-head > svg { width: 14px; height: 14px; flex: 0 0 auto; }

@@ -27,6 +27,19 @@ const { UpdateService } = require("../updates/update-service");
 const { shouldHandoverToSecondInstance } = require("./single-instance");
 const { startStaleInstallWatch, performHandoverRelaunch } = require("./version-watch");
 
+// Registro handler IPC riusabile anche dal bridge web (mobile-web): handle()
+// registra su ipcMain e memoizza la fn così callIpc() può riusarla via HTTP.
+const ipcHandlers = new Map();
+function handle(channel, fn) {
+  ipcHandlers.set(channel, fn);
+  handle(channel, fn);
+}
+function callIpc(channel, args = []) {
+  const fn = ipcHandlers.get(channel);
+  if (!fn) throw new Error(`Canale IPC sconosciuto: ${channel}`);
+  return fn({ sender: null }, ...args);
+}
+
 // In sviluppo usa una userData dedicata: evita che `npm start` collida con
 // l'istanza installata (stesso single-instance lock su ~/.config/Pi Desktop)
 // e che dev e produzione condividano settings/sessioni.
@@ -63,7 +76,7 @@ function notifySessionsChanged(rescan=false){
   if(sessionsWatchTimer) clearTimeout(sessionsWatchTimer);
   sessionsWatchTimer=setTimeout(()=>{
     sessionsWatchTimer=null;
-    if(win && !win.isDestroyed()) try{ win.webContents.send("sessions:changed"); }catch{}
+    try{ sendToUi("sessions:changed"); }catch{}
     if(rescan) restartSessionsWatcher();
   },120);
   sessionsWatchTimer.unref?.();
@@ -209,6 +222,7 @@ function mobileWebDeps() {
     runtime,
     ensureRuntime,
     notifySessionsChanged,
+    callIpc,
   };
 }
 
@@ -218,7 +232,13 @@ async function listProviderSettings() {
 }
 
 function sendAuthEvent(payload) {
-  if (win && !win.isDestroyed()) win.webContents.send("pi:auth-request", payload);
+  sendToUi("pi:auth-request", payload);
+}
+
+// recapito unificato desktop + client web (SSE): non lancia mai.
+function sendToUi(channel, payload) {
+  if (win && !win.isDestroyed()) { try { win.webContents.send(channel, payload); } catch {} }
+  try { mobileWeb.broadcast(channel, payload); } catch {}
 }
 
 function requestAuthPrompt(providerId, prompt, signal) {
@@ -305,7 +325,7 @@ function tTray(key, vars = {}) {
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     { label: tTray("tray.show"), click: () => showWindow() },
-    { label: tTray("tray.newChat"), click: () => { console.log("[tray] nuova chat richiesta"); showWindow(); try { if (win && !win.isDestroyed()) win.webContents.send("pi:tray-new-chat"); } catch {} } },
+    { label: tTray("tray.newChat"), click: () => { console.log("[tray] nuova chat richiesta"); showWindow(); try { sendToUi("pi:tray-new-chat"); } catch {} } },
     { type: "separator" },
     { label: tTray("tray.quit"), role: "quit" },
   ]);
@@ -473,12 +493,7 @@ let handingOverToNewVersion = false;
 let stopStaleInstallWatch = () => {};
 
 function notifyStaleInstall(payload) {
-  if (!win || win.isDestroyed()) return;
-  try {
-    win.webContents.send("app:stale-install", payload);
-  } catch (err) {
-    console.warn("[version-watch] notify fallita:", err.message);
-  }
+  sendToUi("app:stale-install", payload);
 }
 
 function relaunchInstalledApp() {
@@ -570,13 +585,18 @@ if (process.env.NODE_ENV === "test" || typeof globalThis.__PI_TEST__ !== "undefi
 }
 
 const runtime = new RuntimeTabs((channel, payload) => {
-  if (!win || win.isDestroyed()) return;
+  let safe = payload;
   try {
-    const safe = channel === "pi:event" ? ipcSanitize.sanitizeForIpc(payload) : payload;
-    win.webContents.send(channel, safe);
+    safe = channel === "pi:event" ? ipcSanitize.sanitizeForIpc(payload) : payload;
   } catch (err) {
     console.error("[ipc send]", channel, err);
   }
+  // Niente early-return se la finestra è chiusa (tray): i client web (SSE)
+  // devono ricevere gli eventi anche senza finestra desktop aperta.
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send(channel, safe); } catch (err) { console.error("[ipc send]", channel, err); }
+  }
+  try { mobileWeb.broadcast(channel, safe); } catch {}
 });
 
 async function ensureRuntime() {
@@ -626,9 +646,9 @@ async function rememberCurrentPreference() {
 // IPC
 // ---------------------------------------------------------------------------
 
-ipcMain.handle("settings:get", () => publicSettings());
+handle("settings:get", () => publicSettings());
 
-ipcMain.handle("settings:set", async (_e, patch) => {
+handle("settings:set", async (_e, patch) => {
   const allowed = [
     "cwd", "piPath", "sessionsDir", "sidebarVisible", "lastModel", "language", "sessionMeta", "budgets", "notificationPrefs", "onboardingSeen", "terminalHistory",
     "userName", "userNamePromptSeen", "theme", "notificationsEnabled", "notificationsSound",
@@ -685,9 +705,9 @@ ipcMain.handle("settings:set", async (_e, patch) => {
   return { ...publicSettings(), saveOk };
 });
 
-ipcMain.handle("mobileWeb:get", () => ({ ...mobileWeb.info(settings), token: settings.mobileWebToken || "" }));
+handle("mobileWeb:get", () => ({ ...mobileWeb.info(settings), token: settings.mobileWebToken || "" }));
 
-ipcMain.handle("mobileWeb:regenerateToken", () => {
+handle("mobileWeb:regenerateToken", () => {
   const crypto = require("crypto");
   settings.mobileWebToken = crypto.randomBytes(24).toString("hex");
   saveSettings();
@@ -695,12 +715,12 @@ ipcMain.handle("mobileWeb:regenerateToken", () => {
   return { ...mobileWeb.info(settings), token: settings.mobileWebToken };
 });
 
-ipcMain.handle("dialog:pickDirectory", async (_e, title) => {
+handle("dialog:pickDirectory", async (_e, title) => {
   const res = await dialog.showOpenDialog(win, { title: title || "Scegli cartella", properties: ["openDirectory"] });
   return res.canceled ? null : res.filePaths[0];
 });
 
-ipcMain.handle("dialog:pickFiles", async (_e, kind = "files") => {
+handle("dialog:pickFiles", async (_e, kind = "files") => {
   const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp"];
   const res = await dialog.showOpenDialog(win, {
     title: kind === "images" ? "Aggiungi immagini" : "Aggiungi allegati",
@@ -737,10 +757,10 @@ ipcMain.handle("dialog:pickFiles", async (_e, kind = "files") => {
 const mentionService = createMentionService(() => settings?.cwd);
 const searchMentionCandidates = mentionService.searchMentionCandidates;
 
-ipcMain.handle("fs:searchFiles", (_e, query) => searchMentionCandidates(query));
+handle("fs:searchFiles", (_e, query) => searchMentionCandidates(query));
 
 // Drag&drop: lista file dentro una cartella droppata (relativi alla cartella stessa)
-ipcMain.handle("fs:listDropped", async (_e, absPath) => {
+handle("fs:listDropped", async (_e, absPath) => {
   try {
     const p = String(absPath || "").trim();
     if (!p || !isAllowedProjectPath(p)) return [];
@@ -756,13 +776,13 @@ ipcMain.handle("fs:listDropped", async (_e, absPath) => {
   } catch { return []; }
 });
 
-ipcMain.handle("git:getStatus", async (_e, cwd) => {
+handle("git:getStatus", async (_e, cwd) => {
   const target = cwd || settings?.cwd || process.cwd();
   if(!isAllowedProjectPath(target)) return { isGit:false, branch:null, dirty:0, label:"" };
   try { return await gitService.getGitStatus(target); } catch { return { isGit:false, branch:null, dirty:0, label:"" }; }
 });
 
-ipcMain.handle("window:popOutTab", async (_e, tabId) => {
+handle("window:popOutTab", async (_e, tabId) => {
   try {
     const id = String(tabId||"").trim();
     const tab = id ? runtime.list().find((t)=>t.id===id) : null;
@@ -796,24 +816,24 @@ ipcMain.handle("window:popOutTab", async (_e, tabId) => {
 
 // --- controlli finestra (titlebar nativa disattivata) -----------------------
 // Ogni comando agisce sulla finestra chiamante: la stessa UI serve a main e pop-out.
-ipcMain.handle("window:minimize", (e) => { BrowserWindow.fromWebContents(e.sender)?.minimize(); });
-ipcMain.handle("window:toggleMaximize", (e) => {
+handle("window:minimize", (e) => { BrowserWindow.fromWebContents(e.sender)?.minimize(); });
+handle("window:toggleMaximize", (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   if (!w) return false;
   if (w.isMaximized()) w.unmaximize(); else w.maximize();
   return w.isMaximized();
 });
-ipcMain.handle("window:close", (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); });
-ipcMain.handle("window:isMaximized", (e) => Boolean(BrowserWindow.fromWebContents(e.sender)?.isMaximized()));
+handle("window:close", (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); });
+handle("window:isMaximized", (e) => Boolean(BrowserWindow.fromWebContents(e.sender)?.isMaximized()));
 // Lo stato ingrandisci/ripristina può cambiare anche fuori dal renderer (WM,
 // doppio clic sulla topbar): lo si ripete a ogni transizione.
 app.on("browser-window-created", (_e, w) => {
-  const sendState = () => { try { w.webContents.send("window:state", { maximized: w.isMaximized() }); } catch {} };
+  const sendState = () => { try { w.webContents.send("window:state", { maximized: w.isMaximized() }); } catch {} try { mobileWeb.broadcast("window:state", { maximized: w.isMaximized() }); } catch {} };
   w.on("maximize", sendState);
   w.on("unmaximize", sendState);
 });
 
-ipcMain.handle("projects:add", async () => {
+handle("projects:add", async () => {
   const res = await dialog.showOpenDialog(win, {
     title: "Aggiungi un progetto",
     buttonLabel: "Aggiungi progetto",
@@ -827,7 +847,7 @@ ipcMain.handle("projects:add", async () => {
   return publicSettings();
 });
 
-ipcMain.handle("projects:activate", (_e, projectPath) => {
+handle("projects:activate", (_e, projectPath) => {
   const resolved = resolveProjectPath(projectPath);
   const alreadyListed = (settings.projects || []).includes(resolved);
   if (settings.cwd === resolved && alreadyListed) return publicSettings();
@@ -837,7 +857,7 @@ ipcMain.handle("projects:activate", (_e, projectPath) => {
   return publicSettings();
 });
 
-ipcMain.handle("projects:remove", (_e, projectPath) => {
+handle("projects:remove", (_e, projectPath) => {
   if (typeof projectPath !== "string" || !projectPath.trim()) throw new Error("Percorso progetto non valido");
   const resolved = path.resolve(projectPath);
   settings.projects = (settings.projects || []).filter((candidate) => path.resolve(candidate) !== resolved);
@@ -960,16 +980,16 @@ function isAllowedProjectPath(value){
   const target=realPath(value);
   return allowedProjectRoots().some((root)=>target===root || target.startsWith(root+path.sep));
 }
-ipcMain.handle("shell:openExternal", (_e, url) => {
+handle("shell:openExternal", (_e, url) => {
   if (isAllowedExternalUrl(url)) shell.openExternal(url);
   else console.warn("[openExternal] blocked:", String(url).slice(0,200));
 });
 // Shell di login dell'utente: usata solo per il badge del terminale dockato.
-ipcMain.handle("app:getShellInfo", () => {
+handle("app:getShellInfo", () => {
   if (process.platform === "win32") return { shell: "cmd" };
   return { shell: path.basename(String(process.env.SHELL || "bash")) || "bash" };
 });
-ipcMain.handle("shell:openTerminal", (_e, requestedCwd) => {
+handle("shell:openTerminal", (_e, requestedCwd) => {
   const cwd=realPath(requestedCwd || settings?.cwd);
   if(!isAllowedProjectPath(cwd) || !isDirectory(cwd)) throw new Error("Cartella terminale non valida");
   let command=""; let args=[];
@@ -993,7 +1013,7 @@ ipcMain.handle("shell:openTerminal", (_e, requestedCwd) => {
   return {ok:true};
 });
 
-ipcMain.handle("sessions:list", async () => {
+handle("sessions:list", async () => {
   const now = Date.now();
   if (sessionsListCache && now - sessionsListCacheAt < SESSIONS_CACHE_TTL_MS) return sessionsListCache;
   const listed = (await sessionsAsync.listSessions(sessionsDir())).map((session) => ({
@@ -1008,7 +1028,7 @@ ipcMain.handle("sessions:list", async () => {
   return listed;
 });
 
-ipcMain.handle("sessions:preview", async (_e, file) => {
+handle("sessions:preview", async (_e, file) => {
   const resolvedRoot = path.resolve(sessionsDir());
   const resolvedFile = path.resolve(file);
   if (!resolvedFile.startsWith(resolvedRoot + path.sep) || !resolvedFile.endsWith(".jsonl")) {
@@ -1028,23 +1048,23 @@ function resolveSessionFile(file) {
   return resolvedFile;
 }
 
-ipcMain.handle("sessions:messagesPage", async (_e, { file, limit = 2000 }) => {
+handle("sessions:messagesPage", async (_e, { file, limit = 2000 }) => {
   const resolvedFile = resolveSessionFile(file);
   return sanitizeMessagesForIpc(await sessionsAsync.readSessionMessages(resolvedFile), Math.min(limit, 3000), 2_000_000);
 });
 
-ipcMain.handle("sessions:messageCount", async (_e, { file }) => {
+handle("sessions:messageCount", async (_e, { file }) => {
   const resolvedFile = resolveSessionFile(file);
   return { count: await sessionsAsync.countSessionMessages(resolvedFile) };
 });
 
-ipcMain.handle("sessions:messagesRange", async (_e, { file, start, end }) => {
+handle("sessions:messagesRange", async (_e, { file, start, end }) => {
   const resolvedFile = resolveSessionFile(file);
   const messages = await sessionsAsync.readSessionMessagesSlice(resolvedFile, start, end);
   return sanitizeMessagesForIpc({ messages }, messages.length, 2_000_000);
 });
 
-ipcMain.handle("sessions:delete", async (_e, file) => {
+handle("sessions:delete", async (_e, file) => {
   // Safety: only delete inside our sessions dir.
   const resolvedRoot = path.resolve(sessionsDir());
   const resolvedFile = path.resolve(file);
@@ -1062,7 +1082,7 @@ ipcMain.handle("sessions:delete", async (_e, file) => {
   return { ok: true };
 });
 
-ipcMain.handle("sessions:searchFullText", async (_e, query) => {
+handle("sessions:searchFullText", async (_e, query) => {
   if (typeof query === "string") {
     const q = query.trim();
     if (!q) return [];
@@ -1072,7 +1092,7 @@ ipcMain.handle("sessions:searchFullText", async (_e, query) => {
   return sessionsAsync.searchSessionsFullText(sessionsDir(), query, 80);
 });
 
-ipcMain.handle("sessions:bulkDelete", async (_e, files) => {
+handle("sessions:bulkDelete", async (_e, files) => {
   const list = Array.isArray(files) ? files : [];
   if (!list.length) throw new Error("Nessuna sessione selezionata");
   const root = path.resolve(sessionsDir());
@@ -1091,7 +1111,7 @@ ipcMain.handle("sessions:bulkDelete", async (_e, files) => {
   saveSettings();
   return result;
 });
-ipcMain.handle("sessions:restoreTrash", async (_e, trashFile) => {
+handle("sessions:restoreTrash", async (_e, trashFile) => {
   const trashDir = sessionsStore.trashDirFor(sessionsDir());
   const src = path.join(trashDir, path.basename(String(trashFile)));
   if(!fs.existsSync(src)) throw new Error("File trash non trovato");
@@ -1099,7 +1119,7 @@ ipcMain.handle("sessions:restoreTrash", async (_e, trashFile) => {
   sessionsListCache=null; sessionsListCacheAt=0;
   return { ok:true, restored: dest };
 });
-ipcMain.handle("sessions:listTrash", async () => {
+handle("sessions:listTrash", async () => {
   const trashDir = sessionsStore.trashDirFor(sessionsDir());
   try{
     const entries = fs.readdirSync(trashDir).filter(f=>f.endsWith(".jsonl")).map(f=>{
@@ -1109,7 +1129,7 @@ ipcMain.handle("sessions:listTrash", async () => {
   }catch{ return []; }
 });
 
-ipcMain.handle("sessions:setMeta", (_e, { file, patch }) => {
+handle("sessions:setMeta", (_e, { file, patch }) => {
   const resolvedRoot = path.resolve(sessionsDir());
   const resolvedFile = file ? path.resolve(String(file)) : null;
   if (!resolvedFile || !resolvedFile.startsWith(resolvedRoot + path.sep)) throw new Error("Percorso non valido");
@@ -1132,15 +1152,15 @@ ipcMain.handle("sessions:setMeta", (_e, { file, patch }) => {
   return { ok: true, meta: settings.sessionMeta[resolvedFile] || null };
 });
 
-ipcMain.handle("sessions:getMeta", () => settings.sessionMeta || {});
+handle("sessions:getMeta", () => settings.sessionMeta || {});
 
-ipcMain.handle("fs:listExplorer", async (_e, { cwd, depth, showDotfiles }) => {
+handle("fs:listExplorer", async (_e, { cwd, depth, showDotfiles }) => {
   const target = cwd ? path.resolve(String(cwd)) : path.resolve(settings.cwd || app.getPath("home"));
   if (!isDirectory(target) || !isAllowedProjectPath(target)) throw new Error("Cartella non disponibile");
   return sessionsAsync.listExplorerTree(target, Math.min(Math.max(Number(depth)||2,1),4), 800, { showDotfiles: Boolean(showDotfiles) });
 });
 
-ipcMain.handle("fs:readTextFile", async (_e, filePath) => {
+handle("fs:readTextFile", async (_e, filePath) => {
   const p = realPath(filePath);
   const cwd = realPath(settings.cwd || app.getPath("home"));
   if (!p.startsWith(cwd + path.sep) && p !== cwd) throw new Error("File fuori dal progetto");
@@ -1149,11 +1169,11 @@ ipcMain.handle("fs:readTextFile", async (_e, filePath) => {
   return { content: fs.readFileSync(p, "utf8").slice(0, 20000), size: st.size };
 });
 
-ipcMain.handle("health:getPiLogs", () => {
+handle("health:getPiLogs", () => {
   try { return { logs: (runtime.getRecentLogs && runtime.getRecentLogs()) || [] }; } catch { return { logs: [] }; }
 });
 
-ipcMain.handle("sessions:bulkExport", async (_e, files) => {
+handle("sessions:bulkExport", async (_e, files) => {
   const list = Array.isArray(files) ? files : [];
   const picked = [];
   const root = path.resolve(sessionsDir());
@@ -1171,7 +1191,7 @@ ipcMain.handle("sessions:bulkExport", async (_e, files) => {
 
 // --- pi lifecycle -----------------------------------------------------------
 
-ipcMain.handle("pi:start", async (_e, opts = {}) => {
+handle("pi:start", async (_e, opts = {}) => {
   const saved = settings.lastModel || {};
   const result = await runtime.start({
     cwd: opts.cwd || settings.cwd,
@@ -1187,9 +1207,9 @@ ipcMain.handle("pi:start", async (_e, opts = {}) => {
   return result;
 });
 
-ipcMain.handle("pi:listTabs", () => runtime.list());
-ipcMain.handle("pi:activateTab", (_e, tabId) => runtime.activate(tabId));
-ipcMain.handle("pi:closeTab", (_e, tabId) => runtime.close(tabId));
+handle("pi:listTabs", () => runtime.list());
+handle("pi:activateTab", (_e, tabId) => runtime.activate(tabId));
+handle("pi:closeTab", (_e, tabId) => runtime.close(tabId));
 
 async function checkBudgetForCwd(cwd, tabId){
   try{
@@ -1215,30 +1235,30 @@ async function checkBudgetForCwd(cwd, tabId){
     return { ok:true, cost, tokens, pct };
   }catch{ return { ok:true }; }
 }
-ipcMain.handle("pi:prompt", async (_e, { message, images, streamingBehavior, tabId }) => {
+handle("pi:prompt", async (_e, { message, images, streamingBehavior, tabId }) => {
   const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
   const chk = await checkBudgetForCwd(cwd, tabId);
   if(!chk.ok) throw new Error(`Budget superato per ${cwd}: costo ${chk.cost?.toFixed?.(2)||chk.cost} / ${chk.budget.maxCost} o token ${chk.tokens} / ${chk.budget.maxTokens}. Aggiorna il budget in Impostazioni.`);
   await ensureRuntime();
   return runtime.prompt(message, images, streamingBehavior, tabId);
 });
-ipcMain.handle("pi:steer", async (_e, { message, images, tabId }) => {
+handle("pi:steer", async (_e, { message, images, tabId }) => {
   const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
   const chk = await checkBudgetForCwd(cwd, tabId);
   if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.steer(message, images, tabId);
 });
-ipcMain.handle("pi:followUp", async (_e, { message, images, tabId }) => {
+handle("pi:followUp", async (_e, { message, images, tabId }) => {
   const cwd = (tabId && runtime.list().find(t=>t.id===tabId)?.cwd) || settings?.cwd;
   const chk = await checkBudgetForCwd(cwd, tabId);
   if(!chk.ok) throw new Error(`Budget superato per ${cwd}`);
   await ensureRuntime();
   return runtime.followUp(message, images, tabId);
 });
-ipcMain.handle("pi:abort", (_e, tabId) => runtime.abort(tabId));
-ipcMain.handle("pi:forceStop", () => runtime.forceStopAndRecover());
-ipcMain.handle("pi:newSession", async (_e, { cwd, parentSession } = {}) => {
+handle("pi:abort", (_e, tabId) => runtime.abort(tabId));
+handle("pi:forceStop", () => runtime.forceStopAndRecover());
+handle("pi:newSession", async (_e, { cwd, parentSession } = {}) => {
   const t0 = Date.now();
   try {
     return await runtime.newSession({
@@ -1256,7 +1276,7 @@ ipcMain.handle("pi:newSession", async (_e, { cwd, parentSession } = {}) => {
     else console.log(`[pi:newSession] ${ms}ms`);
   }
 });
-ipcMain.handle("pi:openSession", async (_e, { sessionPath, cwd, preference, title }) => {
+handle("pi:openSession", async (_e, { sessionPath, cwd, preference, title }) => {
   const stored = settings.sessionPreferences?.[sessionPath];
   const selected = safePreference(preference || stored);
   const result = await runtime.openSession(sessionPath, {
@@ -1272,7 +1292,7 @@ ipcMain.handle("pi:openSession", async (_e, { sessionPath, cwd, preference, titl
   rememberCurrentPreference().catch(() => {});
   return { ok: true, tabId: result?.tabId, reused: Boolean(result?.reused) };
 });
-ipcMain.handle("pi:getState", async (_e, tabId) => {
+handle("pi:getState", async (_e, tabId) => {
   await ensureRuntime();
   const state = await runtime.getState(tabId);
   try {
@@ -1282,7 +1302,7 @@ ipcMain.handle("pi:getState", async (_e, tabId) => {
     return { tabId };
   }
 });
-ipcMain.handle("pi:getMessages", async (_e, tabId) => {
+handle("pi:getMessages", async (_e, tabId) => {
   await ensureRuntime();
   const payload = await runtime.getMessages(tabId);
   try {
@@ -1292,7 +1312,7 @@ ipcMain.handle("pi:getMessages", async (_e, tabId) => {
     return { messages: [], truncated: false, hiddenCount: 0, loadError: "sanitize_failed" };
   }
 });
-ipcMain.handle("pi:getAvailableModels", async () => {
+handle("pi:getAvailableModels", async () => {
   await ensureRuntime();
   // Il catalogo modelli vive nel processo pi avviato: se pi e' stato aggiornato
   // a app aperta, riavvia il runtime (a streaming fermo) prima di rispondere,
@@ -1349,92 +1369,92 @@ ipcMain.handle("pi:getAvailableModels", async () => {
   } catch {}
   return data;
 });
-ipcMain.handle("pi:setModel", async (_e, { provider, modelId }) => {
+handle("pi:setModel", async (_e, { provider, modelId }) => {
   await ensureRuntime();
   const result = await runtime.setModel(provider, modelId);
   await rememberCurrentPreference();
   return result;
 });
-ipcMain.handle("pi:setThinkingLevel", async (_e, { level }) => {
+handle("pi:setThinkingLevel", async (_e, { level }) => {
   await ensureRuntime();
   const result = await runtime.setThinkingLevel(level);
   await rememberCurrentPreference();
   return result;
 });
-ipcMain.handle("pi:getThinkingLevels", async () => {
+handle("pi:getThinkingLevels", async () => {
   await ensureRuntime();
   return runtime.getThinkingLevels();
 });
-ipcMain.handle("pi:getStats", async () => {
+handle("pi:getStats", async () => {
   await ensureRuntime();
   return runtime.getSessionStats();
 });
-ipcMain.handle("pi:getCommands", async () => {
+handle("pi:getCommands", async () => {
   await ensureRuntime();
   return runtime.getCommands();
 });
-ipcMain.handle("pi:getTree", async () => {
+handle("pi:getTree", async () => {
   await ensureRuntime();
   return runtime.getTree();
 });
-ipcMain.handle("pi:getEntries", async (_e, since) => {
+handle("pi:getEntries", async (_e, since) => {
   await ensureRuntime();
   return runtime.getEntries(typeof since === "string" ? since : undefined);
 });
-ipcMain.handle("pi:getForkMessages", async () => {
+handle("pi:getForkMessages", async () => {
   await ensureRuntime();
   return runtime.getForkMessages();
 });
-ipcMain.handle("pi:fork", async (_e, entryId) => {
+handle("pi:fork", async (_e, entryId) => {
   if (typeof entryId !== "string" || !entryId) throw new Error("Messaggio di fork non valido");
   await ensureRuntime();
   const result = await runtime.fork(entryId);
   await rememberCurrentPreference();
   return result;
 });
-ipcMain.handle("pi:clone", async () => {
+handle("pi:clone", async () => {
   await ensureRuntime();
   const result = await runtime.clone();
   await rememberCurrentPreference();
   return result;
 });
-ipcMain.handle("pi:getLastAssistantText", async () => {
+handle("pi:getLastAssistantText", async () => {
   await ensureRuntime();
   return runtime.getLastAssistantText();
 });
-ipcMain.handle("pi:setSessionName", async (_e, name) => {
+handle("pi:setSessionName", async (_e, name) => {
   if (typeof name !== "string" || name.length > 200) throw new Error("Nome sessione non valido");
   await ensureRuntime();
   const result = await runtime.setSessionName(name.trim());
   return result;
 });
-ipcMain.handle("pi:compact", async (_e, customInstructions) => {
+handle("pi:compact", async (_e, customInstructions) => {
   await ensureRuntime();
   return runtime.compact(typeof customInstructions === "string" ? customInstructions.trim() : undefined);
 });
-ipcMain.handle("pi:setAutoCompaction", async (_e, enabled) => {
+handle("pi:setAutoCompaction", async (_e, enabled) => {
   await ensureRuntime();
   return runtime.setAutoCompaction(Boolean(enabled));
 });
-ipcMain.handle("pi:setAutoRetry", async (_e, enabled) => {
+handle("pi:setAutoRetry", async (_e, enabled) => {
   await ensureRuntime();
   return runtime.setAutoRetry(Boolean(enabled));
 });
-ipcMain.handle("pi:abortRetry", async () => {
+handle("pi:abortRetry", async () => {
   await ensureRuntime();
   return runtime.abortRetry();
 });
-ipcMain.handle("pi:setSteeringMode", async (_e, mode) => {
+handle("pi:setSteeringMode", async (_e, mode) => {
   if (!["all", "one-at-a-time"].includes(mode)) throw new Error("Modalità steer non valida");
   await ensureRuntime();
   return runtime.setSteeringMode(mode);
 });
-ipcMain.handle("pi:setFollowUpMode", async (_e, mode) => {
+handle("pi:setFollowUpMode", async (_e, mode) => {
   if (!["all", "one-at-a-time"].includes(mode)) throw new Error("Modalità follow-up non valida");
   await ensureRuntime();
   return runtime.setFollowUpMode(mode);
 });
-ipcMain.handle("pi:exportHtml", async (_e, outputPath) => {
+handle("pi:exportHtml", async (_e, outputPath) => {
   await ensureRuntime();
   let selected = outputPath;
   if (!selected) {
@@ -1448,37 +1468,37 @@ ipcMain.handle("pi:exportHtml", async (_e, outputPath) => {
   }
   return runtime.exportHtml(selected);
 });
-ipcMain.handle("pi:bash", async (_e, { command, excludeFromContext } = {}) => {
+handle("pi:bash", async (_e, { command, excludeFromContext } = {}) => {
   if (typeof command !== "string" || !command.trim()) throw new Error("Comando shell vuoto");
   await ensureRuntime();
   return runtime.bash(command.trim(), Boolean(excludeFromContext));
 });
-ipcMain.handle("pi:abortBash", async () => {
+handle("pi:abortBash", async () => {
   await ensureRuntime();
   return runtime.abortBash();
 });
 
 // Extension UI dialogs (select/confirm/input/editor) answered by the renderer.
-ipcMain.handle("pi:uiRespond", (_e, { id, payload }) => runtime.uiRespond(id, payload));
+handle("pi:uiRespond", (_e, { id, payload }) => runtime.uiRespond(id, payload));
 
 // --- native pi settings and project trust ---------------------------------
 
-ipcMain.handle("piSettings:get", () => piSettingsStore.get(settings.cwd));
+handle("piSettings:get", () => piSettingsStore.get(settings.cwd));
 
-ipcMain.handle("piSettings:set", async (_e, patch) => {
+handle("piSettings:set", async (_e, patch) => {
   const result = piSettingsStore.setGlobal(settings.cwd, patch || {});
   await runtime.restart().catch(() => runtime.stop());
   return result;
 });
 
-ipcMain.handle("piSettings:setTrust", async (_e, decision) => {
+handle("piSettings:setTrust", async (_e, decision) => {
   if (![true, false, null].includes(decision)) throw new Error("Decisione di trust non valida");
   const result = piSettingsStore.setTrust(settings.cwd, decision);
   await runtime.restart().catch(() => runtime.stop());
   return result;
 });
 
-ipcMain.handle("piSettings:save", async (_e, { patch, trustDecision } = {}) => {
+handle("piSettings:save", async (_e, { patch, trustDecision } = {}) => {
   if (![true, false, null].includes(trustDecision)) throw new Error("Decisione di trust non valida");
   piSettingsStore.setGlobal(settings.cwd, patch || {});
   piSettingsStore.setTrust(settings.cwd, trustDecision);
@@ -1488,21 +1508,21 @@ ipcMain.handle("piSettings:save", async (_e, { patch, trustDecision } = {}) => {
 
 // --- provider credentials (shared with the external pi installation) -------
 
-ipcMain.handle("providers:list", () => listProviderSettings());
+handle("providers:list", () => listProviderSettings());
 
-ipcMain.handle("providers:setKey", async (_e, { providerId, key }) => {
+handle("providers:setKey", async (_e, { providerId, key }) => {
   providerStore.setApiKey(providerId, key);
   await runtime.restart().catch(() => runtime.stop());
   return listProviderSettings();
 });
 
-ipcMain.handle("providers:remove", async (_e, providerId) => {
+handle("providers:remove", async (_e, providerId) => {
   await authService.logout(settings, providerId).catch(() => providerStore.removeCredential(providerId));
   await runtime.restart().catch(() => runtime.stop());
   return listProviderSettings();
 });
 
-ipcMain.handle("providers:login", async (_e, { providerId, authType }) => {
+handle("providers:login", async (_e, { providerId, authType }) => {
   if (typeof providerId !== "string" || !providerId) throw new Error("Provider non valido");
   if (!["api_key", "oauth"].includes(authType)) throw new Error("Tipo di autenticazione non valido");
   const controller = new AbortController();
@@ -1530,7 +1550,7 @@ ipcMain.handle("providers:login", async (_e, { providerId, authType }) => {
   }
 });
 
-ipcMain.handle("providers:authRespond", (_e, { id, value, cancelled } = {}) => {
+handle("providers:authRespond", (_e, { id, value, cancelled } = {}) => {
   const pending = pendingAuthRequests.get(id);
   if (!pending) return { ok: false };
   pendingAuthRequests.delete(id);
@@ -1539,57 +1559,57 @@ ipcMain.handle("providers:authRespond", (_e, { id, value, cancelled } = {}) => {
   return { ok: true };
 });
 
-ipcMain.handle("providers:cancelLogin", (_e, providerId) => {
+handle("providers:cancelLogin", (_e, providerId) => {
   authControllers.get(providerId)?.abort();
   return { ok: true };
 });
 
 // --- pi package store ------------------------------------------------------
 
-ipcMain.handle("packages:search", (_e, query) => packageStore.searchPackages(query));
-ipcMain.handle("packages:listInstalled", () => packageStore.listInstalled(settings));
-ipcMain.handle("packages:listResources", () => packageResources.listResources(settings));
-ipcMain.handle("packages:setResourceEnabled", async (_e, { resource, enabled } = {}) => {
+handle("packages:search", (_e, query) => packageStore.searchPackages(query));
+handle("packages:listInstalled", () => packageStore.listInstalled(settings));
+handle("packages:listResources", () => packageResources.listResources(settings));
+handle("packages:setResourceEnabled", async (_e, { resource, enabled } = {}) => {
   const result = packageResources.setResourceEnabled(settings, resource, Boolean(enabled));
   await runtime.restart().catch(() => runtime.stop());
   return result;
 });
 
-ipcMain.handle("packages:install", async (_e, { name, scope } = {}) => {
+handle("packages:install", async (_e, { name, scope } = {}) => {
   const installed = await packageStore.install(name, settings, (line) => {
-    if (win && !win.isDestroyed()) win.webContents.send("pi:package-output", line);
+    sendToUi("pi:package-output", line);
   }, scope);
   await runtime.restart().catch(() => runtime.stop());
   return installed;
 });
 
-ipcMain.handle("packages:remove", async (_e, { name, scope } = {}) => {
+handle("packages:remove", async (_e, { name, scope } = {}) => {
   const installed = await packageStore.remove(name, settings, (line) => {
-    if (win && !win.isDestroyed()) win.webContents.send("pi:package-output", line);
+    sendToUi("pi:package-output", line);
   }, scope);
   await runtime.restart().catch(() => runtime.stop());
   return installed;
 });
 
-ipcMain.handle("packages:installSource", async (_e, { source, scope } = {}) => {
+handle("packages:installSource", async (_e, { source, scope } = {}) => {
   const installed = await packageStore.installSource(source, scope, settings, (line) => {
-    if (win && !win.isDestroyed()) win.webContents.send("pi:package-output", line);
+    sendToUi("pi:package-output", line);
   });
   await runtime.restart().catch(() => runtime.stop());
   return installed;
 });
 
-ipcMain.handle("packages:removeSource", async (_e, { source, scope } = {}) => {
+handle("packages:removeSource", async (_e, { source, scope } = {}) => {
   const installed = await packageStore.removeSource(source, scope, settings, (line) => {
-    if (win && !win.isDestroyed()) win.webContents.send("pi:package-output", line);
+    sendToUi("pi:package-output", line);
   });
   await runtime.restart().catch(() => runtime.stop());
   return installed;
 });
 
-ipcMain.handle("packages:update", async (_e, target) => {
+handle("packages:update", async (_e, target) => {
   const installed = await packageStore.update(target, settings, (line) => {
-    if (win && !win.isDestroyed()) win.webContents.send("pi:package-output", line);
+    sendToUi("pi:package-output", line);
   });
   await runtime.restart().catch(() => runtime.stop());
   return installed;
@@ -1597,23 +1617,23 @@ ipcMain.handle("packages:update", async (_e, target) => {
 
 // --- app OTA (electron-updater, GitHub Releases) ----------------------------
 
-ipcMain.handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null, autoInstall: true, cachedInstall: false, packageType: "", pendingPackagePath: null }));
-ipcMain.handle("update:check", async () => (appUpdateService ? appUpdateService.check(true) : { success: false, error: "Updater not initialized" }));
-ipcMain.handle("update:download", async () => (appUpdateService ? appUpdateService.download() : { success: false, error: "Updater not initialized" }));
-ipcMain.handle("update:install", async () => (appUpdateService ? appUpdateService.install() : { success: false, error: "Updater not initialized" }));
-ipcMain.handle("app:relaunch", () => {
+handle("update:getState", () => (appUpdateService ? appUpdateService.getState() : { status: "disabled", currentVersion: app.getVersion(), availableVersion: null, progress: 0, error: null, autoInstall: true, cachedInstall: false, packageType: "", pendingPackagePath: null }));
+handle("update:check", async () => (appUpdateService ? appUpdateService.check(true) : { success: false, error: "Updater not initialized" }));
+handle("update:download", async () => (appUpdateService ? appUpdateService.download() : { success: false, error: "Updater not initialized" }));
+handle("update:install", async () => (appUpdateService ? appUpdateService.install() : { success: false, error: "Updater not initialized" }));
+handle("app:relaunch", () => {
   relaunchInstalledApp();
   return { success: true };
 });
 
 // --- pi CLI updates (independent of the app) --------------------------------
 
-ipcMain.handle("pi:updateStatus", () => updater.status(settings));
+handle("pi:updateStatus", () => updater.status(settings));
 
-ipcMain.handle("pi:maintenance", async (_e, kind) => {
+handle("pi:maintenance", async (_e, kind) => {
   if (!["update", "install"].includes(kind)) throw new Error("Operazione non valida");
   const result = await updater.runMaintenance(kind, settings, (line) => {
-    if (win && !win.isDestroyed()) win.webContents.send("pi:maintenance-output", line);
+    sendToUi("pi:maintenance-output", line);
   });
   return result;
 });
