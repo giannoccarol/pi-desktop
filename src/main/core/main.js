@@ -1322,53 +1322,7 @@ handle("pi:getAvailableModels", async () => {
     console.log("[runtime] binario pi aggiornato: riavvio del runtime per aggiornare il catalogo modelli");
     await runtime.restart().catch(() => {});
   }
-  const data = await runtime.getAvailableModels();
-  // ponytail: live opencode fallback - se pi.dev è stale, sintetizza modelli mancanti da API diretta
-  try {
-    const auth = providerStore.readAuth();
-    const liveProviders = [
-      { id: "opencode", url: "https://opencode.ai/zen/v1/models" },
-      { id: "opencode-go", url: "https://opencode.ai/zen/go/v1/models" },
-    ];
-    const existing = new Set((data.models || []).map((m) => `${m.provider}/${m.id}`));
-    for (const { id, url } of liveProviders) {
-      const key = auth[id]?.key;
-      if (!key) continue;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
-      let liveIds = null;
-      try {
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: controller.signal });
-        if (res.ok) {
-          const j = await res.json();
-          liveIds = (j.data || []).map((m) => m.id).filter(Boolean);
-        }
-      } catch {}
-      clearTimeout(timer);
-      if (!liveIds || !liveIds.length) continue;
-      for (const modelId of liveIds) {
-        const k = `${id}/${modelId}`;
-        if (existing.has(k)) continue;
-        const isGoAnthropic = id === "opencode-go" && (modelId.startsWith("minimax-") || modelId.startsWith("qwen") || modelId.startsWith("muse-") || modelId.startsWith("hy"));
-        const api = isGoAnthropic ? "anthropic-messages" : "openai-completions";
-        const baseUrl = id === "opencode-go" ? (api === "anthropic-messages" ? "https://opencode.ai/zen/go" : "https://opencode.ai/zen/go/v1") : "https://opencode.ai/zen/v1";
-        data.models.push({
-          id: modelId,
-          name: modelId.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-          api,
-          provider: id,
-          baseUrl,
-          reasoning: true,
-          input: api === "anthropic-messages" ? ["text", "image"] : ["text"],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-          contextWindow: 131072,
-          maxTokens: 8192,
-        });
-        existing.add(k);
-      }
-    }
-  } catch {}
-  return data;
+  return runtime.getAvailableModels();
 });
 handle("pi:setModel", async (_e, { provider, modelId }) => {
   await ensureRuntime();
