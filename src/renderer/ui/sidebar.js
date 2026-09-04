@@ -415,6 +415,7 @@ function renderProjects() {
       e.stopPropagation();
       if (state.creatingChat) return;
       newChat(project.path);
+      window.closeDrawerOnMobile?.();
     });
     const menuBtn = row.querySelector(".project-remove");
     menuBtn.setAttribute("aria-expanded", state.openProjectMenu === project.path ? "true" : "false");
@@ -532,6 +533,7 @@ function renderProjects() {
           if (session.tabId) await switchToTab(session.tabId);
           else if (openTab) await switchToTab(openTab.id);
           else await openHistorySession(session);
+          window.closeDrawerOnMobile?.();
         });
         item.addEventListener("keydown", (ev)=>{
           if((ev.key==="Enter" || ev.key===" ") && !ev.target.closest("button,input")){ ev.preventDefault(); item.click(); }

@@ -17,6 +17,7 @@ const { execSync } = require("child_process");
 const RENDERER_DIR = path.join(__dirname, "..", "..", "renderer");
 
 let server = null;
+let boundPort = 0;
 let keepAliveTimer = null;
 const sseClients = new Set();
 
@@ -329,7 +330,10 @@ function start(deps) {
   if (!settings.mobileWebEnabled) return null;
   if (server) return server;
   const token = ensureToken(settings, saveSettings);
-  const port = Math.max(1024, Math.min(65535, Number(settings.mobileWebPort) || 3923));
+  const basePort = Math.max(1024, Math.min(65535, Number(settings.mobileWebPort) || 3923));
+  // In dev la userData è separata ma la porta no: +1 per non scontrarsi
+  // con l'istanza installata già in ascolto.
+  const port = Math.min(65535, basePort + (Number(deps.devPortOffset) || 0));
 
   server = http.createServer(async (req, res) => {
     try {
@@ -427,7 +431,13 @@ function start(deps) {
     }
   });
 
-  server.on("error", (err) => console.error("[mobile-web]", err.message));
+  server.on("error", (err) => {
+    console.error("[mobile-web]", err.message);
+    // Porta occupata (es. istanza installata + dev insieme): azzera così
+    // info().running resta veritiero e il prossimo restart riprova.
+    try { server.close(); } catch {}
+    server = null;
+  });
   keepAliveTimer = setInterval(() => {
     for (const res of sseClients) {
       try { res.write(":ping\n\n"); } catch { sseClients.delete(res); }
@@ -437,6 +447,7 @@ function start(deps) {
   server.listen(port, "0.0.0.0", () => {
     const tip = tailscaleIp();
     console.log(`[mobile-web] attivo su porta ${port}`);
+    boundPort = port;
     console.log(`[mobile-web] da mobile (Tailscale): http://${tip || "<IP-TAILSCALE>"}:${port}/?token=${token}`);
     if (!tip) console.log("[mobile-web] IP non rilevato: vedi `tailscale ip -4` sul PC");
   });
@@ -448,6 +459,7 @@ function stop() {
   for (const res of sseClients) { try { res.end(); } catch {} }
   sseClients.clear();
   appHtmlCache = null;
+  boundPort = 0;
   if (!server) return;
   try { server.close(); } catch {}
   server = null;
@@ -473,7 +485,7 @@ function lanIp() {
 function info(settings) {
   const tip = tailscaleIp();
   const lan = lanIp();
-  const port = Number(settings.mobileWebPort) || 3923;
+  const port = boundPort || Number(settings.mobileWebPort) || 3923;
   const token = settings.mobileWebToken || "";
   const host = tip || lan;
   return {

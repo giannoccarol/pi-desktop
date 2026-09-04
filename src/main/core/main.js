@@ -32,7 +32,7 @@ const { startStaleInstallWatch, performHandoverRelaunch } = require("./version-w
 const ipcHandlers = new Map();
 function handle(channel, fn) {
   ipcHandlers.set(channel, fn);
-  handle(channel, fn);
+  ipcMain.handle(channel, fn);
 }
 function callIpc(channel, args = []) {
   const fn = ipcHandlers.get(channel);
@@ -223,6 +223,7 @@ function mobileWebDeps() {
     ensureRuntime,
     notifySessionsChanged,
     callIpc,
+    devPortOffset: app.isPackaged ? 0 : 1,
   };
 }
 

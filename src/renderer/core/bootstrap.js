@@ -19,6 +19,9 @@
   function setConversationMode(a,b){ return (window.piUi ? window.piUi.setConversationMode : window.setConversationMode)?.apply(null, arguments); }
   function closeMenus(){ return (window.piUi ? window.piUi.closeMenus : window.closeMenus)?.apply(null, arguments); }
   function setSidebarVisible(v){ return (window.piUi ? window.piUi.setSidebarVisible : window.setSidebarVisible)?.apply(null, arguments); }
+  // Drawer mobile: dopo aver scelto una chat il menu si richiude da solo.
+  function closeDrawerOnMobile(){ if (window.matchMedia("(max-width: 760px) and (pointer: coarse)").matches) setSidebarVisible(false); }
+  window.closeDrawerOnMobile = closeDrawerOnMobile;
   function applyTheme(th){ return (window.piUi ? window.piUi.applyTheme : window.applyTheme)?.apply(null, arguments); }
   function applyUserName(name) {
     if (window.i18n?.refreshUserNameUI) window.i18n.refreshUserNameUI(name);
@@ -201,7 +204,8 @@
       });
     }
 
-    el.newChat.addEventListener("click", () => (window.newChat||window.piSession?.newChat)?.());
+    el.newChat.addEventListener("click", () => { (window.newChat||window.piSession?.newChat)?.(); closeDrawerOnMobile(); });
+    el.sidebarScrim?.addEventListener("click", () => setSidebarVisible(false));
     // "Nuova chat" dal menu tray (main invia pi:tray-new-chat dopo showWindow).
     // Se il tab corrente e' gia' una chat vuota, newSession lo riusa senza creare
     // un nuovo tab (vedi RuntimeTabs.newSession): mostriamo comunque un feedback,
@@ -808,6 +812,8 @@
     if (i18n && initialLang !== i18n.getLang()) i18n.setLang(initialLang);
     else if (i18n) i18n.applyI18n();
     if (state.settings.sidebarVisible === false) el.sidebar.classList.add("collapsed");
+    // Su schermi piccoli si parte dalla chat: il menu è un drawer chiuso.
+    if (window.matchMedia("(max-width: 760px) and (pointer: coarse)").matches) el.sidebar.classList.add("collapsed");
     el.statusCwd.textContent = state.settings.cwd || "";
     applyUserName(state.settings.userName);
     for (const path of window.piUiSettings?.expandedProjectsList?.(state.settings) || []) {

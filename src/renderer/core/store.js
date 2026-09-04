@@ -95,6 +95,7 @@
     checkAppUpdateStatus: $("#check-app-update-status"),
     btnSettingsSave: $("#btn-settings-save"),
     btnSettingsClose: $("#btn-settings-close"),
+    sidebarScrim: $("#sidebar-scrim"),
     settingMobileEnabled: $("#setting-mobile-enabled"),
     mobileWebLink: $("#mobile-web-link"),
     mobileWebHint: $("#mobile-web-hint"),

@@ -2057,6 +2057,32 @@ html[data-theme="dark"] #chat-tooltip {
   .settings-actions .btn { flex: 1; }
 }
 
+/* Mobile (touch): la sidebar diventa un drawer overlay. Desktop invariato
+   anche a finestra stretta: lì resta il collapse classico senza ombre. */
+#sidebar-scrim { display: none; }
+@media (max-width: 760px) and (pointer: coarse) {
+  #app { height: 100dvh; }
+  #main { border-radius: 0; }
+  #sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: min(300px, 86vw); min-width: 0;
+    margin-left: 0; opacity: 1;
+    z-index: 80;
+    transform: translateX(-105%);
+    transition: transform .24s cubic-bezier(.2,.8,.2,1);
+    border-radius: 0 18px 18px 0;
+    box-shadow: 12px 0 40px rgba(0,0,0,.45);
+  }
+  #sidebar:not(.collapsed) { transform: none; }
+  #sidebar.collapsed { margin-left: 0; opacity: 1; }
+  #sidebar-resizer { display: none; }
+  #sidebar:not(.collapsed) + #sidebar-scrim {
+    display: block;
+    position: fixed; inset: 0; z-index: 70;
+    background: rgba(0,0,0,.45);
+  }
+}
+
 @media (max-height: 670px) {
   #topbar { min-height: 51px; padding-block: 8px; }
   .hero-logo { width: 47px; height: 47px; margin-bottom: 10px; font-size: 31px; }
