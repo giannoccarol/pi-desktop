@@ -1,3 +1,10 @@
+## [0.24.3](https://github.com/giannoccarol/pi-desktop/compare/v0.24.2...v0.24.3) (2026-09-04)
+
+
+### Bug Fixes
+
+* **models:** rimuove fallback sintetico opencode che rompeva setModel ([f2e5fc3](https://github.com/giannoccarol/pi-desktop/commit/f2e5fc3346819ea5ea7974914c930d0c99a49c11))
+
 ## [0.24.2](https://github.com/giannoccarol/pi-desktop/compare/v0.24.1...v0.24.2) (2026-09-04)
 
 
