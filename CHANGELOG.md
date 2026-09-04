@@ -1,3 +1,10 @@
+## [0.24.2](https://github.com/giannoccarol/pi-desktop/compare/v0.24.1...v0.24.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* **mobile:** virgole mancanti nello shim, favicon 204 ([fb84072](https://github.com/giannoccarol/pi-desktop/commit/fb84072fbe44e1d9ac7e21c9129ecd086d05b7fa))
+
 ## [0.24.1](https://github.com/giannoccarol/pi-desktop/compare/v0.24.0...v0.24.1) (2026-09-04)
 
 
