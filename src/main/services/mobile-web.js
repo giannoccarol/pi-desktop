@@ -504,4 +504,4 @@ function info(settings) {
   };
 }
 
-module.exports = { start, stop, restart, info, ensureToken, broadcast };
+module.exports = { start, stop, restart, info, ensureToken, broadcast, _shimJs: shimJs };
