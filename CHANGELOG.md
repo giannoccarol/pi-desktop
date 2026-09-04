@@ -1,3 +1,10 @@
+## [0.24.1](https://github.com/giannoccarol/pi-desktop/compare/v0.24.0...v0.24.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **mobile:** asset statici pubblici, API restano protette ([c5c8465](https://github.com/giannoccarol/pi-desktop/commit/c5c8465beb2bf59b18557ebe897b38a4b93c4a4b))
+
 # [0.24.0](https://github.com/giannoccarol/pi-desktop/compare/v0.23.0...v0.24.0) (2026-09-04)
 
 
