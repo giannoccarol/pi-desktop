@@ -1,3 +1,15 @@
+# [0.24.0](https://github.com/giannoccarol/pi-desktop/compare/v0.23.0...v0.24.0) (2026-09-04)
+
+
+### Bug Fixes
+
+* **mobile:** bridge IPC funzionante + drawer solo touch ([e127ce8](https://github.com/giannoccarol/pi-desktop/commit/e127ce8641afb1a7a379044d99b4ffe5805b5732))
+
+
+### Features
+
+* **renderer:** dock todo come overlay ancorato al composer ([edfbcc0](https://github.com/giannoccarol/pi-desktop/commit/edfbcc062662c99f0cec87a7716c7f72107e6ddf))
+
 # [0.23.0](https://github.com/giannoccarol/pi-desktop/compare/v0.22.1...v0.23.0) (2026-09-03)
 
 
