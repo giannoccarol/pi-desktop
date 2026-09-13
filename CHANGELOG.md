@@ -1,3 +1,10 @@
+## [0.24.4](https://github.com/giannoccarol/pi-desktop/compare/v0.24.3...v0.24.4) (2026-09-13)
+
+
+### Bug Fixes
+
+* **renderer:** sync thinking level after model change ([b3316cc](https://github.com/giannoccarol/pi-desktop/commit/b3316cc8a89ca23816af380ca40694bac59b4e54))
+
 ## [0.24.3](https://github.com/giannoccarol/pi-desktop/compare/v0.24.2...v0.24.3) (2026-09-04)
 
 
