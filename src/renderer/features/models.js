@@ -43,6 +43,7 @@ function renderModelMenu(filter) {
         await api.setModel(m.provider, m.id);
         state.currentModel = { provider: m.provider, id: m.id };
         updateModelLabel();
+        await syncThinkingAfterModelChange();
         renderModelMenu(el.modelSearch.value);
         closeMenus();
         toast(`Modello: ${m.provider}/${m.id}`);
@@ -88,6 +89,7 @@ function renderProviderMenu() {
         await api.setModel(target.provider, target.id);
         state.currentModel = { provider: target.provider, id: target.id };
         updateModelLabel();
+        await syncThinkingAfterModelChange();
         renderProviderMenu();
         closeMenus();
         toast(`Provider: ${label} · ${target.name || target.id}`);
@@ -124,6 +126,17 @@ async function refreshHeaderFromState(forceModels = false) {
   } catch (err) {
     console.warn("[refreshHeaderFromState]", err);
   }
+}
+
+// Dopo un cambio modello il backend sceglie un nuovo thinkingLevel e una
+// nuova lista di livelli validi: vanno riletti, altrimenti la UI resta ferma
+// al livello/lista del modello precedente.
+async function syncThinkingAfterModelChange() {
+  try {
+    const st = await api.getState();
+    if (st && st.thinkingLevel) el.thinkingLabel.textContent = st.thinkingLevel;
+  } catch {}
+  await refreshThinkingLevels().catch(() => {});
 }
 
 async function refreshThinkingLevels() {
@@ -164,5 +177,5 @@ function applyTheme(th){ return window.piUi.applyTheme(th); }
 
 // loadProviderSettings / startProviderLogin / renderProviderSettings vivono in features/auth.js.
 
-window.loadModels=loadModels; window.renderModelMenu=renderModelMenu; window.renderProviderMenu=renderProviderMenu; window.updateModelLabel=updateModelLabel; window.refreshHeaderFromState=refreshHeaderFromState; window.refreshThinkingLevels=refreshThinkingLevels; window.renderThinkingMenu=renderThinkingMenu; window.piModels={loadModels,renderModelMenu,renderProviderMenu,updateModelLabel,refreshHeaderFromState,refreshThinkingLevels,renderThinkingMenu};
+window.loadModels=loadModels; window.renderModelMenu=renderModelMenu; window.renderProviderMenu=renderProviderMenu; window.updateModelLabel=updateModelLabel; window.refreshHeaderFromState=refreshHeaderFromState; window.refreshThinkingLevels=refreshThinkingLevels; window.renderThinkingMenu=renderThinkingMenu; window.syncThinkingAfterModelChange=syncThinkingAfterModelChange; window.piModels={loadModels,renderModelMenu,renderProviderMenu,updateModelLabel,refreshHeaderFromState,refreshThinkingLevels,renderThinkingMenu,syncThinkingAfterModelChange};
 })();
